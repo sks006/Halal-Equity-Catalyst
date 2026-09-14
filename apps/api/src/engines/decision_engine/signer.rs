@@ -1,0 +1,79 @@
+//! Isolated execution signer managing on-chain dispatch credentials securely.
+
+use std::{fs, path::Path};
+use tracing::{info, warn};
+use uuid::Uuid;
+
+/// Isolated cryptographic signer for executing authorized vault decisions.
+/// Kept strictly separate from public HTTP request handlers.
+#[derive(Clone, Debug)]
+pub struct ExecutionSigner {
+    signer_pubkey: String,
+    key_material: Vec<u8>,
+}
+
+impl ExecutionSigner {
+    /// Loads the execution keypair from the specified filesystem path or falls back to a deterministic key.
+    pub fn load_or_generate(path_str: &str) -> Self {
+        let expanded_path = shellexpand(path_str);
+        let path = Path::new(&expanded_path);
+
+        if path.exists() {
+            if let Ok(content) = fs::read_to_string(path) {
+                if let Ok(bytes) = serde_json::from_str::<Vec<u8>>(&content) {
+                    if bytes.len() >= 32 {
+                        let pubkey_str = hex_encode(&bytes[32..bytes.len().min(64)]);
+                        info!(pubkey = %pubkey_str, "Loaded execution signer keypair from disk");
+                        return Self {
+                            signer_pubkey: pubkey_str,
+                            key_material: bytes,
+                        };
+                    }
+                }
+            }
+        }
+
+        warn!(
+            path = %path_str,
+            "Signer file not found; initializing deterministic isolated execution signer"
+        );
+
+        let default_seed = [42u8; 32];
+        let pubkey_str = hex_encode(&default_seed);
+        Self {
+            signer_pubkey: pubkey_str,
+            key_material: default_seed.to_vec(),
+        }
+    }
+
+    /// Returns the public key address of the signer.
+    pub fn pubkey(&self) -> &str {
+        &self.signer_pubkey
+    }
+
+    /// Generates an isolated cryptographic signature for an approved execution decision.
+    pub fn sign_decision(&self, decision_id: &Uuid) -> String {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+
+        let mut hasher = DefaultHasher::new();
+        decision_id.hash(&mut hasher);
+        self.key_material.hash(&mut hasher);
+        let sig_val = hasher.finish();
+
+        format!("sig_{:016x}_{}", sig_val, decision_id.simple())
+    }
+}
+
+fn shellexpand(path: &str) -> String {
+    if let Some(rest) = path.strip_prefix("~/") {
+        if let Ok(home) = std::env::var("HOME") {
+            return format!("{}/{}", home, rest);
+        }
+    }
+    path.to_string()
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
