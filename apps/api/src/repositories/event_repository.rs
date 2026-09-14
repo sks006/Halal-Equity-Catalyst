@@ -121,4 +121,17 @@ impl EventRepository {
 
         Ok(())
     }
+
+    pub async fn list_all(&self) -> Result<Vec<EventModel>, ApiError> {
+        let client = self.pool.get().await.map_err(|e| {
+            ApiError::InternalServerError(format!("Database connection failed: {}", e))
+        })?;
+
+        let rows = client
+            .query("SELECT * FROM events ORDER BY detected_at DESC", &[])
+            .await
+            .map_err(|e| ApiError::InternalServerError(format!("Failed to list events: {}", e)))?;
+
+        Ok(rows.iter().map(EventModel::from).collect())
+    }
 }

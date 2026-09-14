@@ -34,6 +34,15 @@ pub enum ValidationError {
 
     #[error("Zero total portfolio value cannot be rebalanced")]
     ZeroPortfolioValue,
+
+    #[error("Invalid mint address: {0}")]
+    InvalidMintAddress(String),
+
+    #[error("Invalid vault name: {0}")]
+    InvalidVaultName(String),
+
+    #[error("Invalid vault symbol: {0}")]
+    InvalidVaultSymbol(String),
 }
 
 pub fn validate_bps(bps: u16) -> Result<BasisPoints, ValidationError> {
@@ -74,5 +83,47 @@ pub fn validate_risk_limits(limits: &RiskLimits) -> Result<(), ValidationError> 
     validate_bps(limits.max_ltv_bps.0)?;
     validate_bps(limits.max_position_bps.0)?;
     validate_bps(limits.max_slippage_bps.0)?;
+    Ok(())
+}
+
+/// Validates that a string is a well-formed Solana base58 mint address (length 32 to 44 characters, base58 alphabet)
+pub fn validate_mint_address(mint: &str) -> Result<(), ValidationError> {
+    let len = mint.trim().len();
+    if !(32..=44).contains(&len) {
+        return Err(ValidationError::InvalidMintAddress(format!(
+            "Address length must be between 32 and 44 characters, got {}",
+            len
+        )));
+    }
+    // Base58 characters: 1-9, A-H, J-N, P-Z, a-k, m-z (no 0, O, I, l)
+    for c in mint.chars() {
+        if !c.is_ascii_alphanumeric() || c == '0' || c == 'O' || c == 'I' || c == 'l' {
+            return Err(ValidationError::InvalidMintAddress(format!(
+                "Invalid base58 character '{}'",
+                c
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Validates vault name (1..=32 chars) and symbol (1..=12 chars)
+pub fn validate_name_and_symbol(name: &str, symbol: &str) -> Result<(), ValidationError> {
+    let name_trimmed = name.trim();
+    if name_trimmed.is_empty() || name_trimmed.len() > 32 {
+        return Err(ValidationError::InvalidVaultName(format!(
+            "Vault name length must be between 1 and 32 characters, got {}",
+            name_trimmed.len()
+        )));
+    }
+
+    let symbol_trimmed = symbol.trim();
+    if symbol_trimmed.is_empty() || symbol_trimmed.len() > 12 {
+        return Err(ValidationError::InvalidVaultSymbol(format!(
+            "Vault symbol length must be between 1 and 12 characters, got {}",
+            symbol_trimmed.len()
+        )));
+    }
+
     Ok(())
 }

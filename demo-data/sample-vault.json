@@ -1,0 +1,14 @@
+{
+  "vault_address": "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
+  "authority": "auth99X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6",
+  "name": "Solana Liquid Growth Alpha",
+  "symbol": "SLGA",
+  "deposit_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+  "vault_token_account": "vt99X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6",
+  "total_shares": 4420000000000,
+  "total_deposits": 4850000000000,
+  "is_paused": false,
+  "bump": 255,
+  "created_at": "2026-09-01T12:00:00Z",
+  "updated_at": "2026-09-14T08:00:00Z"
+}

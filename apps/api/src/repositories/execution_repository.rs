@@ -128,4 +128,17 @@ impl ExecutionRepository {
 
         Ok(())
     }
+
+    pub async fn list_all(&self) -> Result<Vec<ExecutionModel>, ApiError> {
+        let client = self.pool.get().await.map_err(|e| {
+            ApiError::InternalServerError(format!("Database connection failed: {}", e))
+        })?;
+
+        let rows = client
+            .query("SELECT * FROM executions ORDER BY executed_at DESC", &[])
+            .await
+            .map_err(|e| ApiError::InternalServerError(format!("Failed to list executions: {}", e)))?;
+
+        Ok(rows.iter().map(ExecutionModel::from).collect())
+    }
 }

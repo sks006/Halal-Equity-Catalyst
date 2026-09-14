@@ -5,7 +5,7 @@ use chrono::Utc;
 use redis::AsyncCommands;
 use std::time::Duration;
 use tokio::sync::broadcast;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     engines::decision_engine::{DecisionEngine, ExecutionRequest},
@@ -79,6 +79,12 @@ impl PolicyWorker {
         let vault_addr = event.vault_address.as_deref().ok_or_else(|| {
             ApiError::BadRequest(format!("Event {} does not have a linked vault_address", event.event_id))
         })?;
+
+        // Idempotency / Replay Guardrail: Prevent processing already-processed events
+        if event.status == "PROCESSED" {
+            warn!(event_id = %event.event_id, "Idempotency guard: Event has already been processed");
+            return Err(ApiError::BadRequest(format!("Event {} has already been processed", event.event_id)));
+        }
 
         // 1. Load Vault
         let vault = self

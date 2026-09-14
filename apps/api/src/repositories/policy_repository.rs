@@ -75,4 +75,17 @@ impl PolicyRepository {
 
         Ok(row_opt.map(|r| PolicyModel::from(&r)))
     }
+
+    pub async fn list_all(&self) -> Result<Vec<PolicyModel>, ApiError> {
+        let client = self.pool.get().await.map_err(|e| {
+            ApiError::InternalServerError(format!("Database connection failed: {}", e))
+        })?;
+
+        let rows = client
+            .query("SELECT * FROM policies ORDER BY created_at DESC", &[])
+            .await
+            .map_err(|e| ApiError::InternalServerError(format!("Failed to list policies: {}", e)))?;
+
+        Ok(rows.iter().map(PolicyModel::from).collect())
+    }
 }

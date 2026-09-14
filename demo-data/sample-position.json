@@ -1,0 +1,14 @@
+{
+  "portfolio_id": "pos-nvda-01",
+  "vault_address": "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
+  "asset_symbol": "NVDA",
+  "asset_mint": "Xnvda111111111111111111111111111111111111111",
+  "amount": 6200,
+  "entry_price_usd": 118.5,
+  "current_price_usd": 128.4,
+  "current_value_usd": 796080,
+  "target_weight_bps": 1600,
+  "current_weight_bps": 1641,
+  "last_rebalanced_at": "2026-09-12T10:00:00Z",
+  "updated_at": "2026-09-14T14:00:00Z"
+}

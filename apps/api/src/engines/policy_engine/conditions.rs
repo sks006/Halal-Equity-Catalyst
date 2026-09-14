@@ -33,8 +33,9 @@ pub fn is_drift_trigger(current_bps: u16, target_bps: u16, threshold_bps: u16) -
 
 /// Checks if an event indicates a protocol emergency halt.
 pub fn is_emergency_event(event_type: &str) -> bool {
-    matches!(
-        event_type.to_uppercase().as_str(),
-        "EMERGENCY" | "HALT" | "EXPLOIT_DETECTED" | "CIRCUIT_BREAKER"
-    )
+    let upper = event_type.to_uppercase();
+    upper.contains("EMERGENCY")
+        || upper.contains("HALT")
+        || upper.contains("EXPLOIT")
+        || upper.contains("CIRCUIT_BREAKER")
 }

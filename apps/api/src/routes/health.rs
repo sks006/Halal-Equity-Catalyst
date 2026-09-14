@@ -82,3 +82,15 @@ pub async fn ready_handler(State(state): State<Arc<AppState>>) -> impl IntoRespo
 
     (status_code, Json(response))
 }
+
+/// Handler for GET /health/detailed - Full 8-component health monitoring report
+pub async fn detailed_health_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let report = state.health_monitor().run_full_check().await;
+    let status_code = match report.overall_status {
+        crate::services::HealthStatus::Healthy => StatusCode::OK,
+        crate::services::HealthStatus::Degraded => StatusCode::OK,
+        crate::services::HealthStatus::Unhealthy => StatusCode::SERVICE_UNAVAILABLE,
+    };
+
+    (status_code, Json(report))
+}

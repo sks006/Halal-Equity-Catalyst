@@ -1,0 +1,31 @@
+{
+  "event_id": "a8b1c2d3-e4f5-4678-90ab-cdef12345678",
+  "vault_address": "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
+  "event_type": "EARNINGS_BEAT",
+  "source": "bloomberg_terminal",
+  "sentiment_score": 0.85,
+  "payload": {
+    "symbol": "NVDA",
+    "company_name": "NVIDIA Corporation",
+    "quarter": "Q2 FY2027",
+    "headline": "NVIDIA Reports Record Q2 Revenue of $30.04B, Up 122% YoY on Surging Hopper and Blackwell AI Demand",
+    "eps_actual": 0.68,
+    "eps_estimate": 0.64,
+    "eps_surprise_pct": "+6.25%",
+    "revenue_actual_usd": 30040000000,
+    "revenue_estimate_usd": 28700000000,
+    "revenue_surprise_pct": "+4.67%",
+    "data_center_revenue_usd": 26300000000,
+    "gross_margin_pct": 75.1,
+    "guidance_q3_revenue_usd": 32500000000,
+    "guidance_consensus_usd": 31700000000,
+    "key_takeaways": [
+      "Data Center compute demand accelerating worldwide across sovereign and enterprise hyperscalers",
+      "Blackwell architecture sampling with customer shipments ramping in Q4",
+      "Board authorized an additional $50.0 billion in share repurchases"
+    ]
+  },
+  "status": "PENDING",
+  "detected_at": "2026-09-14T14:30:00Z",
+  "processed_at": null
+}

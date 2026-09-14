@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{
     config::Config,
-    services::{OracleService, QuoteExecutionService, SolanaService},
+    services::{HealthMonitor, OracleService, QuoteExecutionService, SolanaService},
 };
 
 #[derive(Clone)]
@@ -75,5 +75,13 @@ impl AppState {
 
     pub fn is_ready(&self) -> bool {
         self.is_ready.load(Ordering::SeqCst)
+    }
+
+    pub fn health_monitor(&self) -> HealthMonitor {
+        HealthMonitor::new(
+            self.db_pool.clone(),
+            self.redis_client.clone(),
+            self.solana_service.clone(),
+        )
     }
 }
