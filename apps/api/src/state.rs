@@ -4,7 +4,10 @@ use chrono::{DateTime, Utc};
 use deadpool_postgres::Pool;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use crate::{config::Config, services::SolanaService};
+use crate::{
+    config::Config,
+    services::{OracleService, QuoteExecutionService, SolanaService},
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -14,6 +17,8 @@ pub struct AppState {
     pub db_pool: Pool,
     pub redis_client: Option<redis::Client>,
     pub solana_service: Option<SolanaService>,
+    pub oracle_service: Option<Arc<OracleService>>,
+    pub quote_service: Option<Arc<QuoteExecutionService>>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -44,7 +49,19 @@ impl AppState {
             db_pool,
             redis_client,
             solana_service,
+            oracle_service: None,
+            quote_service: None,
         }
+    }
+
+    pub fn with_oracle_service(mut self, oracle_service: Arc<OracleService>) -> Self {
+        self.oracle_service = Some(oracle_service);
+        self
+    }
+
+    pub fn with_quote_service(mut self, quote_service: Arc<QuoteExecutionService>) -> Self {
+        self.quote_service = Some(quote_service);
+        self
     }
 
     pub fn uptime_seconds(&self) -> u64 {

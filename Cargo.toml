@@ -5,6 +5,8 @@ members = [
     "crates/shared",
     "programs/equity_vault",
     "integrations/solana",
+    "integrations/pyth",
+    "integrations/jupiter",
 ]
 
 [profile.release]

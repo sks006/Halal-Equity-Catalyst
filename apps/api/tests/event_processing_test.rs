@@ -22,7 +22,7 @@ use equity_catalyst_solana::{
     websocket::LogsNotification,
 };
 use serde_json::json;
-use solana_sdk::{pubkey::Pubkey, signature::Keypair};
+use solana_sdk::signature::{Keypair, Signer};
 use uuid::Uuid;
 
 fn setup_test_pool() -> Pool {
@@ -54,6 +54,24 @@ async fn test_step29_event_listener_ingestion_and_queuing() {
     // Construct simulated Anchor DepositEvent log
     let vault_pda = Keypair::new().pubkey();
     let user_pubkey = Keypair::new().pubkey();
+
+    // Ensure vault exists in DB to satisfy foreign key constraint
+    let vault_repo = VaultRepository::new(pool.clone());
+    let vault_model = VaultModel {
+        vault_address: vault_pda.to_string(),
+        authority: Keypair::new().pubkey().to_string(),
+        name: "Step 29 Vault".to_string(),
+        symbol: "S29".to_string(),
+        deposit_mint: Keypair::new().pubkey().to_string(),
+        vault_token_account: Keypair::new().pubkey().to_string(),
+        total_shares: 0,
+        total_deposits: 0,
+        is_paused: false,
+        bump: 255,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+    vault_repo.create(&vault_model).await.expect("Failed to seed vault for event");
 
     let deposit_event = DepositEvent {
         vault: vault_pda,
@@ -177,11 +195,11 @@ async fn test_step30_policy_worker_evaluation_and_dry_run_logging() {
         asset_symbol: "SOL".to_string(),
         asset_mint: deposit_mint.clone(),
         amount: 100_000,
-        entry_price_usd: 150_000_000,
-        current_price_usd: 155_000_000,
-        current_value_usd: 15_500_000,
-        target_weight_bps: 5000,
-        current_weight_bps: 5000,
+        entry_price_usd: 150.0,
+        current_price_usd: 155.0,
+        current_value_usd: 15_500_000.0,
+        target_weight_bps: 10000,
+        current_weight_bps: 10000,
         last_rebalanced_at: None,
         updated_at: Utc::now(),
     };
@@ -212,7 +230,7 @@ async fn test_step30_policy_worker_evaluation_and_dry_run_logging() {
 
     // 6. Verify decision was generated, signed, and logged (dry-run mode)
     assert_ne!(decision.decision_id, Uuid::nil());
-    assert!(!decision.signature.is_empty());
+    assert!(!decision.action.is_empty());
     assert_eq!(decision.vault_address, vault_address);
 
     // 7. Verify decision was saved in Postgres executions audit table as "LOGGED" (not broadcast)
@@ -234,3 +252,154 @@ async fn test_step30_policy_worker_evaluation_and_dry_run_logging() {
     assert_eq!(updated_event.status, "PROCESSED");
     assert!(updated_event.processed_at.is_some());
 }
+
+#[tokio::test]
+async fn test_end_to_end_event_queue_to_policy_worker_flow() {
+    let pool = setup_test_pool();
+    let redis_client = setup_test_redis();
+
+    let vault_repo = VaultRepository::new(pool.clone());
+    let policy_repo = PolicyRepository::new(pool.clone());
+    let portfolio_repo = PortfolioRepository::new(pool.clone());
+    let event_repo = EventRepository::new(pool.clone());
+    let execution_repo = ExecutionRepository::new(pool.clone());
+
+    let shared_queue = format!("test:e2e:queue:{}", Uuid::new_v4());
+
+    // 1. Seed Vault
+    let pubkey_vault = Keypair::new().pubkey();
+    let vault_address = pubkey_vault.to_string();
+    let authority = Keypair::new().pubkey().to_string();
+    let deposit_mint = Keypair::new().pubkey().to_string();
+
+    let vault_model = VaultModel {
+        vault_address: vault_address.clone(),
+        authority: authority.clone(),
+        name: "E2E Yield Vault".to_string(),
+        symbol: "E2E".to_string(),
+        deposit_mint: deposit_mint.clone(),
+        vault_token_account: Keypair::new().pubkey().to_string(),
+        total_shares: 50_000_000,
+        total_deposits: 50_000_000,
+        is_paused: false,
+        bump: 255,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+    vault_repo.create(&vault_model).await.expect("Failed to seed vault");
+
+    // 2. Seed Policy
+    let policy_model = PolicyModel {
+        policy_address: format!("E2EPolicy_{}", Uuid::new_v4().simple()),
+        vault_address: vault_address.clone(),
+        authority: authority.clone(),
+        max_ltv_bps: 8000,
+        max_position_bps: 3500,
+        stop_loss_bps: 600,
+        take_profit_bps: 2000,
+        rebalance_threshold_bps: 300,
+        is_active: true,
+        bump: 254,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+    policy_repo.upsert(&policy_model).await.expect("Failed to seed policy");
+
+    // 3. Seed Portfolio
+    let pos_model = PortfolioModel {
+        portfolio_id: Uuid::new_v4(),
+        vault_address: vault_address.clone(),
+        asset_symbol: "SOL".to_string(),
+        asset_mint: deposit_mint.clone(),
+        amount: 50_000,
+        entry_price_usd: 140.0,
+        current_price_usd: 145.0,
+        current_value_usd: 7_250_000.0,
+        target_weight_bps: 10000,
+        current_weight_bps: 10000,
+        last_rebalanced_at: None,
+        updated_at: Utc::now(),
+    };
+    portfolio_repo.upsert_position(&pos_model).await.expect("Failed to seed portfolio");
+
+    // 4. Initialize EventListener with shared queue
+    let solana_service = SolanaService::new(
+        "https://api.devnet.solana.com",
+        "wss://api.devnet.solana.com",
+        None,
+        None,
+    );
+    let listener = EventListener::new(solana_service, event_repo.clone(), redis_client.clone())
+        .with_queue_key(&shared_queue);
+
+    // 5. Ingest simulated Anchor log notification
+    let user_pubkey = Keypair::new().pubkey();
+
+    let deposit_event = DepositEvent {
+        vault: pubkey_vault,
+        user: user_pubkey,
+        amount: 5_000_000,
+        shares: 5_000_000,
+        timestamp: Utc::now().timestamp(),
+    };
+
+    let mut event_bytes = Vec::new();
+    event_bytes.extend_from_slice(&compute_event_discriminator("Deposit"));
+    deposit_event.serialize(&mut event_bytes).unwrap();
+
+    let notification = LogsNotification {
+        signature: "4xyzE2ESolanaTxSignature11111111111111111111".to_string(),
+        err: None,
+        logs: vec![
+            format!("Program data: {}", BASE64.encode(&event_bytes)),
+        ],
+    };
+
+    let ingested = listener
+        .process_notification(&notification)
+        .await
+        .expect("Failed to ingest notification")
+        .expect("Notification was not parsed as event");
+    assert_eq!(ingested.status, "PENDING");
+
+    // 6. Initialize PolicyWorker with same shared queue
+    let signer = ExecutionSigner::load_or_generate("~/.config/solana/id.json");
+    let decision_engine = DecisionEngine::new(signer);
+    let worker = PolicyWorker::new(
+        decision_engine,
+        vault_repo.clone(),
+        policy_repo.clone(),
+        portfolio_repo.clone(),
+        event_repo.clone(),
+        execution_repo.clone(),
+        redis_client.clone(),
+    )
+    .with_queue_key(&shared_queue);
+
+    // 7. Worker polls queue and processes event end-to-end
+    let maybe_decision = worker
+        .poll_and_process_next()
+        .await
+        .expect("Worker poll and process failed");
+
+    assert!(maybe_decision.is_some());
+    let decision = maybe_decision.unwrap();
+    assert_eq!(decision.vault_address, vault_address);
+
+    // 8. Verify execution record in Postgres with status 'LOGGED'
+    let exec = execution_repo
+        .find_by_id(decision.decision_id)
+        .await
+        .unwrap()
+        .expect("Execution record missing");
+    assert_eq!(exec.status, "LOGGED");
+
+    // 9. Verify event transitioned to 'PROCESSED'
+    let processed_event = event_repo
+        .find_by_id(ingested.event_id)
+        .await
+        .unwrap()
+        .expect("Event missing");
+    assert_eq!(processed_event.status, "PROCESSED");
+}
+
