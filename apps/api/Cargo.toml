@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 equity-catalyst-shared = { path = "../../crates/shared" }
 equity-catalyst-solana = { path = "../../integrations/solana" }
+equity-catalyst-pyth = { path = "../../integrations/pyth" }
+equity-catalyst-jupiter = { path = "../../integrations/jupiter" }
 solana-sdk = "1.18.26"
 bincode = "1.3"
 tokio = { version = "1", features = ["full"] }
@@ -26,3 +28,5 @@ redis = { version = "0.27", features = ["tokio-comp", "aio"] }
 
 [dev-dependencies]
 http-body-util = "0.1"
+base64 = "0.21"
+borsh = "=1.5.1"

@@ -59,8 +59,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None,
     ));
 
+    // Initialize Pyth client and Oracle service
+    let pyth_client = Arc::new(equity_catalyst_pyth::PythClient::new(&config.pyth_hermes_url));
+    let portfolio_repo = equity_catalyst_api::repositories::PortfolioRepository::new(db_pool.clone());
+    let oracle_service = Arc::new(equity_catalyst_api::services::OracleService::new(
+        pyth_client,
+        Some(portfolio_repo.clone()),
+    ));
+
+    // Initialize Jupiter client and Quote Execution service
+    let jupiter_client = Arc::new(equity_catalyst_jupiter::JupiterClient::new(&config.jupiter_api_url));
+    let risk_engine = Arc::new(equity_catalyst_api::engines::risk_engine::RiskEngine::new());
+    let vault_repo = equity_catalyst_api::repositories::VaultRepository::new(db_pool.clone());
+    let policy_repo = equity_catalyst_api::repositories::PolicyRepository::new(db_pool.clone());
+    let execution_repo = equity_catalyst_api::repositories::ExecutionRepository::new(db_pool.clone());
+    let quote_service = Arc::new(equity_catalyst_api::services::QuoteExecutionService::new(
+        jupiter_client,
+        risk_engine,
+        Some(vault_repo),
+        Some(policy_repo),
+        Some(portfolio_repo),
+        Some(execution_repo),
+    ));
+
     // Initialize state & router
-    let state = Arc::new(AppState::new(config, db_pool, redis_client, solana_service));
+    let state = Arc::new(
+        AppState::new(config, db_pool, redis_client, solana_service)
+            .with_oracle_service(oracle_service)
+            .with_quote_service(quote_service),
+    );
     let app = create_router(state);
 
     // Bind TCP listener

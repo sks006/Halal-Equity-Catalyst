@@ -40,6 +40,32 @@ pub fn build_app(config: Config, pool: Pool, redis_client: Option<redis::Client>
         None,
         None,
     ));
-    let state = Arc::new(AppState::new(config, pool, redis_client, solana_service));
+
+    let pyth_client = Arc::new(equity_catalyst_pyth::PythClient::new(&config.pyth_hermes_url));
+    let portfolio_repo = repositories::PortfolioRepository::new(pool.clone());
+    let oracle_service = Arc::new(services::OracleService::new(
+        pyth_client,
+        Some(portfolio_repo.clone()),
+    ));
+
+    let jupiter_client = Arc::new(equity_catalyst_jupiter::JupiterClient::new(&config.jupiter_api_url));
+    let risk_engine = Arc::new(engines::risk_engine::RiskEngine::new());
+    let vault_repo = repositories::VaultRepository::new(pool.clone());
+    let policy_repo = repositories::PolicyRepository::new(pool.clone());
+    let execution_repo = repositories::ExecutionRepository::new(pool.clone());
+    let quote_service = Arc::new(services::QuoteExecutionService::new(
+        jupiter_client,
+        risk_engine,
+        Some(vault_repo),
+        Some(policy_repo),
+        Some(portfolio_repo),
+        Some(execution_repo),
+    ));
+
+    let state = Arc::new(
+        AppState::new(config, pool, redis_client, solana_service)
+            .with_oracle_service(oracle_service)
+            .with_quote_service(quote_service),
+    );
     create_router(state)
 }

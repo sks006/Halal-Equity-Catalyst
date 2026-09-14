@@ -1277,10 +1277,14 @@ name = "equity-catalyst-api"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64 0.21.7",
  "bincode",
+ "borsh 1.5.1",
  "chrono",
  "deadpool-postgres",
  "dotenvy",
+ "equity-catalyst-jupiter",
+ "equity-catalyst-pyth",
  "equity-catalyst-shared",
  "equity-catalyst-solana",
  "http-body-util",
@@ -1296,6 +1300,37 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "equity-catalyst-jupiter"
+version = "0.1.0"
+dependencies = [
+ "base64 0.21.7",
+ "bincode",
+ "chrono",
+ "equity-catalyst-shared",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "solana-sdk",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "equity-catalyst-pyth"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "equity-catalyst-shared",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.20",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

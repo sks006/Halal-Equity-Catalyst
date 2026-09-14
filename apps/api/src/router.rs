@@ -2,7 +2,7 @@
 
 use axum::{
     http::Uri,
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use std::sync::Arc;
@@ -13,7 +13,7 @@ use tower_http::{
 
 use crate::{
     error::ApiError,
-    routes::{health_handler, ready_handler},
+    routes::{evaluate_quote_handler, get_price_handler, health_handler, ready_handler},
     state::AppState,
 };
 
@@ -26,6 +26,8 @@ pub fn create_router(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/health", get(health_handler))
         .route("/ready", get(ready_handler))
+        .route("/oracle/price/:symbol", get(get_price_handler))
+        .route("/quotes/evaluate", post(evaluate_quote_handler))
         .fallback(fallback_handler)
         .layer(TraceLayer::new_for_http())
         .layer(cors)

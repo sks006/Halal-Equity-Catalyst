@@ -5,7 +5,7 @@ use chrono::Utc;
 use redis::AsyncCommands;
 use std::time::Duration;
 use tokio::sync::broadcast;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 use crate::{
     engines::decision_engine::{DecisionEngine, ExecutionRequest},
@@ -96,7 +96,7 @@ impl PolicyWorker {
 
         // 3. Load Portfolio positions
         let positions = self.portfolio_repo.list_by_vault(vault_addr).await?;
-        let total_value_usd: u64 = positions.iter().map(|p| p.current_value_usd).sum();
+        let total_value_usd: u64 = positions.iter().map(|p| p.current_value_usd.max(0.0) as u64).sum();
 
         // 4. Evaluate: Policy Engine -> Risk Engine -> Decision Engine
         let decision = self.decision_engine.process_event(
@@ -112,19 +112,20 @@ impl PolicyWorker {
         info!(
             event_id = %event.event_id,
             decision_id = %decision.decision_id,
-            action = ?decision.action_type,
-            orders_count = decision.orders.len(),
-            signature = %decision.signature,
+            action = %decision.action,
+            trades_count = decision.trades.len(),
+            approved = decision.approved,
+            rationale = %decision.rationale,
             "Policy Worker evaluated decision — TRADE EXECUTION SUPPRESSED (DRY-RUN MODE)"
         );
 
         // 6. Record decision in `executions` audit table with status 'LOGGED'
-        let (input_mint, output_mint, amount_in, amount_out) = if let Some(first_order) = decision.orders.first() {
+        let (input_mint, output_mint, amount_in, amount_out) = if let Some(first_trade) = decision.trades.first() {
             (
-                first_order.input_mint.clone(),
-                first_order.output_mint.clone(),
-                first_order.amount_in,
-                first_order.amount_out_expected,
+                vault.deposit_mint.clone(),
+                vault.deposit_mint.clone(),
+                first_trade.usd_value,
+                first_trade.usd_value,
             )
         } else {
             (
@@ -139,16 +140,20 @@ impl PolicyWorker {
             execution_id: decision.decision_id,
             vault_address: vault.vault_address.clone(),
             event_id: Some(event.event_id),
-            action: format!("{:?}", decision.action_type),
+            action: decision.action.clone(),
             input_mint,
             output_mint,
             amount_in,
             amount_out_expected: amount_out,
             amount_out_actual: None,
             slippage_bps: 100, // Default 1%
-            tx_signature: Some(decision.signature.clone()),
+            tx_signature: None, // Suppressed in dry-run mode
             status: "LOGGED".to_string(), // Explicitly recorded as LOGGED, not broadcast
-            error_message: None,
+            error_message: if decision.approved {
+                None
+            } else {
+                Some(decision.rationale.clone())
+            },
             executed_at: Utc::now(),
             confirmed_at: None,
         };
@@ -168,7 +173,7 @@ impl PolicyWorker {
         // 1. Try to pop from Redis FIFO queue
         if let Some(ref client) = self.redis_client {
             if let Ok(mut conn) = client.get_multiplexed_async_connection().await {
-                let maybe_json: Result<Option<String>, _> = conn.lpop(&self.queue_key).await;
+                let maybe_json: Result<Option<String>, _> = conn.lpop(&self.queue_key, None).await;
                 if let Ok(Some(json_str)) = maybe_json {
                     if let Ok(event) = serde_json::from_str::<EventModel>(&json_str) {
                         debug!(event_id = %event.event_id, "Popped event from Redis queue");
