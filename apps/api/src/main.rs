@@ -51,8 +51,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    // Initialize Solana service (read-only by default)
+    let solana_service = Some(equity_catalyst_api::services::SolanaService::new(
+        &config.solana_rpc_url,
+        &config.solana_ws_url,
+        None,
+        None,
+    ));
+
     // Initialize state & router
-    let state = Arc::new(AppState::new(config, db_pool, redis_client));
+    let state = Arc::new(AppState::new(config, db_pool, redis_client, solana_service));
     let app = create_router(state);
 
     // Bind TCP listener

@@ -9,6 +9,7 @@ pub mod router;
 pub mod routes;
 pub mod services;
 pub mod state;
+pub mod workers;
 
 pub use config::Config;
 pub use error::ApiError;
@@ -33,6 +34,12 @@ pub fn create_db_pool(database_url: &str) -> Result<Pool, Box<dyn std::error::Er
 
 /// Builds the API router with the provided state.
 pub fn build_app(config: Config, pool: Pool, redis_client: Option<redis::Client>) -> Router {
-    let state = Arc::new(AppState::new(config, pool, redis_client));
+    let solana_service = Some(services::SolanaService::new(
+        &config.solana_rpc_url,
+        &config.solana_ws_url,
+        None,
+        None,
+    ));
+    let state = Arc::new(AppState::new(config, pool, redis_client, solana_service));
     create_router(state)
 }
