@@ -1,5 +1,6 @@
 //! Isolated execution signer managing on-chain dispatch credentials securely.
 
+use solana_sdk::signature::SeedDerivable;
 use std::{fs, path::Path};
 use tracing::{info, warn};
 use uuid::Uuid;
@@ -62,6 +63,19 @@ impl ExecutionSigner {
         let sig_val = hasher.finish();
 
         format!("sig_{:016x}_{}", sig_val, decision_id.simple())
+    }
+
+    /// Derives or extracts a Solana SDK Keypair from the loaded key material.
+    pub fn to_solana_keypair(&self) -> Result<solana_sdk::signature::Keypair, String> {
+        if self.key_material.len() >= 64 {
+            solana_sdk::signature::Keypair::from_bytes(&self.key_material[..64])
+                .map_err(|e| e.to_string())
+        } else if self.key_material.len() >= 32 {
+            solana_sdk::signature::Keypair::from_seed(&self.key_material[..32])
+                .map_err(|e| e.to_string())
+        } else {
+            Err("Insufficient key material length".to_string())
+        }
     }
 }
 

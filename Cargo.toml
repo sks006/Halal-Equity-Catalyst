@@ -4,6 +4,7 @@ members = [
     "apps/api",
     "crates/shared",
     "programs/equity_vault",
+    "integrations/solana",
 ]
 
 [profile.release]
