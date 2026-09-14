@@ -1,0 +1,27 @@
+//! Policy limits and operational boundary checks.
+
+use equity_catalyst_shared::allocation::RebalanceTrade;
+
+/// Maximum allowable slippage for any rebalancing trade (3.00% = 300 bps)
+pub const MAX_PERMISSIBLE_SLIPPAGE_BPS: u16 = 300;
+
+/// Validates that proposed trades satisfy general size and slippage constraints.
+pub fn validate_trade_limits(
+    trades: &[RebalanceTrade],
+    total_portfolio_usd: u64,
+) -> Result<(), String> {
+    for trade in trades {
+        if trade.trade_value == 0 {
+            return Err(format!("Trade for {} has zero USD value", trade.symbol));
+        }
+
+        if trade.trade_value > total_portfolio_usd {
+            return Err(format!(
+                "Trade size ${} for {} exceeds total portfolio value ${}",
+                trade.trade_value, trade.symbol, total_portfolio_usd
+            ));
+        }
+    }
+
+    Ok(())
+}

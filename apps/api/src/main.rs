@@ -1,9 +1,11 @@
 //! Main executable entrypoint for Equity Catalyst API.
 
-use equity_catalyst_api::{config::Config, router::create_router, state::AppState};
+use equity_catalyst_api::{
+    config::Config, create_db_pool, router::create_router, state::AppState,
+};
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tracing::info;
+use tracing::{error, info, warn};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,8 +27,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Initializing Equity Catalyst API server"
     );
 
+    // Initialize PostgreSQL connection pool
+    let db_pool = match create_db_pool(&config.database_url) {
+        Ok(pool) => {
+            info!("PostgreSQL connection pool initialized successfully");
+            pool
+        }
+        Err(err) => {
+            error!(error = %err, "Failed to initialize PostgreSQL pool");
+            return Err(err);
+        }
+    };
+
+    // Initialize Redis client
+    let redis_client = match redis::Client::open(config.redis_url.as_str()) {
+        Ok(client) => {
+            info!(redis_url = %config.redis_url, "Redis client configured");
+            Some(client)
+        }
+        Err(err) => {
+            warn!(error = %err, "Redis client could not be configured");
+            None
+        }
+    };
+
     // Initialize state & router
-    let state = Arc::new(AppState::new(config));
+    let state = Arc::new(AppState::new(config, db_pool, redis_client));
     let app = create_router(state);
 
     // Bind TCP listener

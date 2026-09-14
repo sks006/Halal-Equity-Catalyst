@@ -2,13 +2,20 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use equity_catalyst_api::{build_app, config::Config};
+use equity_catalyst_api::{build_app, config::Config, create_db_pool};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
+fn setup_test_app() -> axum::Router {
+    let config = Config::from_env();
+    let pool = create_db_pool(&config.database_url).expect("Failed to create test db pool");
+    let redis_client = redis::Client::open(config.redis_url.as_str()).ok();
+    build_app(config, pool, redis_client)
+}
+
 #[tokio::test]
 async fn test_health_endpoint() {
-    let app = build_app(Config::default());
+    let app = setup_test_app();
 
     let response = app
         .oneshot(
@@ -33,7 +40,7 @@ async fn test_health_endpoint() {
 
 #[tokio::test]
 async fn test_ready_endpoint() {
-    let app = build_app(Config::default());
+    let app = setup_test_app();
 
     let response = app
         .oneshot(
@@ -51,11 +58,13 @@ async fn test_ready_endpoint() {
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
 
     assert_eq!(json["ready"], true);
+    assert_eq!(json["database"], "healthy");
+    assert_eq!(json["redis"], "healthy");
 }
 
 #[tokio::test]
 async fn test_not_found_fallback() {
-    let app = build_app(Config::default());
+    let app = setup_test_app();
 
     let response = app
         .oneshot(
