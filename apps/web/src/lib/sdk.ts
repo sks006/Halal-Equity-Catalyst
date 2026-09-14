@@ -22,45 +22,57 @@ export const DEMO_VAULTS: VaultModel[] = [
     authority: "auth99X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6",
     name: "Solana Liquid Growth Alpha",
     symbol: "SLGA",
-    asset_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+    deposit_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", // USDC
+    vault_token_account: "vt99X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6",
     total_deposits: 4850000000000, // 4,850,000 USDC
     total_shares: 4420000000000,
     is_paused: false,
+    bump: 255,
     created_at: "2026-09-01T12:00:00Z",
+    updated_at: "2026-09-14T08:00:00Z",
   },
   {
     vault_address: "JUP99X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6",
     authority: "auth4J2b8j9Q1M6z9Y7w9X8c1V2b3N4EQTYv7cK89Wq3",
     name: "Jupiter Delta Neutral Yield",
     symbol: "JDNY",
-    asset_mint: "So11111111111111111111111111111111111111112", // WSOL
+    deposit_mint: "So11111111111111111111111111111111111111112", // WSOL
+    vault_token_account: "vt4J2b8j9Q1M6z9Y7w9X8c1V2b3N4EQTYv7cK89Wq3",
     total_deposits: 1250000000000, // 1,250,000 USDC
     total_shares: 1190000000000,
     is_paused: false,
+    bump: 254,
     created_at: "2026-09-05T08:30:00Z",
+    updated_at: "2026-09-14T08:00:00Z",
   },
   {
     vault_address: "PYTH89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4EQTY",
     authority: "auth9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4EQTYv7cK89Wq",
     name: "Autonomous Pyth Momentum",
     symbol: "APM",
-    asset_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    deposit_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    vault_token_account: "vt9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4EQTYv7cK89Wq",
     total_deposits: 890000000000, // 890,000 USDC
     total_shares: 820000000000,
     is_paused: false,
+    bump: 255,
     created_at: "2026-09-10T15:45:00Z",
+    updated_at: "2026-09-14T08:00:00Z",
   },
 ];
 
 export const DEMO_POLICY: PolicyModel = {
-  policy_id: "pol-001",
+  policy_address: "pol-001-EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
   vault_address: "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
+  authority: "auth99X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6",
   max_ltv_bps: 6500, // 65%
   max_position_bps: 2500, // 25%
   stop_loss_bps: 800, // 8%
   take_profit_bps: 2000, // 20%
   rebalance_threshold_bps: 150, // 1.5%
   is_active: true,
+  bump: 255,
+  created_at: "2026-09-10T10:00:00Z",
   updated_at: "2026-09-12T10:00:00Z",
 };
 

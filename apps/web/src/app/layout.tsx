@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "../components/Navbar";
 import { WalletProvider } from "../components/WalletProvider";
+import { StoreProvider } from "../components/StoreProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,14 +20,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
-      <body className={`${inter.className} min-h-screen flex flex-col bg-background text-slate-100 selection:bg-emerald-500/30 selection:text-emerald-200`}>
-        <WalletProvider>
-          <div className="fixed inset-0 radial-glow pointer-events-none z-0" />
-          <div className="fixed inset-0 radial-glow-cyan pointer-events-none z-0" />
-          <Navbar />
-          <main className="flex-1 relative z-10">{children}</main>
-        </WalletProvider>
+    <html lang="en">
+      <body className={`${inter.className} min-h-screen flex flex-col bg-white text-slate-900 selection:bg-emerald-100 selection:text-emerald-900`}>
+        <StoreProvider>
+          <WalletProvider>
+            <Navbar />
+            <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+              {children}
+            </main>
+          </WalletProvider>
+        </StoreProvider>
       </body>
     </html>
   );
