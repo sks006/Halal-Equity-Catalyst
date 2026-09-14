@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+    "apps/api",
+    "crates/shared",
+    "programs/equity_vault",
+]
+
+[profile.release]
+overflow-checks = true
+

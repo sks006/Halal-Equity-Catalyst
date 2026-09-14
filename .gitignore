@@ -1,0 +1,11 @@
+node_modules/
+.next/
+dist/
+target/
+.anchor/
+.env
+.env.local
+coverage/
+.DS_Store
+*.log
+test-ledger/
