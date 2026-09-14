@@ -4,6 +4,19 @@ import React from "react";
 import { ArrowDownRight, ArrowUpRight, RefreshCw } from "lucide-react";
 import { PortfolioModel } from "@equity-catalyst/sdk";
 
+import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table";
+import { Button } from "../../components/ui/button";
+import { Badge } from "../../components/ui/badge";
+import { Progress } from "../../components/ui/progress";
+
 interface Props {
   positions: PortfolioModel[];
   onRefresh?: () => void;
@@ -13,47 +26,51 @@ interface Props {
 export function PositionTable({ positions, onRefresh, isRefreshing }: Props) {
   if (!positions || positions.length === 0) {
     return (
-      <div className="glass-panel rounded-xl p-8 text-center">
-        <p className="text-sm text-slate-400">No active portfolio positions found for this vault.</p>
-      </div>
+      <Card className="bg-white p-8 text-center">
+        <p className="text-sm text-slate-500">No active portfolio positions found for this vault.</p>
+      </Card>
     );
   }
 
   return (
-    <div className="glass-panel rounded-xl overflow-hidden border border-slate-800">
+    <Card className="bg-white overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+      <CardHeader className="px-6 py-4 border-b border-slate-100 flex flex-row items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold text-slate-200">Portfolio Allocations & Live Oracle Valuations</h3>
-          <p className="text-xs text-slate-400 mt-0.5">Asset weights benchmarked against Pyth real-time price feeds</p>
+          <CardTitle className="text-sm font-bold text-slate-900">
+            Portfolio Allocations & Live Oracle Valuations
+          </CardTitle>
+          <p className="text-xs text-slate-500 mt-0.5">Asset weights benchmarked against Pyth real-time price feeds</p>
         </div>
 
         {onRefresh && (
-          <button
+          <Button
+            variant="outline"
+            size="sm"
             onClick={onRefresh}
             disabled={isRefreshing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-xs font-medium text-slate-200 transition-colors"
+            className="flex items-center gap-1.5 text-xs font-medium"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-emerald-400" : ""}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-emerald-600" : ""}`} />
             <span>{isRefreshing ? "Updating..." : "Sync Pyth Prices"}</span>
-          </button>
+          </Button>
         )}
-      </div>
+      </CardHeader>
 
       {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-950/60 text-slate-400 uppercase font-mono tracking-wider border-b border-slate-800/60">
-            <tr>
-              <th className="px-5 py-3">Asset</th>
-              <th className="px-5 py-3">Amount</th>
-              <th className="px-5 py-3">Entry Price</th>
-              <th className="px-5 py-3">Current Price</th>
-              <th className="px-5 py-3">Total Value</th>
-              <th className="px-5 py-3">Current vs Target Weight</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-800/60 font-medium">
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="px-6 py-3 font-semibold text-slate-700">Asset</TableHead>
+              <TableHead className="px-6 py-3 font-semibold text-slate-700">Amount</TableHead>
+              <TableHead className="px-6 py-3 font-semibold text-slate-700">Entry Price</TableHead>
+              <TableHead className="px-6 py-3 font-semibold text-slate-700">Current Price</TableHead>
+              <TableHead className="px-6 py-3 font-semibold text-slate-700">Total Value</TableHead>
+              <TableHead className="px-6 py-3 font-semibold text-slate-700">Target vs Actual Weight</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
             {positions.map((pos) => {
               const pnlPercent =
                 pos.entry_price_usd > 0
@@ -66,80 +83,76 @@ export function PositionTable({ positions, onRefresh, isRefreshing }: Props) {
               const driftBps = pos.current_weight_bps - pos.target_weight_bps;
 
               return (
-                <tr key={pos.portfolio_id} className="hover:bg-slate-800/30 transition-colors">
+                <TableRow key={pos.portfolio_id} className="hover:bg-slate-50/70">
                   {/* Asset */}
-                  <td className="px-5 py-3.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-[11px] font-bold text-emerald-400">
+                  <TableCell className="px-6 py-3.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-xs font-bold font-mono text-emerald-700">
                         {pos.asset_symbol.slice(0, 3)}
                       </div>
                       <div>
-                        <div className="font-bold text-slate-200">{pos.asset_symbol}</div>
-                        <div className="text-[10px] font-mono text-slate-500 truncate max-w-[100px]">
+                        <div className="font-bold text-slate-900">{pos.asset_symbol}</div>
+                        <div className="text-[10px] font-mono text-slate-400 truncate max-w-[120px]">
                           {pos.asset_mint}
                         </div>
                       </div>
                     </div>
-                  </td>
+                  </TableCell>
 
                   {/* Amount */}
-                  <td className="px-5 py-3.5 font-mono text-slate-300">
+                  <TableCell className="px-6 py-3.5 font-mono text-slate-700">
                     {pos.amount.toLocaleString()}
-                  </td>
+                  </TableCell>
 
                   {/* Entry Price */}
-                  <td className="px-5 py-3.5 font-mono text-slate-400">
+                  <TableCell className="px-6 py-3.5 font-mono text-slate-500">
                     ${pos.entry_price_usd.toFixed(2)}
-                  </td>
+                  </TableCell>
 
                   {/* Current Price & PnL */}
-                  <td className="px-5 py-3.5 font-mono">
-                    <div className="text-slate-200">${pos.current_price_usd.toFixed(2)}</div>
+                  <TableCell className="px-6 py-3.5 font-mono">
+                    <div className="text-slate-900 font-semibold">${pos.current_price_usd.toFixed(2)}</div>
                     <div
-                      className={`inline-flex items-center gap-0.5 text-[10px] font-semibold ${
-                        isProfitable ? "text-emerald-400" : "text-rose-400"
+                      className={`inline-flex items-center gap-0.5 text-[11px] font-semibold ${
+                        isProfitable ? "text-emerald-600" : "text-rose-600"
                       }`}
                     >
                       {isProfitable ? (
-                        <ArrowUpRight className="w-2.5 h-2.5" />
+                        <ArrowUpRight className="w-3 h-3" />
                       ) : (
-                        <ArrowDownRight className="w-2.5 h-2.5" />
+                        <ArrowDownRight className="w-3 h-3" />
                       )}
                       <span>{Math.abs(pnlPercent).toFixed(2)}%</span>
                     </div>
-                  </td>
+                  </TableCell>
 
                   {/* Total Value */}
-                  <td className="px-5 py-3.5 font-mono text-slate-200 font-bold">
+                  <TableCell className="px-6 py-3.5 font-mono text-slate-900 font-bold">
                     ${pos.current_value_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </td>
+                  </TableCell>
 
                   {/* Weight Progress */}
-                  <td className="px-5 py-3.5">
-                    <div className="space-y-1 w-36">
+                  <TableCell className="px-6 py-3.5">
+                    <div className="space-y-1.5 w-40">
                       <div className="flex justify-between text-[11px] font-mono">
-                        <span className="text-slate-200 font-bold">{currentWeightPct}%</span>
-                        <span className="text-slate-400">Target: {targetWeightPct}%</span>
+                        <span className="text-slate-900 font-bold">{currentWeightPct}%</span>
+                        <span className="text-slate-500">Target: {targetWeightPct}%</span>
                       </div>
-                      <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden relative">
-                        <div
-                          className={`h-full rounded-full transition-all duration-300 ${
-                            Math.abs(driftBps) > 200 ? "bg-amber-400" : "bg-emerald-400"
-                          }`}
-                          style={{ width: `${Math.min(pos.current_weight_bps / 100, 100)}%` }}
-                        />
-                      </div>
+                      <Progress
+                        value={Math.min(pos.current_weight_bps / 100, 100)}
+                        indicatorClassName={Math.abs(driftBps) > 200 ? "bg-amber-500" : "bg-emerald-600"}
+                      />
                       <div className="text-[10px] font-mono text-slate-500 text-right">
                         Drift: {driftBps > 0 ? `+${driftBps}` : driftBps} bps
                       </div>
                     </div>
-                  </td>
-                </tr>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }

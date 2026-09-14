@@ -43,7 +43,10 @@ export function useSolana() {
     rpcUrl: connection.rpcEndpoint,
     balanceLamports,
     balanceSol,
+    balanceFormatted: balanceSol,
+    isDevnet: true,
     isLoading,
     refreshBalance,
+    refresh: refreshBalance,
   };
 }
