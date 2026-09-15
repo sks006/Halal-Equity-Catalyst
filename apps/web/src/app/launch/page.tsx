@@ -103,6 +103,12 @@ export default function LaunchpadPage() {
         </div>
 
         <div className="flex items-center gap-3">
+          <Link href="/launch/simulate">
+            <Button variant="outline" className="border-slate-300 hover:bg-slate-50 text-slate-700 gap-2 shadow-sm">
+              <BarChart3 className="w-4 h-4 text-purple-600" />
+              Simulate Configurations
+            </Button>
+          </Link>
           <Link href="/launch/new">
             <Button className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2 shadow-sm">
               <Plus className="w-4 h-4" />

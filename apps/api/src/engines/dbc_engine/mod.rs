@@ -2,13 +2,19 @@ pub mod config;
 pub mod curve;
 pub mod graduation;
 pub mod pricing;
+pub mod simulator;
 pub mod validation;
 
 pub use config::{
     CurveSegmentConfig, DbcConfigRequest, DbcConfigResponse, FeeStructureConfig,
     GraduationTargetConfig,
 };
+pub use simulator::{
+    ComparisonSimulationRequest, ComparisonSimulationResponse, DbcSimulationInput,
+    DbcSimulationResult, DbcSimulator, SimulationPricePoint, SimulationSegment,
+};
 pub use validation::DbcValidationError;
+
 
 /// Meteora DBC Program ID on Devnet and Mainnet.
 pub const METEORA_DBC_PROGRAM_ID: &str = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN";

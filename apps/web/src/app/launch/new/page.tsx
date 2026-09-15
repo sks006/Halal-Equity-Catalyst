@@ -14,7 +14,9 @@ import {
   Sparkles,
   TrendingUp,
   Zap,
+  Sliders,
 } from "lucide-react";
+
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../../components/ui/card";
@@ -199,22 +201,31 @@ export default function NewLaunchPage() {
       </div>
 
       {/* Header Banner */}
-      <div className="border-b border-slate-200 pb-6">
-        <div className="flex items-center gap-2 mb-2">
-          <Badge variant="emerald" className="font-mono text-xs">
-            Phase 3 — DBC Configurator
-          </Badge>
-          <Badge variant="outline" className="font-mono text-xs">
-            Meteora Program: dbcij3...aqN
-          </Badge>
+      <div className="border-b border-slate-200 pb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Badge variant="emerald" className="font-mono text-xs">
+              Phase 3 & 4 — DBC Configurator & Simulator
+            </Badge>
+            <Badge variant="outline" className="font-mono text-xs">
+              Meteora Program: dbcij3...aqN
+            </Badge>
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
+            DBC Equity Discovery Configurator
+          </h1>
+          <p className="text-sm text-slate-600 mt-1">
+            Configure an institutional-grade bonding curve designed around tokenized stock behavior.
+            The backend validates parameters and generates production-ready Meteora DBC instructions.
+          </p>
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-slate-900">
-          DBC Equity Discovery Configurator
-        </h1>
-        <p className="text-sm text-slate-600 mt-1">
-          Configure an institutional-grade bonding curve designed around tokenized stock behavior.
-          The backend validates parameters and generates production-ready Meteora DBC instructions.
-        </p>
+
+        <Link href="/launch/simulate">
+          <Button variant="outline" className="text-xs font-semibold gap-2 border-emerald-300 bg-emerald-50/50 hover:bg-emerald-100/60 text-emerald-800 shrink-0 shadow-sm">
+            <Sliders className="w-3.5 h-3.5 text-emerald-600" />
+            Config A vs B vs Default Simulator
+          </Button>
+        </Link>
       </div>
 
       {/* Grid: Left Column Form, Right Column Preview */}
