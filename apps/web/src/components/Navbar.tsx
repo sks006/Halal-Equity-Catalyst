@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Layers, PlusCircle, Sparkles, Zap } from "lucide-react";
+import { Activity, Layers, PlusCircle, Rocket, Sparkles, Zap } from "lucide-react";
 
 import { WalletButton } from "./WalletButton";
 import { Badge } from "./ui/badge";
@@ -12,6 +12,7 @@ export function Navbar() {
 
   const navItems = [
     { label: "Dashboard", href: "/dashboard", icon: Layers },
+    { label: "DBC Launchpad", href: "/launch", icon: Rocket },
     { label: "Demo Pipeline", href: "/demo", icon: Sparkles },
     { label: "New Vault", href: "/vault/new", icon: PlusCircle },
   ];

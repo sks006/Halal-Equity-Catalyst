@@ -17,6 +17,10 @@ const badgeVariants = cva(
         outline: "text-slate-950 border-slate-200",
         success:
           "border-emerald-200 bg-emerald-50 text-emerald-700 font-medium",
+        emerald:
+          "border-emerald-200 bg-emerald-50 text-emerald-700 font-medium",
+        purple:
+          "border-purple-200 bg-purple-50 text-purple-700 font-medium",
         warning:
           "border-amber-200 bg-amber-50 text-amber-700 font-medium",
         cyan:
@@ -24,6 +28,7 @@ const badgeVariants = cva(
         rose:
           "border-rose-200 bg-rose-50 text-rose-700 font-medium",
       },
+
     },
     defaultVariants: {
       variant: "default",

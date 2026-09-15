@@ -3,3 +3,6 @@ allowBuilds:
   bufferutil: true
   utf-8-validate: true
 
+overrides:
+  uuid: 9.0.1
+
