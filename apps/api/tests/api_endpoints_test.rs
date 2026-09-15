@@ -404,3 +404,46 @@ async fn test_api_get_executions() {
     assert_eq!(json.as_array().unwrap().len(), 1);
     assert_eq!(json[0]["action"], "BUY");
 }
+
+#[tokio::test]
+async fn test_api_post_dbc_configure() {
+    let (app, _) = setup_test_app();
+
+    let request_payload = json!({
+        "asset": "TOKENIZED_STOCK",
+        "quote_token": "USDC",
+        "initial_price": 100.0,
+        "curve_profile": "equity_discovery",
+        "graduation_threshold": 750.0
+    });
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/dbc/configure")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(serde_json::to_vec(&request_payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .expect("Failed to execute POST /dbc/configure");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = response.into_body().collect().await.unwrap().to_bytes();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(json["asset"], "TOKENIZED_STOCK");
+    assert_eq!(json["quote_token"], "USDC");
+    assert_eq!(json["initial_price"], 100.0);
+    assert_eq!(json["program_id"], "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN");
+    assert_eq!(json["graduation"]["migration_option"], "MET_DAMM_V2");
+    assert_eq!(json["graduation"]["migration_quote_threshold"], 750.0);
+
+    let segments = json["segments"].as_array().expect("Segments must be an array");
+    assert_eq!(segments.len(), 3);
+    assert_eq!(segments[0]["liquidity_weight"], 1);
+    assert_eq!(segments[1]["liquidity_weight"], 4);
+    assert_eq!(segments[2]["liquidity_weight"], 8);
+}
+

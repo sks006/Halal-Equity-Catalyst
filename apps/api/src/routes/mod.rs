@@ -7,6 +7,7 @@ pub mod oracle;
 pub mod policies;
 pub mod quotes;
 pub mod vaults;
+pub mod dbc;
 
 pub use events::*;
 pub use executions::*;
@@ -15,4 +16,6 @@ pub use oracle::*;
 pub use policies::*;
 pub use quotes::*;
 pub use vaults::*;
+pub use dbc::*;
+
 

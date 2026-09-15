@@ -6,3 +6,5 @@ export * from "./execution";
 export * from "./portfolio";
 export * from "./credit";
 export * from "./client";
+export * as meteora from "./meteora";
+export * from "./meteora";

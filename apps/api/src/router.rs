@@ -14,11 +14,12 @@ use tower_http::{
 use crate::{
     error::ApiError,
     routes::{
-        create_event_handler, create_or_update_policy_handler, create_vault_handler,
-        detailed_health_handler, evaluate_quote_handler, get_policy_handler, get_price_handler,
-        get_vault_handler, health_handler, list_events_handler, list_executions_handler,
-        list_pending_events_handler, list_policies_handler, list_vault_events_handler,
-        list_vault_executions_handler, list_vaults_handler, ready_handler,
+        compare_dbc_handler, configure_dbc_handler, create_event_handler, create_or_update_policy_handler,
+        create_vault_handler, detailed_health_handler, evaluate_quote_handler, get_policy_handler,
+        get_price_handler, get_vault_handler, health_handler, list_events_handler,
+        list_executions_handler, list_pending_events_handler, list_policies_handler,
+        list_vault_events_handler, list_vault_executions_handler, list_vaults_handler, ready_handler,
+        simulate_dbc_handler,
     },
     state::AppState,
 };
@@ -36,6 +37,9 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/ready", get(ready_handler))
         .route("/oracle/price/:symbol", get(get_price_handler))
         .route("/quotes/evaluate", post(evaluate_quote_handler))
+        .route("/dbc/configure", post(configure_dbc_handler))
+        .route("/dbc/simulate", post(simulate_dbc_handler))
+        .route("/dbc/simulate/compare", post(compare_dbc_handler))
         .route("/vaults", get(list_vaults_handler).post(create_vault_handler))
         .route("/vaults/:address", get(get_vault_handler))
         .route("/vaults/:address/policy", get(get_policy_handler).put(create_or_update_policy_handler))
