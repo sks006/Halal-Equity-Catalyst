@@ -57,3 +57,88 @@ pub fn evaluate_event_signal(
         }
     }
 }
+
+pub fn is_bullish_event(event_type: &str) -> bool {
+    matches!(event_type, "earnings_beat" | "product_launch" | "guidance_raised")
+}
+
+pub fn is_bearish_event(event_type: &str) -> bool {
+    matches!(event_type, "earnings_miss" | "regulatory_action" | "guidance_lowered")
+}
+
+pub fn is_emergency_event(event_type: &str) -> bool {
+    matches!(event_type, "circuit_breaker" | "exploit_detected" | "extreme_volatility")
+}
+
+/// Shifts target allocation weights based on policy evaluation
+pub fn evaluate_policy_event(
+    target: &AllocationTarget,
+    event_type: &str,
+    symbol: &str,
+    sentiment_score: f32,
+    policy: &PolicyDefinition,
+) -> Result<AllocationTarget, crate::validation::ValidationError> {
+    use crate::types::AssetWeight;
+    use crate::constants::MAX_BPS;
+
+    let signal = evaluate_event_signal(event_type, sentiment_score, policy)
+        .unwrap_or(SignalType::Neutral);
+
+    match signal {
+        SignalType::EmergencyExit => {
+            AllocationTarget::new(vec![AssetWeight {
+                symbol: "USDC".to_string(),
+                target_weight: BasisPoints(MAX_BPS),
+            }])
+        }
+        SignalType::Bullish => {
+            let mut weights = target.weights.clone();
+            let delta = 500; // 5.00%
+            let mut sym_idx = None;
+            let mut usdc_idx = None;
+
+            for (i, w) in weights.iter().enumerate() {
+                if w.symbol == symbol {
+                    sym_idx = Some(i);
+                }
+                if w.symbol == "USDC" {
+                    usdc_idx = Some(i);
+                }
+            }
+
+            if let (Some(s_i), Some(u_i)) = (sym_idx, usdc_idx) {
+                let new_sym = (weights[s_i].target_weight.0 + delta).min(MAX_BPS);
+                let new_usdc = weights[u_i].target_weight.0.saturating_sub(delta);
+                weights[s_i].target_weight = BasisPoints(new_sym);
+                weights[u_i].target_weight = BasisPoints(new_usdc);
+            }
+
+            AllocationTarget::new(weights)
+        }
+        SignalType::Bearish => {
+            let mut weights = target.weights.clone();
+            let delta = 500;
+            let mut sym_idx = None;
+            let mut usdc_idx = None;
+
+            for (i, w) in weights.iter().enumerate() {
+                if w.symbol == symbol {
+                    sym_idx = Some(i);
+                }
+                if w.symbol == "USDC" {
+                    usdc_idx = Some(i);
+                }
+            }
+
+            if let (Some(s_i), Some(u_i)) = (sym_idx, usdc_idx) {
+                let new_sym = weights[s_i].target_weight.0.saturating_sub(delta);
+                let new_usdc = (weights[u_i].target_weight.0 + delta).min(MAX_BPS);
+                weights[s_i].target_weight = BasisPoints(new_sym);
+                weights[u_i].target_weight = BasisPoints(new_usdc);
+            }
+
+            AllocationTarget::new(weights)
+        }
+        _ => Ok(target.clone()),
+    }
+}

@@ -242,6 +242,31 @@ impl SolanaRpcClient {
         Signature::from_str(sig_str).map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))
     }
 
+    #[instrument(skip(self, tx_bytes))]
+    pub async fn simulate_transaction(&self, tx_bytes: &[u8]) -> Result<Value, crate::SolanaError> {
+        let encoded = BASE64.encode(tx_bytes);
+        let params = json!([
+            encoded,
+            {
+                "encoding": "base64",
+                "commitment": self.commitment,
+                "sigVerify": false,
+            }
+        ]);
+
+        let result = self.send_rpc_request("simulateTransaction", params).await?;
+        let val = result.get("value").unwrap_or(&result);
+
+        if let Some(err) = val.get("err").filter(|e| !e.is_null()) {
+            return Err(crate::SolanaError::RpcError {
+                code: -1,
+                message: format!("Transaction simulation failed: {}", err),
+            });
+        }
+
+        Ok(val.clone())
+    }
+
     #[instrument(skip(self), fields(sig = %sig))]
     pub async fn get_signature_status(&self, sig: &Signature) -> Result<Option<SignatureStatus>, crate::SolanaError> {
         let params = json!([

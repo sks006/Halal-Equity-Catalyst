@@ -18,6 +18,20 @@ export function getSdkClient(): EquityCatalystClient {
 // Fallback demo fixtures for seamless presentation when local devnet/API has no seeded vaults
 export const DEMO_VAULTS: VaultModel[] = [
   {
+    vault_address: "FKsxhTr6QYPc6RQFBR9XL8CsXPBhxKwEdurFwwg7zR6V",
+    authority: "Dtur175PvRNiR1HESsZwUi3NcS8j2GdY3WrwfQ4m5TYL",
+    name: "Catalyst Alpha",
+    symbol: "CAT-A",
+    deposit_mint: "G5w1yze7iVEUtkeCiAAiohD7VwUepdQRbTy5S3p2RuVZ",
+    vault_token_account: "Gp5Hmf6zzBhrgJWHivDWcE6eaK36eayCvjHRb8keGeBA",
+    total_deposits: 2500000,
+    total_shares: 2500000,
+    is_paused: false,
+    bump: 253,
+    created_at: "2026-09-14T10:11:38Z",
+    updated_at: "2026-09-14T10:11:38Z",
+  },
+  {
     vault_address: "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
     authority: "auth99X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6",
     name: "Solana Liquid Growth Alpha",

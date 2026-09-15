@@ -27,6 +27,8 @@ import { TransactionStatus } from "../../../components/TransactionStatus";
 import { RiskMeter } from "../../../features/vault/RiskMeter";
 import { PositionTable } from "../../../features/portfolio/PositionTable";
 import { PolicyBuilder } from "../../../features/policy/PolicyBuilder";
+import { EventFeed } from "../../../features/events/EventFeed";
+import { DecisionTimeline } from "../../../features/events/DecisionTimeline";
 import { DEMO_VAULTS, getSdkClient } from "../../../lib/sdk";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
@@ -561,6 +563,32 @@ export default function VaultDetailPage() {
         vaultAddress={vault.vault_address}
         initialPolicy={policy}
       />
+
+      {/* Autonomous Event Feed & Backend Decision Pipeline */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
+              <span>Autonomous Decision & Execution Pipeline</span>
+              <Badge variant="cyan" className="font-mono text-[10px]">
+                Live Stream
+              </Badge>
+            </h2>
+            <p className="text-xs text-slate-500">
+              Audit log of market events, policy rule matching, multi-factor risk validation, and Anchor CPI settlement
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-5">
+            <EventFeed />
+          </div>
+          <div className="lg:col-span-7">
+            <DecisionTimeline />
+          </div>
+        </div>
+      </div>
 
       {/* Transaction Status Modal */}
       <TransactionStatus status={txStatus} onClose={resetTx} />

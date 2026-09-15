@@ -4,8 +4,17 @@ dist/
 target/
 .anchor/
 .env
-.env.local
+.env.*
+!.env.example
 coverage/
 .DS_Store
 *.log
 test-ledger/
+
+# Security Hardening: Never commit secrets, keypairs, or private keys
+*.key
+*-keypair.json
+*id.json
+*.pem
+*.secret
+.solana/

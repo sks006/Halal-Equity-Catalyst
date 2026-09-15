@@ -1,0 +1,153 @@
+{
+  "scenario_id": "demo-nvda-earnings-rebalance",
+  "title": "Deterministic NVDA Earnings Beat Pipeline Replay",
+  "description": "End-to-end replay simulating real-time market event ingestion through policy rule evaluation, risk defense, execution decision synthesis, Jupiter swap routing, and Solana Anchor settlement.",
+  "parameters": {
+    "vault_address": "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
+    "target_asset": "NVDA",
+    "target_weight_delta_bps": 500,
+    "source_asset": "USDC",
+    "trade_budget_usd": 242500,
+    "max_allowed_slippage_bps": 50,
+    "max_allowed_price_impact_bps": 150
+  },
+  "stages": [
+    {
+      "step": 1,
+      "name": "Event detected",
+      "stage_code": "EVENT_DETECTED",
+      "source": "Bloomberg Terminal Feeds / SEC EDGAR",
+      "event_type": "EARNINGS_BEAT",
+      "sentiment_score": 0.85,
+      "details": {
+        "headline": "NVIDIA Reports Record Q2 Revenue of $30.04B, Up 122% YoY on Surging Hopper & Blackwell AI Demand",
+        "eps_actual": 0.68,
+        "eps_estimate": 0.64,
+        "surprise": "+6.25%"
+      },
+      "status": "INGESTED"
+    },
+    {
+      "step": 2,
+      "name": "Signal generated",
+      "stage_code": "SIGNAL_GENERATED",
+      "matched_rule": "PolicyRule::EarningsBeat { symbol: \"NVDA\", sentiment: 0.85 }",
+      "signal_type": "BULLISH",
+      "weight_delta_bps": 500,
+      "reason": "Bullish event on NVDA with positive sentiment score 0.85 exceeds threshold (0.50)",
+      "status": "GENERATED"
+    },
+    {
+      "step": 3,
+      "name": "Policy evaluated",
+      "stage_code": "POLICY_EVALUATED",
+      "portfolio_total_value_usd": 4850000,
+      "target_allocation_shifts": [
+        {
+          "symbol": "NVDA",
+          "previous_target_bps": 1600,
+          "new_target_bps": 2100,
+          "direction": "INCREASE"
+        },
+        {
+          "symbol": "USDC",
+          "previous_target_bps": 1900,
+          "new_target_bps": 1400,
+          "direction": "DECREASE"
+        }
+      ],
+      "proposed_trade": {
+        "symbol": "NVDA",
+        "is_buy": true,
+        "trade_value_usd": 242500,
+        "trade_asset_mint": "Xnvda111111111111111111111111111111111111111"
+      },
+      "status": "EVALUATED"
+    },
+    {
+      "step": 4,
+      "name": "Risk evaluated",
+      "stage_code": "RISK_EVALUATED",
+      "checks": [
+        {
+          "check": "Position Exposure Limit",
+          "metric": "Projected NVDA post-trade weight",
+          "evaluated_value": "21.41% (2141 bps)",
+          "threshold_limit": "25.00% (2500 bps)",
+          "passed": true
+        },
+        {
+          "check": "Max Trade Drift Limit",
+          "metric": "Single-rebalance delta",
+          "evaluated_value": "5.00% (500 bps)",
+          "threshold_limit": "10.00% (1000 bps)",
+          "passed": true
+        },
+        {
+          "check": "Vault Leverage / LTV Limit",
+          "metric": "Total Debt / Collateral Value",
+          "evaluated_value": "0.00% (0 bps)",
+          "threshold_limit": "65.00% (6500 bps)",
+          "passed": true
+        },
+        {
+          "check": "Stop-Loss & Drawdown Check",
+          "metric": "Unrealized PnL on existing NVDA position",
+          "evaluated_value": "+8.35%",
+          "threshold_limit": "-8.00% (-800 bps stop)",
+          "passed": true
+        }
+      ],
+      "verdict": "APPROVED",
+      "status": "APPROVED"
+    },
+    {
+      "step": 5,
+      "name": "Decision generated",
+      "stage_code": "DECISION_GENERATED",
+      "decision_id": "dec-9011e2f4-8a71-46e3-b1d2-09cba5678912",
+      "action": "BUY",
+      "orders": [
+        {
+          "symbol": "NVDA",
+          "is_buy": true,
+          "usd_value": 242500
+        }
+      ],
+      "authority_signature_required": true,
+      "preflight_validation": "PASSED",
+      "status": "SYNTHESIZED"
+    },
+    {
+      "step": 6,
+      "name": "Jupiter quote evaluated",
+      "stage_code": "JUPITER_QUOTE",
+      "input_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      "output_mint": "Xnvda111111111111111111111111111111111111111",
+      "amount_in": 242500000000,
+      "amount_in_usd": 242500.0,
+      "expected_amount_out": 1888629283,
+      "expected_tokens_out": 1888.629283,
+      "min_amount_out": 1879186136,
+      "price_impact_bps": 4,
+      "price_impact_pct": "0.04%",
+      "route": "USDC (242,500) -> Meteora DLMM -> Wrapped SOL -> Raydium CLMM -> NVDA (xStock)",
+      "status": "QUOTED_AND_APPROVED"
+    },
+    {
+      "step": 7,
+      "name": "Execution submitted & confirmed",
+      "stage_code": "EXECUTION_CONFIRMED",
+      "action_type": 1,
+      "instruction": "execute_action",
+      "pda_execution": "Exec91X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6",
+      "tx_signature": "4ZpT7VyJvM9Q1bC6w8nL2p4k8R1e3S5x7Z9c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
+      "solana_cluster": "devnet",
+      "confirmation_status": "finalized",
+      "block_time_ms": 418,
+      "post_execution_nav_usd": 4850000,
+      "new_nvda_weight_bps": 2141,
+      "status": "CONFIRMED"
+    }
+  ]
+}

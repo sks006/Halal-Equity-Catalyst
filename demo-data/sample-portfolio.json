@@ -1,0 +1,58 @@
+[
+  {
+    "portfolio_id": "pos-nvda-01",
+    "vault_address": "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
+    "asset_symbol": "NVDA",
+    "asset_mint": "Xnvda111111111111111111111111111111111111111",
+    "amount": 6200,
+    "entry_price_usd": 118.5,
+    "current_price_usd": 128.4,
+    "current_value_usd": 796080,
+    "target_weight_bps": 1600,
+    "current_weight_bps": 1641,
+    "last_rebalanced_at": "2026-09-12T10:00:00Z",
+    "updated_at": "2026-09-14T14:00:00Z"
+  },
+  {
+    "portfolio_id": "pos-sol-01",
+    "vault_address": "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
+    "asset_symbol": "SOL",
+    "asset_mint": "So11111111111111111111111111111111111111112",
+    "amount": 14200,
+    "entry_price_usd": 138.5,
+    "current_price_usd": 152.2,
+    "current_value_usd": 2161240,
+    "target_weight_bps": 4500,
+    "current_weight_bps": 4456,
+    "last_rebalanced_at": "2026-09-12T10:00:00Z",
+    "updated_at": "2026-09-14T14:00:00Z"
+  },
+  {
+    "portfolio_id": "pos-jup-02",
+    "vault_address": "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
+    "asset_symbol": "JUP",
+    "asset_mint": "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    "amount": 850000,
+    "entry_price_usd": 0.95,
+    "current_price_usd": 1.12,
+    "current_value_usd": 952000,
+    "target_weight_bps": 2000,
+    "current_weight_bps": 1962,
+    "last_rebalanced_at": "2026-09-12T10:00:00Z",
+    "updated_at": "2026-09-14T14:00:00Z"
+  },
+  {
+    "portfolio_id": "pos-usdc-04",
+    "vault_address": "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
+    "asset_symbol": "USDC",
+    "asset_mint": "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "amount": 940680,
+    "entry_price_usd": 1.0,
+    "current_price_usd": 1.0,
+    "current_value_usd": 940680,
+    "target_weight_bps": 1900,
+    "current_weight_bps": 1941,
+    "last_rebalanced_at": "2026-09-12T10:00:00Z",
+    "updated_at": "2026-09-14T14:00:00Z"
+  }
+]

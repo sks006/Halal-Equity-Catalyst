@@ -249,6 +249,36 @@ impl SolanaService {
         Ok(sig)
     }
 
+    /// Simulates a transaction against the cluster prior to broadcast to verify validity.
+    #[instrument(skip(self, instructions, signers))]
+    pub async fn simulate_transaction(
+        &self,
+        instructions: &[Instruction],
+        payer: &Pubkey,
+        signers: &[&Keypair],
+    ) -> Result<serde_json::Value, ApiError> {
+        let (recent_blockhash, _) = self
+            .rpc
+            .get_latest_blockhash()
+            .await
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+
+        let tx = solana_sdk::transaction::Transaction::new_signed_with_payer(
+            instructions,
+            Some(payer),
+            signers,
+            recent_blockhash,
+        );
+
+        let tx_bytes = bincode::serialize(&tx)
+            .map_err(|e| ApiError::InternalServerError(format!("Serialization error: {}", e)))?;
+
+        self.rpc
+            .simulate_transaction(&tx_bytes)
+            .await
+            .map_err(|e| ApiError::InternalServerError(format!("Simulation failed: {}", e)))
+    }
+
     #[instrument(skip(self))]
     pub async fn confirm_signature(
         &self,

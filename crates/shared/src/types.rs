@@ -91,6 +91,10 @@ impl AllocationTarget {
     pub fn total_weight_bps(&self) -> u16 {
         self.weights.iter().map(|w| w.target_weight.0).sum()
     }
+
+    pub fn get_weight(&self, symbol: &str) -> Option<BasisPoints> {
+        self.weights.iter().find(|w| w.symbol == symbol).map(|w| w.target_weight)
+    }
 }
 
 /// Snapshot of an individual active position.
