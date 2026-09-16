@@ -3,6 +3,7 @@ pub mod config;
 pub mod curve;
 pub mod graduation;
 pub mod pricing;
+pub mod registry;
 pub mod simulator;
 pub mod validation;
 
@@ -11,6 +12,7 @@ pub use config::{
     CurveSegmentConfig, DbcConfigRequest, DbcConfigResponse, FeeStructureConfig,
     GraduationTargetConfig,
 };
+pub use registry::*;
 pub use simulator::{
     ComparisonSimulationRequest, ComparisonSimulationResponse, DbcSimulationInput,
     DbcSimulationResult, DbcSimulator, SimulationPricePoint, SimulationSegment,

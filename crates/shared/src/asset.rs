@@ -37,6 +37,8 @@ impl fmt::Display for AssetType {
 pub enum AssetProvider {
     PreStocks,
     Tessera,
+    Clawpump,
+    Backed,
     Pyth,
     Native,
 }
@@ -46,6 +48,8 @@ impl fmt::Display for AssetProvider {
         match self {
             Self::PreStocks => write!(f, "prestocks"),
             Self::Tessera => write!(f, "tessera"),
+            Self::Clawpump => write!(f, "clawpump"),
+            Self::Backed => write!(f, "backed"),
             Self::Pyth => write!(f, "pyth"),
             Self::Native => write!(f, "native"),
         }
@@ -278,6 +282,96 @@ impl AssetMarketData {
     }
 }
 
+/// Canonical Collateral & Quote Token Mints on Solana.
+pub const MAINNET_USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+pub const DEVNET_USDC_MINT: &str = "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr";
+pub const WRAPPED_SOL_MINT: &str = "So11111111111111111111111111111111111111112";
+
+/// Canonical Backed / Tokenized Equity Mints on Solana.
+pub const BACKED_NVDA_MINT: &str = "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh";
+pub const BACKED_AAPL_MINT: &str = "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp";
+pub const BACKED_SPYX_MINT: &str = "XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W";
+
+/// Canonical Verified Meteora DBC Pools for Mainnet Equities.
+pub const METEORA_NVDA_USDC_POOL: &str = "JCqWLp5RAaC3FPFX8MoAt7yRuPqRW2W9ZG3Byigxd1A7";
+pub const METEORA_AAPL_USDC_POOL: &str = "C3Zm5CTFQxfCdbbDameKXRsmMUz8nfpkHqrevmdX97YS";
+pub const METEORA_SPYX_USDC_POOL: &str = "CNutHtA6JUuwwWGCcJXobusHdRWZ4EgJTSUxxzXqnRj7";
+
+/// Returns verified production assets with confirmed on-chain mints.
+pub fn verified_mainnet_assets() -> Vec<Asset> {
+    vec![
+        Asset::new(
+            AssetIdentity {
+                asset_id: "backed:NVDAx".to_string(),
+                symbol: "NVDA".to_string(),
+                name: "Backed NVIDIA (NVDAx)".to_string(),
+                asset_type: AssetType::Stock,
+                underlying_reference: "NASDAQ:NVDA (ISIN US67066G1040)".to_string(),
+            },
+            TokenDetails {
+                mint: BACKED_NVDA_MINT.to_string(),
+                decimals: 8,
+                network: Network::SolanaMainnet,
+            },
+            ProviderConfig {
+                provider: AssetProvider::PreStocks,
+                price_feed_id: "3155e714652285e6834d8ef0b3558163f4585c5b9679f222956cf57fb3645391"
+                    .to_string(),
+                meteora_pool: Some(METEORA_NVDA_USDC_POOL.to_string()),
+                secondary_reference: Some("tessera:NVDA".to_string()),
+                status: AssetStatus::Active,
+            },
+        )
+        .expect("Valid NVDA asset"),
+        Asset::new(
+            AssetIdentity {
+                asset_id: "backed:AAPLx".to_string(),
+                symbol: "AAPL".to_string(),
+                name: "Backed Apple (AAPLx)".to_string(),
+                asset_type: AssetType::Stock,
+                underlying_reference: "NASDAQ:AAPL (ISIN US0378331005)".to_string(),
+            },
+            TokenDetails {
+                mint: BACKED_AAPL_MINT.to_string(),
+                decimals: 8,
+                network: Network::SolanaMainnet,
+            },
+            ProviderConfig {
+                provider: AssetProvider::PreStocks,
+                price_feed_id: "49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175ec697df854ab"
+                    .to_string(),
+                meteora_pool: Some(METEORA_AAPL_USDC_POOL.to_string()),
+                secondary_reference: Some("tessera:AAPL".to_string()),
+                status: AssetStatus::Active,
+            },
+        )
+        .expect("Valid AAPL asset"),
+        Asset::new(
+            AssetIdentity {
+                asset_id: "backed:SPYx".to_string(),
+                symbol: "SPYx".to_string(),
+                name: "Backed S&P 500 Index (SPYx)".to_string(),
+                asset_type: AssetType::Index,
+                underlying_reference: "NYSEArca:SPY (Swiss DLT Act)".to_string(),
+            },
+            TokenDetails {
+                mint: BACKED_SPYX_MINT.to_string(),
+                decimals: 8,
+                network: Network::SolanaMainnet,
+            },
+            ProviderConfig {
+                provider: AssetProvider::PreStocks,
+                price_feed_id: "2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b"
+                    .to_string(),
+                meteora_pool: Some(METEORA_SPYX_USDC_POOL.to_string()),
+                secondary_reference: None,
+                status: AssetStatus::Active,
+            },
+        )
+        .expect("Valid SPYx asset"),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -389,7 +483,6 @@ mod tests {
         assert!(AssetMarketData::new("id", "SYM", -10.0, 0.1, -8, now, now, 60).is_err());
         assert!(AssetMarketData::new("id", "SYM", 0.0, 0.1, -8, now, now, 60).is_err());
 
-        // Stale detection
         let stale_data = AssetMarketData::new(
             "prestocks:NVDA",
             "NVDA",
@@ -402,5 +495,57 @@ mod tests {
         )
         .expect("Valid parse but stale");
         assert!(stale_data.is_stale);
+    }
+
+    #[test]
+    fn test_verify_supported_token_mints() {
+        let assets = verified_mainnet_assets();
+        assert_eq!(assets.len(), 3);
+
+        for asset in &assets {
+            assert!(!asset.mint().is_empty());
+            assert_eq!(asset.decimals(), 8);
+            assert!(asset.is_active());
+            assert_eq!(asset.token.network, Network::SolanaMainnet);
+            assert!(asset.provider.meteora_pool.is_some());
+        }
+
+        // Verify canonical constants
+        assert_eq!(
+            MAINNET_USDC_MINT,
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+        );
+        assert_eq!(
+            DEVNET_USDC_MINT,
+            "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"
+        );
+        assert_eq!(
+            WRAPPED_SOL_MINT,
+            "So11111111111111111111111111111111111111112"
+        );
+        assert_eq!(
+            BACKED_NVDA_MINT,
+            "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+        );
+        assert_eq!(
+            BACKED_AAPL_MINT,
+            "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp"
+        );
+        assert_eq!(
+            BACKED_SPYX_MINT,
+            "XsoCS1TfEyfFhfvj8EtZ528L3CaKBDBRqRapnBbDF2W"
+        );
+        assert_eq!(
+            METEORA_NVDA_USDC_POOL,
+            "JCqWLp5RAaC3FPFX8MoAt7yRuPqRW2W9ZG3Byigxd1A7"
+        );
+        assert_eq!(
+            METEORA_AAPL_USDC_POOL,
+            "C3Zm5CTFQxfCdbbDameKXRsmMUz8nfpkHqrevmdX97YS"
+        );
+        assert_eq!(
+            METEORA_SPYX_USDC_POOL,
+            "CNutHtA6JUuwwWGCcJXobusHdRWZ4EgJTSUxxzXqnRj7"
+        );
     }
 }

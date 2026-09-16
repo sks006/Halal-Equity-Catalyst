@@ -50,12 +50,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Initialize Solana service (read-only by default)
-    let solana_service = Some(equity_catalyst_api::services::SolanaService::new(
-        &config.solana_rpc_url,
-        &config.solana_ws_url,
-        None,
-        None,
-    ));
+    let solana_service = Some(
+        equity_catalyst_api::services::SolanaService::new_with_fallbacks(
+            &config.solana_rpc_url,
+            config.solana_fallback_rpc_urls.clone(),
+            &config.solana_ws_url,
+            None,
+            None,
+            std::time::Duration::from_millis(config.solana_rpc_timeout_ms),
+        ),
+    );
 
     // Initialize Pyth client and Oracle service
     let pyth_client = Arc::new(equity_catalyst_pyth::PythClient::new(

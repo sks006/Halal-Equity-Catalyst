@@ -60,9 +60,10 @@ pub fn validate_dbc_request(req: &DbcConfigRequest) -> Result<(), DbcValidationE
 /// Returns the decimals and known mint address for supported quote tokens.
 pub fn resolve_quote_token_info(quote_token: &str) -> (u8, &'static str) {
     match quote_token.trim().to_uppercase().as_str() {
-        "USDC" => (6, "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"),
+        "USDC" => (6, crate::engines::dbc_engine::registry::MAINNET_USDC_MINT),
+        "DEVNET_USDC" => (6, crate::engines::dbc_engine::registry::DEVNET_USDC_MINT),
         "USDT" => (6, "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB"),
-        "SOL" | "WSOL" => (9, "So11111111111111111111111111111111111111112"),
-        _ => (6, "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr"),
+        "SOL" | "WSOL" => (9, crate::engines::dbc_engine::registry::WRAPPED_SOL_MINT),
+        _ => (6, crate::engines::dbc_engine::registry::MAINNET_USDC_MINT),
     }
 }

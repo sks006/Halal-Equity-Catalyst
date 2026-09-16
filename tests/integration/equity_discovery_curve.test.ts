@@ -71,4 +71,49 @@ describe("PHASE 2: Equity Discovery Curve (EDC) Integration Tests", () => {
     expect(config.migratedPoolFee).to.not.be.null;
     expect(config.migratedPoolFee?.poolFeeBps).to.equal(100);
   });
+
+  it("should have verified production mainnet pool entries for NVDA, AAPL, and SPYx", () => {
+    const {
+      VERIFIED_METEORA_POOLS,
+      BACKED_NVDA_MINT,
+      BACKED_AAPL_MINT,
+      BACKED_SPYX_MINT,
+      MAINNET_USDC_MINT,
+      WRAPPED_SOL_MINT,
+      METEORA_NVDA_USDC_POOL,
+      METEORA_AAPL_USDC_POOL,
+      METEORA_SPYX_USDC_POOL,
+    } = require("../../sdk/src/meteora/constants");
+
+    expect(VERIFIED_METEORA_POOLS["NVDA-USDC"]).to.not.be.undefined;
+    expect(VERIFIED_METEORA_POOLS["NVDA-USDC"].poolAddress.toBase58()).to.equal(
+      METEORA_NVDA_USDC_POOL.toBase58()
+    );
+    expect(VERIFIED_METEORA_POOLS["NVDA-USDC"].baseMint.toBase58()).to.equal(
+      BACKED_NVDA_MINT.toBase58()
+    );
+    expect(VERIFIED_METEORA_POOLS["NVDA-USDC"].quoteMint.toBase58()).to.equal(
+      MAINNET_USDC_MINT.toBase58()
+    );
+
+    expect(VERIFIED_METEORA_POOLS["AAPL-USDC"]).to.not.be.undefined;
+    expect(VERIFIED_METEORA_POOLS["AAPL-USDC"].poolAddress.toBase58()).to.equal(
+      METEORA_AAPL_USDC_POOL.toBase58()
+    );
+    expect(VERIFIED_METEORA_POOLS["AAPL-USDC"].baseMint.toBase58()).to.equal(
+      BACKED_AAPL_MINT.toBase58()
+    );
+
+    expect(VERIFIED_METEORA_POOLS["SPYX-USDC"]).to.not.be.undefined;
+    expect(VERIFIED_METEORA_POOLS["SPYX-USDC"].poolAddress.toBase58()).to.equal(
+      METEORA_SPYX_USDC_POOL.toBase58()
+    );
+    expect(VERIFIED_METEORA_POOLS["SPYX-USDC"].baseMint.toBase58()).to.equal(
+      BACKED_SPYX_MINT.toBase58()
+    );
+
+    expect(VERIFIED_METEORA_POOLS["NVDA-SOL"].quoteMint.toBase58()).to.equal(
+      WRAPPED_SOL_MINT.toBase58()
+    );
+  });
 });

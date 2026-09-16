@@ -34,11 +34,13 @@ pub fn create_db_pool(database_url: &str) -> Result<Pool, Box<dyn std::error::Er
 
 /// Builds the API router with the provided state.
 pub fn build_app(config: Config, pool: Pool, redis_client: Option<redis::Client>) -> Router {
-    let solana_service = Some(services::SolanaService::new(
+    let solana_service = Some(services::SolanaService::new_with_fallbacks(
         &config.solana_rpc_url,
+        config.solana_fallback_rpc_urls.clone(),
         &config.solana_ws_url,
         None,
         None,
+        std::time::Duration::from_millis(config.solana_rpc_timeout_ms),
     ));
 
     let pyth_client = Arc::new(equity_catalyst_pyth::PythClient::new(

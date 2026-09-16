@@ -10,6 +10,9 @@ equity_vault = "8NhtqxR1mwq7a3HTUtcGABNZ3KWzQi9KM3fXu3rHS8LH"
 [programs.devnet]
 equity_vault = "8NhtqxR1mwq7a3HTUtcGABNZ3KWzQi9KM3fXu3rHS8LH"
 
+[programs.mainnet]
+equity_vault = "8NhtqxR1mwq7a3HTUtcGABNZ3KWzQi9KM3fXu3rHS8LH"
+
 [registry]
 url = "https://api.apr.dev"
 

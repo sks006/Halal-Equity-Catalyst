@@ -76,3 +76,18 @@ export interface DBCPoolSummary {
   migrationThreshold: string;
   isMigrated: boolean;
 }
+
+export interface VerifiedMeteoraPool {
+  poolAddress: PublicKey;
+  configAddress: PublicKey;
+  baseMint: PublicKey;
+  quoteMint: PublicKey;
+  symbol: string;
+  quoteSymbol: string;
+  baseDecimals: number;
+  quoteDecimals: number;
+  initialPriceUsd: number;
+  currentPriceUsd: number;
+  curveProfile: string;
+  graduationThreshold: number;
+}

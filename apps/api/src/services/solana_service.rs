@@ -39,7 +39,28 @@ impl SolanaService {
         program_id_opt: Option<Pubkey>,
         signer: Option<Arc<ExecutionSigner>>,
     ) -> Self {
-        let rpc = Arc::new(SolanaRpcClient::new(rpc_url));
+        Self::new_with_fallbacks(
+            rpc_url,
+            Vec::new(),
+            ws_url,
+            program_id_opt,
+            signer,
+            Duration::from_secs(30),
+        )
+    }
+
+    pub fn new_with_fallbacks(
+        rpc_url: &str,
+        fallback_urls: Vec<String>,
+        ws_url: &str,
+        program_id_opt: Option<Pubkey>,
+        signer: Option<Arc<ExecutionSigner>>,
+        timeout: Duration,
+    ) -> Self {
+        let rpc = Arc::new(
+            SolanaRpcClient::new_with_fallbacks(rpc_url, fallback_urls)
+                .with_timeout(timeout),
+        );
         let ws = Arc::new(SolanaWebSocketClient::new(ws_url));
         let p_id = program_id_opt.unwrap_or_else(program_id);
         let anchor = AnchorClient::new(Arc::clone(&rpc)).with_program_id(p_id);

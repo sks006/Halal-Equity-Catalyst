@@ -10,6 +10,7 @@ use equity_catalyst_shared::{
 };
 
 use crate::engines::dbc_engine::{
+    registry::{build_initial_pool_liquidity_state, verified_dbc_pools},
     simulator::{DbcSimulationInput, DbcSimulationResult, DbcSimulator, SimulationSegment},
     METEORA_DBC_PROGRAM_ID,
 };
@@ -68,10 +69,19 @@ pub struct MeteoraDbcProvider {
 
 impl MeteoraDbcProvider {
     pub fn new(rpc_url: &str) -> Self {
+        let pool_map = Arc::new(RwLock::new(HashMap::new()));
+        {
+            let mut pools = pool_map.write().unwrap();
+            for pool_info in verified_dbc_pools() {
+                let state = build_initial_pool_liquidity_state(&pool_info);
+                pools.insert(pool_info.pool_address.to_string(), state);
+            }
+        }
+
         Self {
             rpc_url: rpc_url.to_string(),
             program_id: METEORA_DBC_PROGRAM_ID.to_string(),
-            pools: Arc::new(RwLock::new(HashMap::new())),
+            pools: pool_map,
             mock_mode: false,
         }
     }
@@ -368,5 +378,30 @@ mod tests {
             .expect("Simulation succeeded");
         assert_eq!(sim.starting_price, 100.0);
         assert!(!sim.price_path.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_verified_mainnet_dbc_pool_quotes() {
+        let provider = MeteoraDbcProvider::new_mock();
+        // Uses pre-populated verified mainnet NVDA-USDC pool
+        let req = LiquidityQuoteRequest::new(
+            crate::engines::dbc_engine::registry::METEORA_NVDA_USDC_POOL,
+            crate::engines::dbc_engine::registry::MAINNET_USDC_MINT,
+            crate::engines::dbc_engine::registry::BACKED_NVDA_MINT,
+            10_000_000_000, // 10,000 USDC
+            50,             // 0.50% slippage
+            TradeDirection::Buy,
+        )
+        .expect("Valid request");
+
+        let quote = provider.get_quote(&req).await.expect("Quote succeeded");
+        assert_eq!(
+            quote.pool_address,
+            crate::engines::dbc_engine::registry::METEORA_NVDA_USDC_POOL
+        );
+        assert_eq!(quote.amount_in, 10_000_000_000);
+        assert!(quote.expected_amount_out > 0);
+        assert!(quote.min_amount_out <= quote.expected_amount_out);
+        assert!(quote.effective_execution_price_usd >= 118.50);
     }
 }
