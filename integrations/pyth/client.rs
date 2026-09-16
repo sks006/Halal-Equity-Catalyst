@@ -95,7 +95,7 @@ impl PythClient {
         feeds
             .into_iter()
             .find(|f| f.id.to_lowercase() == clean_id)
-            .ok_or_else(|| PythError::FeedNotFound(clean_id))
+            .ok_or(PythError::FeedNotFound(clean_id))
     }
 
     /// Fetches latest prices for multiple feed IDs in a single batch query.
@@ -159,10 +159,9 @@ impl PythClient {
 
     /// Fetches price feed by token ticker symbol.
     pub async fn get_price_by_symbol(&self, symbol: &str) -> Result<ParsedPriceFeed, PythError> {
-        let feed_id = self
-            .registry
-            .get_feed_id(symbol)
-            .ok_or_else(|| PythError::FeedNotFound(format!("Symbol '{}' not in registry", symbol)))?;
+        let feed_id = self.registry.get_feed_id(symbol).ok_or_else(|| {
+            PythError::FeedNotFound(format!("Symbol '{}' not in registry", symbol))
+        })?;
 
         self.get_latest_price(&feed_id).await
     }

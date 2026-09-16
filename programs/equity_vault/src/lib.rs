@@ -1,3 +1,5 @@
+#![allow(unexpected_cfgs)]
+
 use anchor_lang::prelude::*;
 
 pub mod constants;
@@ -22,7 +24,13 @@ pub mod equity_vault {
         max_ltv_bps: u16,
         max_position_bps: u16,
     ) -> Result<()> {
-        instructions::initialize_vault::initialize_vault(ctx, name, symbol, max_ltv_bps, max_position_bps)
+        instructions::initialize_vault::initialize_vault(
+            ctx,
+            name,
+            symbol,
+            max_ltv_bps,
+            max_position_bps,
+        )
     }
 
     pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {

@@ -1,6 +1,6 @@
 use equity_catalyst_jupiter::{
-    calculate_effective_rate, parse_price_impact_bps, validate_quote_price_impact,
-    JupiterClient, JupiterError, QuoteRequest, QuoteResponse, RoutePlanStep, SwapInfo,
+    calculate_effective_rate, parse_price_impact_bps, validate_quote_price_impact, JupiterClient,
+    JupiterError, QuoteRequest, QuoteResponse, RoutePlanStep, SwapInfo,
 };
 
 fn sample_quote() -> QuoteResponse {
@@ -53,7 +53,10 @@ fn test_price_impact_validation_limits() {
     let verdict = validate_quote_price_impact(&quote, 2);
     assert!(verdict.is_err());
     match verdict.unwrap_err() {
-        JupiterError::PriceImpactTooHigh { actual_bps, max_bps } => {
+        JupiterError::PriceImpactTooHigh {
+            actual_bps,
+            max_bps,
+        } => {
             assert_eq!(actual_bps, 5);
             assert_eq!(max_bps, 2);
         }
@@ -86,7 +89,10 @@ async fn test_mock_client_quote_and_swap() {
         1_000_000_000,
     );
 
-    let fetched = client.get_quote(&req).await.expect("Failed to get mock quote");
+    let fetched = client
+        .get_quote(&req)
+        .await
+        .expect("Failed to get mock quote");
     assert_eq!(fetched.out_amount, "145000000");
 
     let swap_req = equity_catalyst_jupiter::build_swap_request(
@@ -95,6 +101,9 @@ async fn test_mock_client_quote_and_swap() {
         Some(10_000),
     );
 
-    let swap_resp = client.build_swap(&swap_req).await.expect("Failed to build swap");
+    let swap_resp = client
+        .build_swap(&swap_req)
+        .await
+        .expect("Failed to build swap");
     assert!(!swap_resp.swap_transaction.is_empty());
 }

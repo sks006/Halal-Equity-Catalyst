@@ -7,10 +7,7 @@ use axum::{
 use std::sync::Arc;
 
 use crate::{
-    error::ApiError,
-    models::ExecutionModel,
-    repositories::ExecutionRepository,
-    state::AppState,
+    error::ApiError, models::ExecutionModel, repositories::ExecutionRepository, state::AppState,
 };
 
 pub async fn list_executions_handler(

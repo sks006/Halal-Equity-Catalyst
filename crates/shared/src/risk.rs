@@ -17,7 +17,10 @@ pub struct RiskAssessment {
 
 /// Calculate Loan-to-Value (LTV) ratio in basis points.
 /// ltv = (loan_amount * 10,000) / collateral_value
-pub fn calculate_ltv(loan_amount: u64, collateral_value: u64) -> Result<BasisPoints, ValidationError> {
+pub fn calculate_ltv(
+    loan_amount: u64,
+    collateral_value: u64,
+) -> Result<BasisPoints, ValidationError> {
     if collateral_value == 0 {
         if loan_amount > 0 {
             return Ok(BasisPoints::MAX);

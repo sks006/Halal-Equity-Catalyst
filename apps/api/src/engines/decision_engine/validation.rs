@@ -1,7 +1,7 @@
 //! Decision pre-flight validation rules.
 
-use crate::models::{PolicyModel, VaultModel};
 use super::decision::ExecutionRequest;
+use crate::models::{PolicyModel, VaultModel};
 
 /// Performs strict pre-flight validation on the generated execution request.
 pub fn validate_decision_preflight(
@@ -31,7 +31,9 @@ pub fn validate_decision_preflight(
     }
 
     if request.approved && request.trades.is_empty() && request.action != "NOOP" {
-        return Err("Pre-flight failed: Approved decision with non-NOOP action has no trades".to_string());
+        return Err(
+            "Pre-flight failed: Approved decision with non-NOOP action has no trades".to_string(),
+        );
     }
 
     Ok(())

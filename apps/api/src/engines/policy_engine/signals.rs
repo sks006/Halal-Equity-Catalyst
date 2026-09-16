@@ -1,7 +1,7 @@
 //! Signal generation mapping policy rules to domain signals.
 
-use equity_catalyst_shared::types::SignalType;
 use super::rules::PolicyRule;
+use equity_catalyst_shared::types::SignalType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PolicySignal {

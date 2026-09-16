@@ -2,7 +2,10 @@
 
 use deadpool_postgres::Pool;
 
-use crate::{error::ApiError, models::dbc_pool::{CreateDbcPoolRequest, DbcPoolModel}};
+use crate::{
+    error::ApiError,
+    models::dbc_pool::{CreateDbcPoolRequest, DbcPoolModel},
+};
 
 #[derive(Clone, Debug)]
 pub struct DbcPoolRepository {
@@ -67,7 +70,10 @@ impl DbcPoolRepository {
         Ok(DbcPoolModel::from(&row))
     }
 
-    pub async fn find_by_pool_address(&self, pool_address: &str) -> Result<Option<DbcPoolModel>, ApiError> {
+    pub async fn find_by_pool_address(
+        &self,
+        pool_address: &str,
+    ) -> Result<Option<DbcPoolModel>, ApiError> {
         let client = self.pool.get().await.map_err(|e| {
             ApiError::InternalServerError(format!("Database connection failed: {}", e))
         })?;
@@ -78,7 +84,9 @@ impl DbcPoolRepository {
                 &[&pool_address],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to query dbc pool: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to query dbc pool: {}", e))
+            })?;
 
         Ok(row_opt.map(|r| DbcPoolModel::from(&r)))
     }
@@ -89,9 +97,14 @@ impl DbcPoolRepository {
         })?;
 
         let rows = client
-            .query("SELECT * FROM dbc_pools ORDER BY creation_timestamp DESC", &[])
+            .query(
+                "SELECT * FROM dbc_pools ORDER BY creation_timestamp DESC",
+                &[],
+            )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to list dbc pools: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to list dbc pools: {}", e))
+            })?;
 
         Ok(rows.iter().map(DbcPoolModel::from).collect())
     }

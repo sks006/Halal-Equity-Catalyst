@@ -36,7 +36,7 @@ pub fn calculate_basis_points(part: u64, total: u64) -> Result<BasisPoints, Vali
 
 /// Calculate absolute drift difference between two basis points values.
 pub fn calculate_drift(current_bps: BasisPoints, target_bps: BasisPoints) -> BasisPoints {
-    let diff = (current_bps.0 as i32 - target_bps.0 as i32).abs() as u16;
+    let diff = (current_bps.0 as i32 - target_bps.0 as i32).unsigned_abs() as u16;
     BasisPoints(diff)
 }
 

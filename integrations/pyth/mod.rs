@@ -4,4 +4,6 @@ pub mod types;
 
 pub use client::PythClient;
 pub use feeds::{known_feeds, PythFeedRegistry};
-pub use types::{HermesLatestPriceResponse, NormalizedPrice, ParsedPriceFeed, PythError, PythRawPrice};
+pub use types::{
+    HermesLatestPriceResponse, NormalizedPrice, ParsedPriceFeed, PythError, PythRawPrice,
+};

@@ -1,5 +1,5 @@
-use anchor_lang::prelude::*;
 use crate::constants::{MAX_NAME_LEN, MAX_SYMBOL_LEN};
+use anchor_lang::prelude::*;
 
 #[account]
 #[derive(InitSpace)]

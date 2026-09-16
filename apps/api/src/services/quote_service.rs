@@ -1,9 +1,7 @@
 //! Quote execution domain service integrating Jupiter v6 quotes with the Risk Engine.
 
 use chrono::{DateTime, Utc};
-use equity_catalyst_jupiter::{
-    parse_price_impact_bps, JupiterClient, QuoteRequest, QuoteResponse,
-};
+use equity_catalyst_jupiter::{parse_price_impact_bps, JupiterClient, QuoteRequest, QuoteResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -97,8 +95,9 @@ impl QuoteExecutionService {
         let slippage = request.slippage_bps.unwrap_or(50); // Default 0.50%
 
         // 1. token A -> Jupiter quote
-        let quote_req = QuoteRequest::new(&request.input_mint, &request.output_mint, request.amount_in)
-            .with_slippage_bps(slippage);
+        let quote_req =
+            QuoteRequest::new(&request.input_mint, &request.output_mint, request.amount_in)
+                .with_slippage_bps(slippage);
 
         let quote: QuoteResponse = self
             .jupiter_client
@@ -107,10 +106,9 @@ impl QuoteExecutionService {
             .map_err(|e| ApiError::InternalServerError(format!("Jupiter quote failed: {}", e)))?;
 
         // 2. Expected output & other amount threshold
-        let expected_amount_out: u64 = quote
-            .out_amount
-            .parse()
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to parse out_amount: {}", e)))?;
+        let expected_amount_out: u64 = quote.out_amount.parse().map_err(|e| {
+            ApiError::InternalServerError(format!("Failed to parse out_amount: {}", e))
+        })?;
 
         let min_amount_out: u64 = quote
             .other_amount_threshold
@@ -167,16 +165,22 @@ impl QuoteExecutionService {
 
                             let current_pos_val = positions
                                 .iter()
-                                .find(|p| p.asset_symbol == target_sym || p.asset_mint == request.output_mint)
+                                .find(|p| {
+                                    p.asset_symbol == target_sym
+                                        || p.asset_mint == request.output_mint
+                                })
                                 .map(|p| p.current_value_usd.max(0.0) as u64)
                                 .unwrap_or(0);
 
                             // Estimate new trade value (amount_in micro-USD or proportional)
-                            let trade_val = (request.amount_in as f64).min(total_portfolio_usd as f64) as u64;
+                            let trade_val =
+                                (request.amount_in as f64).min(total_portfolio_usd as f64) as u64;
                             let post_val = current_pos_val + trade_val;
 
                             if total_portfolio_usd > 0 {
-                                let exposure_bps = ((post_val as f64 / total_portfolio_usd as f64) * 10_000.0).round() as u16;
+                                let exposure_bps =
+                                    ((post_val as f64 / total_portfolio_usd as f64) * 10_000.0)
+                                        .round() as u16;
                                 evaluated_exposure_bps = Some(exposure_bps);
 
                                 if let Err(reason) = validate_position_exposure(
@@ -208,7 +212,11 @@ impl QuoteExecutionService {
                 amount_out_actual: None,
                 slippage_bps: slippage as i32,
                 tx_signature: None, // NO LIVE SWAP SUBMITTED
-                status: if approved { "QUOTE_ONLY".to_string() } else { "REJECTED".to_string() },
+                status: if approved {
+                    "QUOTE_ONLY".to_string()
+                } else {
+                    "REJECTED".to_string()
+                },
                 error_message: rejection_reason.clone(),
                 executed_at: Utc::now(),
                 confirmed_at: None,

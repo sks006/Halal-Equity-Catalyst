@@ -55,10 +55,7 @@ impl EventRepository {
         })?;
 
         let row_opt = client
-            .query_opt(
-                "SELECT * FROM events WHERE event_id = $1",
-                &[&event_id],
-            )
+            .query_opt("SELECT * FROM events WHERE event_id = $1", &[&event_id])
             .await
             .map_err(|e| ApiError::InternalServerError(format!("Failed to query event: {}", e)))?;
 
@@ -92,7 +89,9 @@ impl EventRepository {
                 &[],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to list pending events: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to list pending events: {}", e))
+            })?;
 
         Ok(rows.iter().map(EventModel::from).collect())
     }
@@ -117,7 +116,9 @@ impl EventRepository {
                 &[&event_id, &status, &processed_at],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to update event status: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to update event status: {}", e))
+            })?;
 
         Ok(())
     }

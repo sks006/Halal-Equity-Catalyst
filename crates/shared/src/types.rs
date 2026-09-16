@@ -54,7 +54,7 @@ impl Default for RiskLimits {
         Self {
             max_ltv_bps: BasisPoints(7_500),      // 75.00%
             max_position_bps: BasisPoints(2_500), // 25.00%
-            max_slippage_bps: BasisPoints(100),    // 1.00%
+            max_slippage_bps: BasisPoints(100),   // 1.00%
         }
     }
 }
@@ -93,7 +93,10 @@ impl AllocationTarget {
     }
 
     pub fn get_weight(&self, symbol: &str) -> Option<BasisPoints> {
-        self.weights.iter().find(|w| w.symbol == symbol).map(|w| w.target_weight)
+        self.weights
+            .iter()
+            .find(|w| w.symbol == symbol)
+            .map(|w| w.target_weight)
     }
 }
 

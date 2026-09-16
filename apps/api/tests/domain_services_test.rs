@@ -43,10 +43,16 @@ async fn test_vault_service_lifecycle_and_accounting() {
     };
 
     // 1. Create vault
-    service.create_vault(&vault).await.expect("Failed to create vault");
+    service
+        .create_vault(&vault)
+        .await
+        .expect("Failed to create vault");
 
     // 2. Read vault
-    let fetched = service.get_vault(&address).await.expect("Failed to get vault");
+    let fetched = service
+        .get_vault(&address)
+        .await
+        .expect("Failed to get vault");
     assert_eq!(fetched.total_shares, 0);
 
     // 3. Track deposit
@@ -66,7 +72,10 @@ async fn test_vault_service_lifecycle_and_accounting() {
     assert_eq!(post_withdrawal.total_shares, 75_000);
 
     // 5. Test emergency pause enforcement
-    service.set_paused(&address, true).await.expect("Failed to pause");
+    service
+        .set_paused(&address, true)
+        .await
+        .expect("Failed to pause");
     let paused_vault = service.get_vault(&address).await.unwrap();
     assert!(paused_vault.is_paused);
 
@@ -108,7 +117,7 @@ fn test_policy_engine_event_to_allocation_flow() {
             entry_price_usd: 120.0,
             current_price_usd: 120.0,
             current_value_usd: 120_000.0,
-            target_weight_bps: 3_500,  // 35.00%
+            target_weight_bps: 3_500, // 35.00%
             current_weight_bps: 3_500,
             last_rebalanced_at: None,
             updated_at: Utc::now(),
@@ -122,7 +131,7 @@ fn test_policy_engine_event_to_allocation_flow() {
             entry_price_usd: 1.0,
             current_price_usd: 1.0,
             current_value_usd: 222_857.0,
-            target_weight_bps: 6_500,  // 65.00%
+            target_weight_bps: 6_500, // 65.00%
             current_weight_bps: 6_500,
             last_rebalanced_at: None,
             updated_at: Utc::now(),
@@ -170,9 +179,9 @@ fn test_risk_engine_defense_lines() {
         policy_address: "P1".to_string(),
         vault_address: "V1".to_string(),
         authority: "A1".to_string(),
-        max_ltv_bps: 7_500,         // 75% max LTV
-        max_position_bps: 3_000,    // 30% max position cap
-        stop_loss_bps: 500,         // 5% stop loss
+        max_ltv_bps: 7_500,      // 75% max LTV
+        max_position_bps: 3_000, // 30% max position cap
+        stop_loss_bps: 500,      // 5% stop loss
         take_profit_bps: 1_500,
         rebalance_threshold_bps: 200,
         is_active: true,
@@ -181,22 +190,20 @@ fn test_risk_engine_defense_lines() {
         updated_at: Utc::now(),
     };
 
-    let positions = vec![
-        PortfolioModel {
-            portfolio_id: Uuid::new_v4(),
-            vault_address: "V1".to_string(),
-            asset_symbol: "NVDA".to_string(),
-            asset_mint: "M1".to_string(),
-            amount: 100,
-            entry_price_usd: 100.0,
-            current_price_usd: 100.0,
-            current_value_usd: 25_000.0, // 25% of 100,000
-            target_weight_bps: 2_500,
-            current_weight_bps: 2_500,
-            last_rebalanced_at: None,
-            updated_at: Utc::now(),
-        },
-    ];
+    let positions = vec![PortfolioModel {
+        portfolio_id: Uuid::new_v4(),
+        vault_address: "V1".to_string(),
+        asset_symbol: "NVDA".to_string(),
+        asset_mint: "M1".to_string(),
+        amount: 100,
+        entry_price_usd: 100.0,
+        current_price_usd: 100.0,
+        current_value_usd: 25_000.0, // 25% of 100,000
+        target_weight_bps: 2_500,
+        current_weight_bps: 2_500,
+        last_rebalanced_at: None,
+        updated_at: Utc::now(),
+    }];
 
     let total_portfolio_usd = 100_000;
 

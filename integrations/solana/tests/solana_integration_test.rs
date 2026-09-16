@@ -1,9 +1,6 @@
 use borsh::BorshSerialize;
 use equity_catalyst_solana::{
-    accounts::*,
-    anchor_client::*,
-    rpc::SolanaRpcClient,
-    AnchorClient, SolanaError,
+    accounts::*, anchor_client::*, rpc::SolanaRpcClient, AnchorClient, SolanaError,
 };
 use solana_sdk::{
     pubkey::Pubkey,
@@ -234,7 +231,9 @@ fn test_instruction_builders_layout() {
     assert_eq!(&wdr_ix.data[..8], &WITHDRAW_DISCRIMINATOR);
 
     // 5. Emergency exit
-    let emg_ix = client.build_emergency_exit_ix(&authority, &v_pda, true).unwrap();
+    let emg_ix = client
+        .build_emergency_exit_ix(&authority, &v_pda, true)
+        .unwrap();
     assert_eq!(&emg_ix.data[..8], &EMERGENCY_EXIT_DISCRIMINATOR);
     assert_eq!(emg_ix.accounts.len(), 2);
 }

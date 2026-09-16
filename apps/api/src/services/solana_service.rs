@@ -18,8 +18,7 @@ use tokio::sync::{mpsc, RwLock};
 use tracing::{info, instrument, warn};
 
 use crate::{
-    engines::decision_engine::signer::ExecutionSigner,
-    error::ApiError,
+    engines::decision_engine::signer::ExecutionSigner, error::ApiError,
     repositories::vault_repository::VaultRepository,
 };
 
@@ -93,7 +92,10 @@ impl SolanaService {
     // ==========================================
 
     #[instrument(skip(self))]
-    pub async fn read_vault_state(&self, vault_address: &str) -> Result<Option<VaultAccount>, ApiError> {
+    pub async fn read_vault_state(
+        &self,
+        vault_address: &str,
+    ) -> Result<Option<VaultAccount>, ApiError> {
         let pubkey = Pubkey::from_str(vault_address)
             .map_err(|e| ApiError::BadRequest(format!("Invalid vault address: {}", e)))?;
 
@@ -108,7 +110,10 @@ impl SolanaService {
     }
 
     #[instrument(skip(self))]
-    pub async fn read_policy_state(&self, vault_address: &str) -> Result<Option<PolicyAccount>, ApiError> {
+    pub async fn read_policy_state(
+        &self,
+        vault_address: &str,
+    ) -> Result<Option<PolicyAccount>, ApiError> {
         let vault_pda = Pubkey::from_str(vault_address)
             .map_err(|e| ApiError::BadRequest(format!("Invalid vault address: {}", e)))?;
         let (policy_pda, _) = find_policy_pda(&vault_pda, &self.program_id);
@@ -154,7 +159,9 @@ impl SolanaService {
             .rpc
             .get_token_account_balance(&pubkey)
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to query token balance: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to query token balance: {}", e))
+            })?;
         Ok(res.amount)
     }
 
@@ -163,11 +170,9 @@ impl SolanaService {
         let pubkey = Pubkey::from_str(account)
             .map_err(|e| ApiError::BadRequest(format!("Invalid account: {}", e)))?;
 
-        let balance = self
-            .rpc
-            .get_balance(&pubkey)
-            .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to query SOL balance: {}", e)))?;
+        let balance = self.rpc.get_balance(&pubkey).await.map_err(|e| {
+            ApiError::InternalServerError(format!("Failed to query SOL balance: {}", e))
+        })?;
         Ok(balance)
     }
 
@@ -186,7 +191,10 @@ impl SolanaService {
                 repo.update_totals(vault_address, onchain.total_shares, onchain.total_deposits)
                     .await?;
                 repo.set_paused(vault_address, onchain.is_paused).await?;
-                info!(vault_address, "Successfully synchronized on-chain state with database");
+                info!(
+                    vault_address,
+                    "Successfully synchronized on-chain state with database"
+                );
             } else {
                 warn!(vault_address, "Vault not found in database for sync update");
             }
@@ -197,10 +205,9 @@ impl SolanaService {
 
     /// Subscribes to real-time Anchor program logs and event notifications via WebSocket.
     pub async fn subscribe_events(&self) -> Result<mpsc::Receiver<LogsNotification>, ApiError> {
-        self.ws
-            .logs_subscribe(&self.program_id)
-            .await
-            .map_err(|e| ApiError::InternalServerError(format!("WebSocket subscription failed: {}", e)))
+        self.ws.logs_subscribe(&self.program_id).await.map_err(|e| {
+            ApiError::InternalServerError(format!("WebSocket subscription failed: {}", e))
+        })
     }
 
     // ==========================================
@@ -239,11 +246,10 @@ impl SolanaService {
         let tx_bytes = bincode::serialize(&tx)
             .map_err(|e| ApiError::InternalServerError(format!("Serialization error: {}", e)))?;
 
-        let sig = self
-            .rpc
-            .send_transaction(&tx_bytes)
-            .await
-            .map_err(|e| ApiError::InternalServerError(format!("RPC submission failed: {}", e)))?;
+        let sig =
+            self.rpc.send_transaction(&tx_bytes).await.map_err(|e| {
+                ApiError::InternalServerError(format!("RPC submission failed: {}", e))
+            })?;
 
         info!(sig = %sig, "Transaction sent to Solana cluster");
         Ok(sig)
@@ -320,6 +326,7 @@ impl SolanaService {
         Ok((sig, vault_pda, policy_pda))
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_policy(
         &self,
         authority: &Keypair,
@@ -420,6 +427,7 @@ impl SolanaService {
             .await
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn execute_action(
         &self,
         keeper: &Keypair,

@@ -108,7 +108,9 @@ impl SolanaWebSocketClient {
                                         };
 
                                         if tx.send(notification).await.is_err() {
-                                            debug!("Logs receiver dropped, closing WebSocket listener");
+                                            debug!(
+                                                "Logs receiver dropped, closing WebSocket listener"
+                                            );
                                             break;
                                         }
                                     }
@@ -177,13 +179,31 @@ impl SolanaWebSocketClient {
                             if let Some(params) = v.get("params") {
                                 if let Some(result) = params.get("result") {
                                     if let Some(val) = result.get("value") {
-                                        let lamports = val.get("lamports").and_then(|l| l.as_u64()).unwrap_or(0);
-                                        let owner = val.get("owner").and_then(|o| o.as_str()).unwrap_or("").to_string();
-                                        let executable = val.get("executable").and_then(|e| e.as_bool()).unwrap_or(false);
-                                        let rent_epoch = val.get("rentEpoch").and_then(|r| r.as_u64()).unwrap_or(0);
-                                        let data = if let Some(arr) = val.get("data").and_then(|d| d.as_array()) {
-                                            if let Some(b64) = arr.first().and_then(|s| s.as_str()) {
-                                                base64::engine::general_purpose::STANDARD.decode(b64).unwrap_or_default()
+                                        let lamports = val
+                                            .get("lamports")
+                                            .and_then(|l| l.as_u64())
+                                            .unwrap_or(0);
+                                        let owner = val
+                                            .get("owner")
+                                            .and_then(|o| o.as_str())
+                                            .unwrap_or("")
+                                            .to_string();
+                                        let executable = val
+                                            .get("executable")
+                                            .and_then(|e| e.as_bool())
+                                            .unwrap_or(false);
+                                        let rent_epoch = val
+                                            .get("rentEpoch")
+                                            .and_then(|r| r.as_u64())
+                                            .unwrap_or(0);
+                                        let data = if let Some(arr) =
+                                            val.get("data").and_then(|d| d.as_array())
+                                        {
+                                            if let Some(b64) = arr.first().and_then(|s| s.as_str())
+                                            {
+                                                base64::engine::general_purpose::STANDARD
+                                                    .decode(b64)
+                                                    .unwrap_or_default()
                                             } else {
                                                 Vec::new()
                                             }

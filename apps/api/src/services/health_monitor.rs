@@ -99,8 +99,12 @@ impl HealthMonitor {
         components.push(self.check_execution_worker().await);
 
         // Calculate aggregate system status
-        let has_unhealthy = components.iter().any(|c| c.status == HealthStatus::Unhealthy);
-        let has_degraded = components.iter().any(|c| c.status == HealthStatus::Degraded);
+        let has_unhealthy = components
+            .iter()
+            .any(|c| c.status == HealthStatus::Unhealthy);
+        let has_degraded = components
+            .iter()
+            .any(|c| c.status == HealthStatus::Degraded);
 
         let overall_status = if has_unhealthy {
             HealthStatus::Unhealthy
@@ -195,7 +199,8 @@ impl HealthMonitor {
             let start = Instant::now();
             match client.get_multiplexed_async_connection().await {
                 Ok(mut conn) => {
-                    let ping_res: Result<String, _> = redis::cmd("PING").query_async(&mut conn).await;
+                    let ping_res: Result<String, _> =
+                        redis::cmd("PING").query_async(&mut conn).await;
                     match ping_res {
                         Ok(pong) => ComponentHealth {
                             name: "Redis".to_string(),

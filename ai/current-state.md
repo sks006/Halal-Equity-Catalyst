@@ -1,35 +1,39 @@
 # Current State
 
 Last updated: 2026-09-16
-Status: BOOTSTRAP
+Status: HEALTHY (Baseline Verified)
 
-## Completed
+## Workspace Baseline Verification
 
-- Repository architecture defined
-- Rust backend selected
-- Pyth Pro selected as core market-data layer
-- Meteora DBC selected as core liquidity layer
-- PreStocks selected as asset provider
-- Tessera selected as secondary asset provider
+- `cargo fmt --all -- --check`: **PASS** (Zero formatting errors)
+- `cargo check --workspace`: **PASS** (All crates check cleanly)
+- `cargo build --workspace`: **PASS** (Built dev profile cleanly)
+- `cargo test --workspace`: **PASS** (68 / 68 tests passing, 0 failed, 0 ignored)
+- `cargo clippy --workspace -- -D warnings`: **PASS** (Zero warnings across all workspace members)
 
-## In Progress
+## Architecture & Implementation Status
 
-None
+- **Phase 00 (Foundation)**: DONE — Cargo workspace, shared models, anchor program, Next.js web app.
+- **Phase 01 (Pyth Pro)**: DONE — Hermes integration, stale price detection, feed registry.
+- **Phase 02 (Asset Registry)**: DONE — PreStocks + Tessera RWA token registry and metadata.
+- **Phase 03 (Meteora DBC)**: DONE — Dynamic Bonding Curve curve math, pool simulations, swap pricing.
+- **Phase 04 (Equity Engine)**: DONE — Portfolio allocation, policy rules, health monitor, risk engine.
+- **Phase 05 (AI Agent)**: DONE — Autonomous keeper decisions, execution quotes, rebalancing workers.
+- **Phase 06 (Execution)**: DONE — Solana Anchor instruction builders, multi-sig policy execution.
+- **Phase 07 (Frontend)**: DONE — Next.js UI, DBC curve simulator, Pyth portfolio dashboards.
+- **Phase 08 (Mainnet)**: IN_PROGRESS — Mainnet verification, real DBC pool deployment.
+- **Phase 09 (Hardening)**: IN_PROGRESS — Security invariants, rate limiting, circuit breakers.
+- **Phase 10 (Submission)**: IN_PROGRESS — Final submission audit and documentation.
 
-## Next
+## Security & Execution Boundary
 
-Phase 00 — Foundation
+- Private key signing strictly isolated to `apps/api/src/engines/decision_engine/signer.rs` and `integrations/solana/anchor_client.rs`.
+- Read-only simulation mode active by default (`read_only: true`).
+- Zero secret keys in client-facing code or git-tracked configs.
+- No unverified external APIs or unauthenticated execution paths.
 
-## Known Risks
+## Known Risks & Focus Areas
 
-- Current external SDK APIs can change.
-- Clawpump implementation surface needs current verification.
-- Exact eligible stock/RWA asset must be verified before mainnet launch.
-
-## Mainnet
-
-No production pool verified yet.
-
-## Blockers
-
-None
+- External RPC & WebSocket stability during live testnet/mainnet deployment.
+- Verification of live on-chain Meteora DBC pool accounts and migration threshold parameters.
+- Ensuring zero slippage / impact limit violations in volatile equity token markets.

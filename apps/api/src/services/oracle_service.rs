@@ -6,11 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
-use crate::{
-    error::ApiError,
-    models::PortfolioModel,
-    repositories::PortfolioRepository,
-};
+use crate::{error::ApiError, models::PortfolioModel, repositories::PortfolioRepository};
 
 /// Service responsible for fetching, validating, and normalizing external oracle price feeds.
 #[derive(Clone)]
@@ -23,10 +19,7 @@ pub struct OracleService {
 
 impl OracleService {
     /// Creates a new OracleService with standard safety thresholds.
-    pub fn new(
-        pyth_client: Arc<PythClient>,
-        portfolio_repo: Option<PortfolioRepository>,
-    ) -> Self {
+    pub fn new(pyth_client: Arc<PythClient>, portfolio_repo: Option<PortfolioRepository>) -> Self {
         Self {
             pyth_client,
             portfolio_repo,
@@ -59,14 +52,21 @@ impl OracleService {
             .get_normalized_price_by_symbol(symbol, self.max_staleness_secs)
             .await
             .map_err(|e| match e {
-                PythError::FeedNotFound(s) => ApiError::NotFound(format!("Oracle feed not found: {}", s)),
-                PythError::StalePrice { symbol, publish_time, max_staleness_secs } => {
-                    ApiError::BadRequest(format!(
-                        "Oracle price for {} is stale (age exceeds {}s, published at {})",
-                        symbol, max_staleness_secs, publish_time
-                    ))
+                PythError::FeedNotFound(s) => {
+                    ApiError::NotFound(format!("Oracle feed not found: {}", s))
                 }
-                other => ApiError::InternalServerError(format!("Oracle failure for {}: {}", symbol, other)),
+                PythError::StalePrice {
+                    symbol,
+                    publish_time,
+                    max_staleness_secs,
+                } => ApiError::BadRequest(format!(
+                    "Oracle price for {} is stale (age exceeds {}s, published at {})",
+                    symbol, max_staleness_secs, publish_time
+                )),
+                other => ApiError::InternalServerError(format!(
+                    "Oracle failure for {}: {}",
+                    symbol, other
+                )),
             })?;
 
         // Validate staleness
@@ -90,7 +90,9 @@ impl OracleService {
                 );
                 return Err(ApiError::BadRequest(format!(
                     "Oracle confidence interval too wide for {}: {:.2}% > limit {:.2}%",
-                    symbol, conf_ratio * 100.0, self.max_confidence_ratio * 100.0
+                    symbol,
+                    conf_ratio * 100.0,
+                    self.max_confidence_ratio * 100.0
                 )));
             }
         }
@@ -117,7 +119,9 @@ impl OracleService {
         vault_address: &str,
     ) -> Result<Vec<PortfolioModel>, ApiError> {
         let repo = self.portfolio_repo.as_ref().ok_or_else(|| {
-            ApiError::InternalServerError("Portfolio repository not configured in OracleService".into())
+            ApiError::InternalServerError(
+                "Portfolio repository not configured in OracleService".into(),
+            )
         })?;
 
         let positions = repo.list_by_vault(vault_address).await?;
@@ -166,7 +170,8 @@ impl OracleService {
         let mut final_positions = Vec::new();
         for mut pos in updated_positions {
             if total_portfolio_usd > 0.0 {
-                let weight_bps = ((pos.current_value_usd / total_portfolio_usd) * 10_000.0).round() as i32;
+                let weight_bps =
+                    ((pos.current_value_usd / total_portfolio_usd) * 10_000.0).round() as i32;
                 pos.current_weight_bps = weight_bps;
             }
             let saved = repo.upsert_position(&pos).await?;

@@ -8,12 +8,7 @@ use axum::{
 };
 use std::sync::Arc;
 
-use crate::{
-    error::ApiError,
-    models::EventModel,
-    repositories::EventRepository,
-    state::AppState,
-};
+use crate::{error::ApiError, models::EventModel, repositories::EventRepository, state::AppState};
 
 pub async fn list_events_handler(
     State(state): State<Arc<AppState>>,

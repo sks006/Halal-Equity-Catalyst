@@ -115,13 +115,15 @@ impl DbcSimulator {
                 current_base_sold += base_out;
                 prev_quote_vol = target_quote_vol;
 
-                let price_impact = ((current_price - input.starting_price) / input.starting_price) * 100.0;
+                let price_impact =
+                    ((current_price - input.starting_price) / input.starting_price) * 100.0;
                 let avg_exec_price = if current_base_sold > 0.0 {
                     current_quote_reserve / current_base_sold
                 } else {
                     current_price
                 };
-                let effective_slippage = ((avg_exec_price - input.starting_price) / input.starting_price) * 100.0;
+                let effective_slippage =
+                    ((avg_exec_price - input.starting_price) / input.starting_price) * 100.0;
 
                 price_path.push(SimulationPricePoint {
                     cumulative_quote_in: target_quote_vol,
@@ -154,7 +156,8 @@ impl DbcSimulator {
         let graduation_estimate = GraduationEstimate {
             quote_needed_to_graduate: input.graduation_threshold,
             price_at_graduation: max_price,
-            base_tokens_sold_at_graduation: current_base_sold * (input.graduation_threshold / current_quote_reserve.max(1.0)),
+            base_tokens_sold_at_graduation: current_base_sold
+                * (input.graduation_threshold / current_quote_reserve.max(1.0)),
             is_graduated_in_simulation: is_graduated,
             estimated_damm_initial_pool_liquidity: input.graduation_threshold * 0.95, // 95% post-migration fee
         };
@@ -319,14 +322,12 @@ impl DbcSimulator {
         let default_dbc_input = DbcSimulationInput {
             name: "Default DBC (Speculative Monolithic)".to_string(),
             starting_price: p0,
-            segments: vec![
-                SimulationSegment {
-                    name: "Monolithic Curve".to_string(),
-                    start_price: p0,
-                    end_price: p0 * 10.0,
-                    liquidity_weight: 1,
-                },
-            ],
+            segments: vec![SimulationSegment {
+                name: "Monolithic Curve".to_string(),
+                start_price: p0,
+                end_price: p0 * 10.0,
+                liquidity_weight: 1,
+            }],
             base_liquidity: 10_000.0,
             base_fee_bps: 100,
             dynamic_fee_multiplier: 1.0,
@@ -400,9 +401,18 @@ mod tests {
         };
 
         let comp = DbcSimulator::compare(req);
-        assert_eq!(comp.config_a.configuration_name, "Configuration A (Equity Discovery)");
-        assert_eq!(comp.config_b.configuration_name, "Configuration B (Aggressive Growth)");
-        assert_eq!(comp.default_dbc.configuration_name, "Default DBC (Speculative Monolithic)");
+        assert_eq!(
+            comp.config_a.configuration_name,
+            "Configuration A (Equity Discovery)"
+        );
+        assert_eq!(
+            comp.config_b.configuration_name,
+            "Configuration B (Aggressive Growth)"
+        );
+        assert_eq!(
+            comp.default_dbc.configuration_name,
+            "Default DBC (Speculative Monolithic)"
+        );
 
         // Config A should have lower price impact at $10k than Default DBC due to 4x concentrated liquidity
         assert!(comp.config_a.price_impact_at_10k < comp.default_dbc.price_impact_at_10k);

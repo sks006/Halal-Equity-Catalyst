@@ -34,10 +34,10 @@ fn create_sample_policy(is_active: bool) -> PolicyModel {
         policy_address: "pol-001-EQTY".to_string(),
         vault_address: "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4".to_string(),
         authority: "auth99X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6".to_string(),
-        max_ltv_bps: 6500,        // 65.00%
-        max_position_bps: 2500,   // 25.00%
-        stop_loss_bps: 800,       // 8.00%
-        take_profit_bps: 2000,    // 20.00%
+        max_ltv_bps: 6500,            // 65.00%
+        max_position_bps: 2500,       // 25.00%
+        stop_loss_bps: 800,           // 8.00%
+        take_profit_bps: 2000,        // 20.00%
         rebalance_threshold_bps: 150, // 1.50%
         is_active,
         bump: 255,
@@ -108,7 +108,10 @@ fn test_policy_engine_approve_cases() {
         .expect("Policy evaluation should succeed");
 
     assert!(matches!(result.rule, PolicyRule::EarningsBeat { .. }));
-    assert_eq!(result.signal.signal_type, equity_catalyst_shared::types::SignalType::Bullish);
+    assert_eq!(
+        result.signal.signal_type,
+        equity_catalyst_shared::types::SignalType::Bullish
+    );
     assert_eq!(result.signal.weight_delta_bps, 500); // +5.00% expansion
 
     // Proposed rebalance trade should buy NVDA
@@ -136,7 +139,10 @@ fn test_policy_engine_approve_cases() {
         .expect("Policy evaluation should succeed");
 
     assert!(matches!(miss_result.rule, PolicyRule::EarningsMiss { .. }));
-    assert_eq!(miss_result.signal.signal_type, equity_catalyst_shared::types::SignalType::Bearish);
+    assert_eq!(
+        miss_result.signal.signal_type,
+        equity_catalyst_shared::types::SignalType::Bearish
+    );
     assert_eq!(miss_result.signal.weight_delta_bps, -500); // -5.00% reduction
 }
 
@@ -161,9 +167,14 @@ fn test_policy_engine_reject_and_halt_cases() {
         processed_at: None,
     };
 
-    let inactive_res = engine.evaluate(&event, &inactive_policy, &positions, total_value).unwrap();
+    let inactive_res = engine
+        .evaluate(&event, &inactive_policy, &positions, total_value)
+        .unwrap();
     assert_eq!(inactive_res.rule, PolicyRule::NoOp);
-    assert_eq!(inactive_res.signal.signal_type, equity_catalyst_shared::types::SignalType::Neutral);
+    assert_eq!(
+        inactive_res.signal.signal_type,
+        equity_catalyst_shared::types::SignalType::Neutral
+    );
     assert!(inactive_res.proposed_trades.is_empty());
 
     // Case 2: Emergency Halt Event
@@ -180,11 +191,20 @@ fn test_policy_engine_reject_and_halt_cases() {
     };
 
     let active_policy = create_sample_policy(true);
-    let halt_res = engine.evaluate(&halt_event, &active_policy, &positions, total_value).unwrap();
+    let halt_res = engine
+        .evaluate(&halt_event, &active_policy, &positions, total_value)
+        .unwrap();
     assert_eq!(halt_res.rule, PolicyRule::EmergencyHalt);
-    assert_eq!(halt_res.signal.signal_type, equity_catalyst_shared::types::SignalType::EmergencyExit);
+    assert_eq!(
+        halt_res.signal.signal_type,
+        equity_catalyst_shared::types::SignalType::EmergencyExit
+    );
     // Liquidates non-USDC assets to cash
-    let sell_trade = halt_res.proposed_trades.iter().find(|t| t.symbol == "NVDA").unwrap();
+    let sell_trade = halt_res
+        .proposed_trades
+        .iter()
+        .find(|t| t.symbol == "NVDA")
+        .unwrap();
     assert!(!sell_trade.is_buy);
 
     // Case 3: Empty Portfolio Rejection
@@ -339,7 +359,11 @@ fn test_risk_engine_reject_cases() {
     );
     match res_stop {
         RiskAssessment::Rejected { reason } => {
-            assert!(reason.to_lowercase().contains("stop-loss"), "Reason: {}", reason);
+            assert!(
+                reason.to_lowercase().contains("stop-loss"),
+                "Reason: {}",
+                reason
+            );
         }
         _ => panic!("Expected rejection on stop loss"),
     }
@@ -400,13 +424,21 @@ fn test_decision_engine_reject_cases() {
 
     // Case 1: Preflight rejection on paused vault
     let paused_vault = create_sample_vault(true);
-    let paused_err = decision_engine.process_event(&event, &paused_vault, &policy, &positions, 4_850_000, 0);
+    let paused_err =
+        decision_engine.process_event(&event, &paused_vault, &policy, &positions, 4_850_000, 0);
     assert!(matches!(paused_err, Err(ApiError::BadRequest(msg)) if msg.contains("paused")));
 
     // Case 2: Preflight rejection on inactive policy
     let active_vault = create_sample_vault(false);
     let inactive_policy = create_sample_policy(false);
-    let inactive_err = decision_engine.process_event(&event, &active_vault, &inactive_policy, &positions, 4_850_000, 0);
+    let inactive_err = decision_engine.process_event(
+        &event,
+        &active_vault,
+        &inactive_policy,
+        &positions,
+        4_850_000,
+        0,
+    );
     assert!(matches!(inactive_err, Err(ApiError::BadRequest(msg)) if msg.contains("inactive")));
 }
 
@@ -419,11 +451,17 @@ fn test_execution_quote_evaluation_approve_and_reject() {
     // APPROVE scenario: 4 bps impact is well within 150 bps limit
     let low_impact_bps = 4;
     let max_allowed = 150;
-    assert!(low_impact_bps <= max_allowed, "Low impact quote should be approved");
+    assert!(
+        low_impact_bps <= max_allowed,
+        "Low impact quote should be approved"
+    );
 
     // REJECT scenario: 350 bps impact breaches 150 bps limit
     let high_impact_bps = 350;
-    assert!(high_impact_bps > max_allowed, "High impact quote must be rejected");
+    assert!(
+        high_impact_bps > max_allowed,
+        "High impact quote must be rejected"
+    );
 
     // Paused vault rejection logic check
     let vault = create_sample_vault(true);
@@ -431,5 +469,8 @@ fn test_execution_quote_evaluation_approve_and_reject() {
 
     // Inactive policy rejection logic check
     let policy = create_sample_policy(false);
-    assert!(!policy.is_active, "Inactive policy should trigger rejection");
+    assert!(
+        !policy.is_active,
+        "Inactive policy should trigger rejection"
+    );
 }

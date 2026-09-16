@@ -9,10 +9,7 @@ use axum::{
 use std::sync::Arc;
 
 use crate::{
-    error::ApiError,
-    models::PolicyModel,
-    repositories::PolicyRepository,
-    state::AppState,
+    error::ApiError, models::PolicyModel, repositories::PolicyRepository, state::AppState,
 };
 
 pub async fn list_policies_handler(
@@ -28,10 +25,9 @@ pub async fn get_policy_handler(
     Path(vault_address): Path<String>,
 ) -> Result<Json<PolicyModel>, ApiError> {
     let repo = PolicyRepository::new(state.db_pool.clone());
-    let policy = repo
-        .find_by_vault(&vault_address)
-        .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Policy not found for vault: {}", vault_address)))?;
+    let policy = repo.find_by_vault(&vault_address).await?.ok_or_else(|| {
+        ApiError::NotFound(format!("Policy not found for vault: {}", vault_address))
+    })?;
     Ok(Json(policy))
 }
 

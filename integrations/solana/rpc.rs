@@ -2,7 +2,11 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use solana_sdk::{hash::Hash, pubkey::Pubkey, signature::Signature};
-use std::{str::FromStr, sync::atomic::{AtomicU64, Ordering}, time::Duration};
+use std::{
+    str::FromStr,
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
 use tracing::{debug, info, instrument};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,7 +66,11 @@ impl SolanaRpcClient {
         &self.commitment
     }
 
-    async fn send_rpc_request(&self, method: &str, params: Value) -> Result<Value, crate::SolanaError> {
+    async fn send_rpc_request(
+        &self,
+        method: &str,
+        params: Value,
+    ) -> Result<Value, crate::SolanaError> {
         let id = self.request_id.fetch_add(1, Ordering::Relaxed);
         let payload = json!({
             "jsonrpc": "2.0",
@@ -112,7 +120,10 @@ impl SolanaRpcClient {
     }
 
     #[instrument(skip(self), fields(pubkey = %pubkey))]
-    pub async fn get_account_info(&self, pubkey: &Pubkey) -> Result<Option<AccountInfo>, crate::SolanaError> {
+    pub async fn get_account_info(
+        &self,
+        pubkey: &Pubkey,
+    ) -> Result<Option<AccountInfo>, crate::SolanaError> {
         let params = json!([
             pubkey.to_string(),
             {
@@ -130,13 +141,19 @@ impl SolanaRpcClient {
         let val = value.unwrap();
         let lamports = val.get("lamports").and_then(|l| l.as_u64()).unwrap_or(0);
         let owner_str = val.get("owner").and_then(|o| o.as_str()).unwrap_or("");
-        let owner = Pubkey::from_str(owner_str).map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?;
-        let executable = val.get("executable").and_then(|e| e.as_bool()).unwrap_or(false);
+        let owner = Pubkey::from_str(owner_str)
+            .map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?;
+        let executable = val
+            .get("executable")
+            .and_then(|e| e.as_bool())
+            .unwrap_or(false);
         let rent_epoch = val.get("rentEpoch").and_then(|r| r.as_u64()).unwrap_or(0);
 
         let data_bytes = if let Some(data_arr) = val.get("data").and_then(|d| d.as_array()) {
             if let Some(b64_str) = data_arr.first().and_then(|s| s.as_str()) {
-                BASE64.decode(b64_str).map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?
+                BASE64
+                    .decode(b64_str)
+                    .map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?
             } else {
                 Vec::new()
             }
@@ -172,7 +189,10 @@ impl SolanaRpcClient {
     }
 
     #[instrument(skip(self), fields(pubkey = %pubkey))]
-    pub async fn get_token_account_balance(&self, pubkey: &Pubkey) -> Result<TokenAccountBalance, crate::SolanaError> {
+    pub async fn get_token_account_balance(
+        &self,
+        pubkey: &Pubkey,
+    ) -> Result<TokenAccountBalance, crate::SolanaError> {
         let params = json!([
             pubkey.to_string(),
             {
@@ -180,7 +200,9 @@ impl SolanaRpcClient {
             }
         ]);
 
-        let result = self.send_rpc_request("getTokenAccountBalance", params).await?;
+        let result = self
+            .send_rpc_request("getTokenAccountBalance", params)
+            .await?;
         let val = result.get("value").unwrap_or(&result);
 
         let amount_str = val.get("amount").and_then(|a| a.as_str()).unwrap_or("0");
@@ -213,8 +235,12 @@ impl SolanaRpcClient {
                 code: -1,
                 message: "Missing blockhash in getLatestBlockhash response".to_string(),
             })?;
-        let hash = Hash::from_str(hash_str).map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?;
-        let last_valid = val.get("lastValidBlockHeight").and_then(|h| h.as_u64()).unwrap_or(0);
+        let hash = Hash::from_str(hash_str)
+            .map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?;
+        let last_valid = val
+            .get("lastValidBlockHeight")
+            .and_then(|h| h.as_u64())
+            .unwrap_or(0);
 
         Ok((hash, last_valid))
     }
@@ -239,7 +265,8 @@ impl SolanaRpcClient {
                 message: "Missing signature in sendTransaction response".to_string(),
             })?;
 
-        Signature::from_str(sig_str).map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))
+        Signature::from_str(sig_str)
+            .map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))
     }
 
     #[instrument(skip(self, tx_bytes))]
@@ -268,7 +295,10 @@ impl SolanaRpcClient {
     }
 
     #[instrument(skip(self), fields(sig = %sig))]
-    pub async fn get_signature_status(&self, sig: &Signature) -> Result<Option<SignatureStatus>, crate::SolanaError> {
+    pub async fn get_signature_status(
+        &self,
+        sig: &Signature,
+    ) -> Result<Option<SignatureStatus>, crate::SolanaError> {
         let params = json!([
             [sig.to_string()],
             {
@@ -276,7 +306,9 @@ impl SolanaRpcClient {
             }
         ]);
 
-        let result = self.send_rpc_request("getSignatureStatuses", params).await?;
+        let result = self
+            .send_rpc_request("getSignatureStatuses", params)
+            .await?;
         let values = result
             .get("value")
             .and_then(|v| v.as_array())
@@ -290,9 +322,15 @@ impl SolanaRpcClient {
                 return Ok(None);
             }
             let slot = first.get("slot").and_then(|s| s.as_u64()).unwrap_or(0);
-            let confirmations = first.get("confirmations").and_then(|c| c.as_u64()).map(|c| c as usize);
+            let confirmations = first
+                .get("confirmations")
+                .and_then(|c| c.as_u64())
+                .map(|c| c as usize);
             let err = first.get("err").cloned().filter(|e| !e.is_null());
-            let confirmation_status = first.get("confirmationStatus").and_then(|s| s.as_str()).map(|s| s.to_string());
+            let confirmation_status = first
+                .get("confirmationStatus")
+                .and_then(|s| s.as_str())
+                .map(|s| s.to_string());
 
             Ok(Some(SignatureStatus {
                 slot,

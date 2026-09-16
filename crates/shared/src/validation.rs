@@ -1,7 +1,7 @@
 //! Domain validation primitives for Equity Catalyst.
 
-use thiserror::Error;
 use std::collections::HashSet;
+use thiserror::Error;
 
 use crate::constants::MAX_BPS;
 use crate::types::{AssetWeight, BasisPoints, RiskLimits};

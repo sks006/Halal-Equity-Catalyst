@@ -1,5 +1,5 @@
-use thiserror::Error;
 use crate::engines::dbc_engine::config::DbcConfigRequest;
+use thiserror::Error;
 
 #[derive(Debug, Error, PartialEq)]
 pub enum DbcValidationError {
@@ -28,15 +28,24 @@ pub fn validate_dbc_request(req: &DbcConfigRequest) -> Result<(), DbcValidationE
     let quote = req.quote_token.trim().to_uppercase();
     match quote.as_str() {
         "USDC" | "USDT" | "SOL" | "WSOL" => {}
-        _ => return Err(DbcValidationError::UnsupportedQuoteToken(req.quote_token.clone())),
+        _ => {
+            return Err(DbcValidationError::UnsupportedQuoteToken(
+                req.quote_token.clone(),
+            ))
+        }
     }
 
     if req.initial_price <= 0.0 || req.initial_price.is_nan() || req.initial_price.is_infinite() {
         return Err(DbcValidationError::InvalidInitialPrice(req.initial_price));
     }
 
-    if req.graduation_threshold < 10.0 || req.graduation_threshold.is_nan() || req.graduation_threshold.is_infinite() {
-        return Err(DbcValidationError::InvalidGraduationThreshold(req.graduation_threshold));
+    if req.graduation_threshold < 10.0
+        || req.graduation_threshold.is_nan()
+        || req.graduation_threshold.is_infinite()
+    {
+        return Err(DbcValidationError::InvalidGraduationThreshold(
+            req.graduation_threshold,
+        ));
     }
 
     if let Some(supply) = req.total_supply {

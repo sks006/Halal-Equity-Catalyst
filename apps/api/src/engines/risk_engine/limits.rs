@@ -18,8 +18,7 @@ pub fn validate_trade_limits(
             return Err(format!("Trade for {} has zero USD value", trade.symbol));
         }
 
-        if total_portfolio_usd > 0 {
-            let trade_bps = (trade.trade_value * 10_000) / total_portfolio_usd;
+        if let Some(trade_bps) = (trade.trade_value * 10_000).checked_div(total_portfolio_usd) {
             if trade_bps > MAX_SINGLE_TRADE_BPS as u64 {
                 return Err(format!(
                     "Trade size ${} for {} exceeds single trade limit of 10.00% ({} bps > {} bps)",

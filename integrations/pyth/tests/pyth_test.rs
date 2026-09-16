@@ -81,27 +81,23 @@ fn test_feed_registry_lookups_and_custom_registration() {
     let registry = PythFeedRegistry::new();
 
     // Check defaults
-    assert_eq!(
-        registry.get_feed_id("SOL").unwrap(),
-        known_feeds::SOL_USD
-    );
-    assert_eq!(
-        registry.get_feed_id("USDC").unwrap(),
-        known_feeds::USDC_USD
-    );
-    assert_eq!(
-        registry.get_feed_id("AAPL").unwrap(),
-        known_feeds::AAPL_USD
-    );
+    assert_eq!(registry.get_feed_id("SOL").unwrap(), known_feeds::SOL_USD);
+    assert_eq!(registry.get_feed_id("USDC").unwrap(), known_feeds::USDC_USD);
+    assert_eq!(registry.get_feed_id("AAPL").unwrap(), known_feeds::AAPL_USD);
 
     // Dynamic registration
-    registry.register_feed("GOOGL", "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff");
+    registry.register_feed(
+        "GOOGL",
+        "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff",
+    );
     assert_eq!(
         registry.get_feed_id("GOOGL").unwrap(),
         "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff"
     );
     assert_eq!(
-        registry.get_symbol("11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff").unwrap(),
+        registry
+            .get_symbol("11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff")
+            .unwrap(),
         "GOOGL"
     );
 }

@@ -1,8 +1,6 @@
 //! Main executable entrypoint for Equity Catalyst API.
 
-use equity_catalyst_api::{
-    config::Config, create_db_pool, router::create_router, state::AppState,
-};
+use equity_catalyst_api::{config::Config, create_db_pool, router::create_router, state::AppState};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{error, info, warn};
@@ -60,19 +58,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     ));
 
     // Initialize Pyth client and Oracle service
-    let pyth_client = Arc::new(equity_catalyst_pyth::PythClient::new(&config.pyth_hermes_url));
-    let portfolio_repo = equity_catalyst_api::repositories::PortfolioRepository::new(db_pool.clone());
+    let pyth_client = Arc::new(equity_catalyst_pyth::PythClient::new(
+        &config.pyth_hermes_url,
+    ));
+    let portfolio_repo =
+        equity_catalyst_api::repositories::PortfolioRepository::new(db_pool.clone());
     let oracle_service = Arc::new(equity_catalyst_api::services::OracleService::new(
         pyth_client,
         Some(portfolio_repo.clone()),
     ));
 
     // Initialize Jupiter client and Quote Execution service
-    let jupiter_client = Arc::new(equity_catalyst_jupiter::JupiterClient::new(&config.jupiter_api_url));
+    let jupiter_client = Arc::new(equity_catalyst_jupiter::JupiterClient::new(
+        &config.jupiter_api_url,
+    ));
     let risk_engine = Arc::new(equity_catalyst_api::engines::risk_engine::RiskEngine::new());
     let vault_repo = equity_catalyst_api::repositories::VaultRepository::new(db_pool.clone());
     let policy_repo = equity_catalyst_api::repositories::PolicyRepository::new(db_pool.clone());
-    let execution_repo = equity_catalyst_api::repositories::ExecutionRepository::new(db_pool.clone());
+    let execution_repo =
+        equity_catalyst_api::repositories::ExecutionRepository::new(db_pool.clone());
     let quote_service = Arc::new(equity_catalyst_api::services::QuoteExecutionService::new(
         jupiter_client,
         risk_engine,

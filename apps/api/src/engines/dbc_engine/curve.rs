@@ -1,7 +1,4 @@
-use crate::engines::dbc_engine::{
-    config::CurveSegmentConfig,
-    pricing::compute_sqrt_price_q64,
-};
+use crate::engines::dbc_engine::{config::CurveSegmentConfig, pricing::compute_sqrt_price_q64};
 
 /// Generates piecewise curve segments based on the requested curve profile and initial anchor price.
 pub fn generate_curve_segments(

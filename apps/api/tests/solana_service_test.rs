@@ -29,7 +29,14 @@ async fn test_solana_service_read_only_default_and_transition() {
     let dummy_mint = Keypair::new().pubkey();
 
     let res = service
-        .deposit(&dummy_user, &dummy_vault, &dummy_ata, &dummy_ata, &dummy_mint, 1000)
+        .deposit(
+            &dummy_user,
+            &dummy_vault,
+            &dummy_ata,
+            &dummy_ata,
+            &dummy_mint,
+            1000,
+        )
         .await;
 
     match res {
