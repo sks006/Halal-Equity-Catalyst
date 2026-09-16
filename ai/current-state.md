@@ -8,18 +8,18 @@ Status: HEALTHY (Baseline Verified)
 - `cargo fmt --all -- --check`: **PASS** (Zero formatting errors)
 - `cargo check --workspace`: **PASS** (All crates check cleanly)
 - `cargo build --workspace`: **PASS** (Built dev profile cleanly)
-- `cargo test --workspace`: **PASS** (68 / 68 tests passing, 0 failed, 0 ignored)
+- `cargo test --workspace`: **PASS** (85 / 85 tests passing, 0 failed, 0 ignored)
 - `cargo clippy --workspace -- -D warnings`: **PASS** (Zero warnings across all workspace members)
 
 ## Architecture & Implementation Status
 
 - **Phase 00 (Foundation)**: DONE — Cargo workspace, shared models, anchor program, Next.js web app.
 - **Phase 01 (Pyth Pro)**: DONE — Hermes integration, stale price detection, feed registry.
-- **Phase 02 (Asset Registry)**: DONE — PreStocks + Tessera RWA token registry and metadata.
-- **Phase 03 (Meteora DBC)**: DONE — Dynamic Bonding Curve curve math, pool simulations, swap pricing.
-- **Phase 04 (Equity Engine)**: DONE — Portfolio allocation, policy rules, health monitor, risk engine.
-- **Phase 05 (AI Agent)**: DONE — Autonomous keeper decisions, execution quotes, rebalancing workers.
-- **Phase 06 (Execution)**: DONE — Solana Anchor instruction builders, multi-sig policy execution.
+- **Phase 02 (Asset Registry)**: DONE — PreStocks + Tessera RWA token registry and metadata, validation rules.
+- **Phase 03 (Meteora DBC)**: DONE — Dynamic Bonding Curve adapter, liquidity traits, quote structures, pool state.
+- **Phase 04 (Equity Engine)**: DONE — Deterministic portfolio, positions, valuations, rebalancing planner, limits.
+- **Phase 05 (AI Agent)**: DONE — Constrained AgentProposal, 5-stage deterministic validation gate, audit logging.
+- **Phase 06 (Execution)**: DONE — ExecutionEngineService, idempotency, fresh revalidation, simulation gate, signing boundary, reconciliation.
 - **Phase 07 (Frontend)**: DONE — Next.js UI, DBC curve simulator, Pyth portfolio dashboards.
 - **Phase 08 (Mainnet)**: IN_PROGRESS — Mainnet verification, real DBC pool deployment.
 - **Phase 09 (Hardening)**: IN_PROGRESS — Security invariants, rate limiting, circuit breakers.

@@ -1,3 +1,4 @@
+pub mod adapter;
 pub mod config;
 pub mod curve;
 pub mod graduation;
@@ -5,6 +6,7 @@ pub mod pricing;
 pub mod simulator;
 pub mod validation;
 
+pub use adapter::{DbcError, LiquidityProvider, MeteoraDbcProvider};
 pub use config::{
     CurveSegmentConfig, DbcConfigRequest, DbcConfigResponse, FeeStructureConfig,
     GraduationTargetConfig,

@@ -1,17 +1,25 @@
 //! Shared deterministic domain logic for Equity Catalyst.
 
+pub mod agent;
 pub mod allocation;
+pub mod asset;
 pub mod constants;
+pub mod liquidity;
 pub mod math;
 pub mod policy;
+pub mod portfolio;
 pub mod risk;
 pub mod types;
 pub mod validation;
 
+pub use agent::*;
 pub use allocation::*;
+pub use asset::*;
 pub use constants::*;
+pub use liquidity::*;
 pub use math::*;
 pub use policy::*;
+pub use portfolio::*;
 pub use risk::*;
 pub use types::*;
 pub use validation::*;
