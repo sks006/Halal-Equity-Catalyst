@@ -481,4 +481,3 @@ async fn test_rpc_client_exhaustion_returns_error() {
         other => panic!("Expected RpcError 500, got {:?}", other),
     }
 }
-

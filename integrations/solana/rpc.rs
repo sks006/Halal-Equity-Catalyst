@@ -48,10 +48,7 @@ impl SolanaRpcClient {
         Self::new_with_fallbacks(rpc_url, Vec::new())
     }
 
-    pub fn new_with_fallbacks(
-        primary_url: impl Into<String>,
-        fallback_urls: Vec<String>,
-    ) -> Self {
+    pub fn new_with_fallbacks(primary_url: impl Into<String>, fallback_urls: Vec<String>) -> Self {
         Self {
             client: reqwest::Client::builder()
                 .timeout(Duration::from_secs(30))

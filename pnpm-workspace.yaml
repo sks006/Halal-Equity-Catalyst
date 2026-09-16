@@ -4,5 +4,6 @@ allowBuilds:
   utf-8-validate: true
 
 overrides:
-  uuid: 9.0.1
+  uuid: ^9.0.1
+  stream-json: ^3.5.0
 
