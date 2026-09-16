@@ -92,7 +92,10 @@ async fn test_step33_quote_only_execution_approval_flow() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    vault_repo.create(&vault).await.expect("Vault creation failed");
+    vault_repo
+        .create(&vault)
+        .await
+        .expect("Vault creation failed");
 
     // 2. Seed active policy: 3% max rebalance drift (300 bps), 30% max position (3000 bps)
     let policy = PolicyModel {
@@ -109,7 +112,10 @@ async fn test_step33_quote_only_execution_approval_flow() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    policy_repo.upsert(&policy).await.expect("Policy upsert failed");
+    policy_repo
+        .upsert(&policy)
+        .await
+        .expect("Policy upsert failed");
 
     // 3. Configure Jupiter mock client with 0.05% (5 bps) price impact
     let jupiter_mock = Arc::new(JupiterClient::new_mock());
@@ -136,19 +142,32 @@ async fn test_step33_quote_only_execution_approval_flow() {
         target_symbol: Some("USDC".to_string()),
     };
 
-    let verdict = quote_service.evaluate_quote(&req).await.expect("Quote evaluation failed");
+    let verdict = quote_service
+        .evaluate_quote(&req)
+        .await
+        .expect("Quote evaluation failed");
 
     // 5. Verify outcomes
     assert!(verdict.approved, "Quote should be approved by Risk Engine");
     assert_eq!(verdict.expected_amount_out, 145_000_000);
     assert_eq!(verdict.price_impact_bps, 5);
-    assert!(verdict.is_dry_run, "Dry-run flag must be true (no real swap executed)");
+    assert!(
+        verdict.is_dry_run,
+        "Dry-run flag must be true (no real swap executed)"
+    );
     assert!(verdict.rejection_reason.is_none());
 
     // 6. Verify audit entry in PostgreSQL
-    let saved_exec = exec_repo.find_by_id(verdict.execution_id).await.unwrap().unwrap();
+    let saved_exec = exec_repo
+        .find_by_id(verdict.execution_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(saved_exec.status, "QUOTE_ONLY");
-    assert!(saved_exec.tx_signature.is_none(), "No on-chain transaction signature allowed in quote mode");
+    assert!(
+        saved_exec.tx_signature.is_none(),
+        "No on-chain transaction signature allowed in quote mode"
+    );
     assert_eq!(saved_exec.amount_out_expected, 145_000_000);
 }
 
@@ -178,7 +197,10 @@ async fn test_step33_quote_rejection_on_excessive_price_impact() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    vault_repo.create(&vault).await.expect("Vault creation failed");
+    vault_repo
+        .create(&vault)
+        .await
+        .expect("Vault creation failed");
 
     // Policy allows up to 2.00% (200 bps) impact
     let policy = PolicyModel {
@@ -195,7 +217,10 @@ async fn test_step33_quote_rejection_on_excessive_price_impact() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    policy_repo.upsert(&policy).await.expect("Policy upsert failed");
+    policy_repo
+        .upsert(&policy)
+        .await
+        .expect("Policy upsert failed");
 
     // Mock quote with 4.50% (450 bps) price impact
     let jupiter_mock = Arc::new(JupiterClient::new_mock());
@@ -221,15 +246,28 @@ async fn test_step33_quote_rejection_on_excessive_price_impact() {
         target_symbol: Some("USDC".to_string()),
     };
 
-    let verdict = quote_service.evaluate_quote(&req).await.expect("Evaluation should succeed with rejection verdict");
+    let verdict = quote_service
+        .evaluate_quote(&req)
+        .await
+        .expect("Evaluation should succeed with rejection verdict");
 
-    assert!(!verdict.approved, "Quote should be rejected due to excessive price impact");
+    assert!(
+        !verdict.approved,
+        "Quote should be rejected due to excessive price impact"
+    );
     assert_eq!(verdict.price_impact_bps, 450);
     assert!(verdict.rejection_reason.is_some());
-    assert!(verdict.rejection_reason.unwrap().contains("breaches maximum allowed limit"));
+    assert!(verdict
+        .rejection_reason
+        .unwrap()
+        .contains("breaches maximum allowed limit"));
 
     // Check DB status is REJECTED
-    let saved_exec = exec_repo.find_by_id(verdict.execution_id).await.unwrap().unwrap();
+    let saved_exec = exec_repo
+        .find_by_id(verdict.execution_id)
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(saved_exec.status, "REJECTED");
 }
 
@@ -257,7 +295,10 @@ async fn test_step33_quote_rejection_on_paused_vault() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    vault_repo.create(&vault).await.expect("Vault creation failed");
+    vault_repo
+        .create(&vault)
+        .await
+        .expect("Vault creation failed");
 
     let policy = PolicyModel {
         policy_address: format!("Policy_{}", Uuid::new_v4().simple()),
@@ -273,7 +314,10 @@ async fn test_step33_quote_rejection_on_paused_vault() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    policy_repo.upsert(&policy).await.expect("Policy upsert failed");
+    policy_repo
+        .upsert(&policy)
+        .await
+        .expect("Policy upsert failed");
 
     let jupiter_mock = Arc::new(JupiterClient::new_mock());
     let quote = create_mock_quote(sol_mint, usdc_mint, "1000000", "145000", "0.01");
@@ -321,10 +365,8 @@ async fn test_quote_evaluate_http_endpoint() {
         None,
     ));
 
-    let state = Arc::new(
-        AppState::new(test_config(), pool, None, None)
-            .with_quote_service(quote_service),
-    );
+    let state =
+        Arc::new(AppState::new(test_config(), pool, None, None).with_quote_service(quote_service));
     let app = create_router(state);
 
     let request_payload = serde_json::json!({

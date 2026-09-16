@@ -1,9 +1,7 @@
 //! Stop-loss and take-profit condition checks.
 
 use equity_catalyst_shared::{
-    allocation::RebalanceTrade,
-    risk::is_stop_loss_triggered,
-    types::BasisPoints,
+    allocation::RebalanceTrade, risk::is_stop_loss_triggered, types::BasisPoints,
 };
 
 use crate::models::PortfolioModel;

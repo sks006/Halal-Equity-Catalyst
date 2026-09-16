@@ -1,35 +1,39 @@
 # Current State
 
 Last updated: 2026-09-16
-Status: BOOTSTRAP
+Status: HEALTHY (Baseline Verified)
 
-## Completed
+## Workspace Baseline Verification
 
-- Repository architecture defined
-- Rust backend selected
-- Pyth Pro selected as core market-data layer
-- Meteora DBC selected as core liquidity layer
-- PreStocks selected as asset provider
-- Tessera selected as secondary asset provider
+- `cargo fmt --all -- --check`: **PASS** (Zero formatting errors)
+- `cargo check --workspace`: **PASS** (All crates check cleanly)
+- `cargo build --workspace`: **PASS** (Built dev profile cleanly)
+- `cargo test --workspace`: **PASS** (85 / 85 tests passing, 0 failed, 0 ignored)
+- `cargo clippy --workspace -- -D warnings`: **PASS** (Zero warnings across all workspace members)
 
-## In Progress
+## Architecture & Implementation Status
 
-None
+- **Phase 00 (Foundation)**: DONE — Cargo workspace, shared models, anchor program, Next.js web app.
+- **Phase 01 (Pyth Pro)**: DONE — Hermes integration, stale price detection, feed registry.
+- **Phase 02 (Asset Registry)**: DONE — PreStocks + Tessera RWA token registry and metadata, validation rules.
+- **Phase 03 (Meteora DBC)**: DONE — Dynamic Bonding Curve adapter, liquidity traits, quote structures, pool state.
+- **Phase 04 (Equity Engine)**: DONE — Deterministic portfolio, positions, valuations, rebalancing planner, limits.
+- **Phase 05 (AI Agent)**: DONE — Constrained AgentProposal, 5-stage deterministic validation gate, audit logging.
+- **Phase 06 (Execution)**: DONE — ExecutionEngineService, idempotency, fresh revalidation, simulation gate, signing boundary, reconciliation.
+- **Phase 07 (Frontend)**: DONE — 9 core areas, typed API client, live dashboard, asset explorer, AI decision transparency gate, 6-stage proposal pipeline, execution ledger, error handling suite, and strict credential isolation.
+- **Phase 08 (Mainnet)**: IN_PROGRESS — Mainnet verification, real DBC pool deployment.
+- **Phase 09 (Hardening)**: IN_PROGRESS — Security invariants, rate limiting, circuit breakers.
+- **Phase 10 (Submission)**: IN_PROGRESS — Final submission audit and documentation.
 
-## Next
+## Security & Execution Boundary
 
-Phase 00 — Foundation
+- Private key signing strictly isolated to `apps/api/src/engines/decision_engine/signer.rs` and `integrations/solana/anchor_client.rs`.
+- Read-only simulation mode active by default (`read_only: true`).
+- Zero secret keys in client-facing code or git-tracked configs.
+- No unverified external APIs or unauthenticated execution paths.
 
-## Known Risks
+## Known Risks & Focus Areas
 
-- Current external SDK APIs can change.
-- Clawpump implementation surface needs current verification.
-- Exact eligible stock/RWA asset must be verified before mainnet launch.
-
-## Mainnet
-
-No production pool verified yet.
-
-## Blockers
-
-None
+- External RPC & WebSocket stability during live testnet/mainnet deployment.
+- Verification of live on-chain Meteora DBC pool accounts and migration threshold parameters.
+- Ensuring zero slippage / impact limit violations in volatile equity token markets.

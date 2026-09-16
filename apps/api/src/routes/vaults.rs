@@ -8,12 +8,7 @@ use axum::{
 };
 use std::sync::Arc;
 
-use crate::{
-    error::ApiError,
-    models::VaultModel,
-    repositories::VaultRepository,
-    state::AppState,
-};
+use crate::{error::ApiError, models::VaultModel, repositories::VaultRepository, state::AppState};
 
 pub async fn list_vaults_handler(
     State(state): State<Arc<AppState>>,

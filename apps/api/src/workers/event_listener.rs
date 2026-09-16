@@ -2,10 +2,7 @@
 //! persisting events to PostgreSQL, and publishing to Redis queues for policy evaluation.
 
 use chrono::Utc;
-use equity_catalyst_solana::{
-    accounts::*,
-    websocket::LogsNotification,
-};
+use equity_catalyst_solana::{accounts::*, websocket::LogsNotification};
 use redis::AsyncCommands;
 use serde_json::json;
 use tokio::sync::broadcast;
@@ -13,9 +10,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::{
-    error::ApiError,
-    models::EventModel,
-    repositories::event_repository::EventRepository,
+    error::ApiError, models::EventModel, repositories::event_repository::EventRepository,
     services::SolanaService,
 };
 

@@ -51,13 +51,13 @@ pub fn withdraw(ctx: Context<Withdraw>, shares_to_burn: u64) -> Result<()> {
     require!(shares_to_burn > 0, VaultError::InsufficientShares);
 
     let user_shares = &mut ctx.accounts.user_shares;
-    require!(user_shares.shares >= shares_to_burn, VaultError::InsufficientShares);
+    require!(
+        user_shares.shares >= shares_to_burn,
+        VaultError::InsufficientShares
+    );
 
-    let assets_to_return = calculate_assets_to_withdraw(
-        shares_to_burn,
-        vault.total_deposits,
-        vault.total_shares,
-    )?;
+    let assets_to_return =
+        calculate_assets_to_withdraw(shares_to_burn, vault.total_deposits, vault.total_shares)?;
 
     // CPI Transfer from Vault token account to User signed by Vault PDA
     let authority_key = vault.authority;

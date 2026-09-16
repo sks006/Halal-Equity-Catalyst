@@ -4,7 +4,8 @@ use equity_catalyst_api::{
     create_db_pool,
     models::{EventModel, ExecutionModel, PolicyModel, PortfolioModel, VaultModel},
     repositories::{
-        EventRepository, ExecutionRepository, PolicyRepository, PortfolioRepository, VaultRepository,
+        EventRepository, ExecutionRepository, PolicyRepository, PortfolioRepository,
+        VaultRepository,
     },
 };
 use uuid::Uuid;
@@ -29,7 +30,8 @@ fn setup_repositories() -> (
 
 #[tokio::test]
 async fn test_full_repository_lifecycle() {
-    let (vault_repo, policy_repo, event_repo, execution_repo, portfolio_repo) = setup_repositories();
+    let (vault_repo, policy_repo, event_repo, execution_repo, portfolio_repo) =
+        setup_repositories();
 
     let random_suffix = &Uuid::new_v4().to_string()[..8];
     let vault_address = format!("TestVault{}", random_suffix);
@@ -52,7 +54,10 @@ async fn test_full_repository_lifecycle() {
         updated_at: Utc::now(),
     };
 
-    let created_vault = vault_repo.create(&vault).await.expect("Failed to create vault");
+    let created_vault = vault_repo
+        .create(&vault)
+        .await
+        .expect("Failed to create vault");
     assert_eq!(created_vault.vault_address, vault_address);
     assert_eq!(created_vault.name, "Test NVDA Vault");
 
@@ -97,7 +102,10 @@ async fn test_full_repository_lifecycle() {
         updated_at: Utc::now(),
     };
 
-    let upserted_policy = policy_repo.upsert(&policy).await.expect("Failed to upsert policy");
+    let upserted_policy = policy_repo
+        .upsert(&policy)
+        .await
+        .expect("Failed to upsert policy");
     assert_eq!(upserted_policy.policy_address, policy_address);
     assert_eq!(upserted_policy.max_ltv_bps, 7_500);
 
@@ -122,11 +130,17 @@ async fn test_full_repository_lifecycle() {
         processed_at: None,
     };
 
-    let created_event = event_repo.create(&event).await.expect("Failed to create event");
+    let created_event = event_repo
+        .create(&event)
+        .await
+        .expect("Failed to create event");
     assert_eq!(created_event.event_id, event_id);
     assert_eq!(created_event.status, "PENDING");
 
-    let pending_events = event_repo.find_pending().await.expect("Failed to find pending events");
+    let pending_events = event_repo
+        .find_pending()
+        .await
+        .expect("Failed to find pending events");
     assert!(pending_events.iter().any(|e| e.event_id == event_id));
 
     event_repo

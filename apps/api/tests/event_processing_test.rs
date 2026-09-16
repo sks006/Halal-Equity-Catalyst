@@ -8,10 +8,8 @@ use equity_catalyst_api::{
     engines::decision_engine::{DecisionEngine, ExecutionSigner},
     models::{EventModel, PolicyModel, PortfolioModel, VaultModel},
     repositories::{
-        event_repository::EventRepository,
-        execution_repository::ExecutionRepository,
-        policy_repository::PolicyRepository,
-        portfolio_repository::PortfolioRepository,
+        event_repository::EventRepository, execution_repository::ExecutionRepository,
+        policy_repository::PolicyRepository, portfolio_repository::PortfolioRepository,
         vault_repository::VaultRepository,
     },
     services::SolanaService,
@@ -71,7 +69,10 @@ async fn test_step29_event_listener_ingestion_and_queuing() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    vault_repo.create(&vault_model).await.expect("Failed to seed vault for event");
+    vault_repo
+        .create(&vault_model)
+        .await
+        .expect("Failed to seed vault for event");
 
     let deposit_event = DepositEvent {
         vault: vault_pda,
@@ -169,7 +170,10 @@ async fn test_step30_policy_worker_evaluation_and_dry_run_logging() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    vault_repo.create(&vault_model).await.expect("Failed to create vault");
+    vault_repo
+        .create(&vault_model)
+        .await
+        .expect("Failed to create vault");
 
     // 2. Seed test Policy in Postgres
     let policy_model = PolicyModel {
@@ -186,7 +190,10 @@ async fn test_step30_policy_worker_evaluation_and_dry_run_logging() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    policy_repo.upsert(&policy_model).await.expect("Failed to upsert policy");
+    policy_repo
+        .upsert(&policy_model)
+        .await
+        .expect("Failed to upsert policy");
 
     // 3. Seed Portfolio position in Postgres
     let pos_model = PortfolioModel {
@@ -203,7 +210,10 @@ async fn test_step30_policy_worker_evaluation_and_dry_run_logging() {
         last_rebalanced_at: None,
         updated_at: Utc::now(),
     };
-    portfolio_repo.upsert_position(&pos_model).await.expect("Failed to seed position");
+    portfolio_repo
+        .upsert_position(&pos_model)
+        .await
+        .expect("Failed to seed position");
 
     // 4. Create an incoming market/oracle event for this vault
     let event = EventModel {
@@ -220,7 +230,10 @@ async fn test_step30_policy_worker_evaluation_and_dry_run_logging() {
         detected_at: Utc::now(),
         processed_at: None,
     };
-    let created_event = event_repo.create(&event).await.expect("Failed to create event");
+    let created_event = event_repo
+        .create(&event)
+        .await
+        .expect("Failed to create event");
 
     // 5. Evaluate event via PolicyWorker
     let decision = worker
@@ -286,7 +299,10 @@ async fn test_end_to_end_event_queue_to_policy_worker_flow() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    vault_repo.create(&vault_model).await.expect("Failed to seed vault");
+    vault_repo
+        .create(&vault_model)
+        .await
+        .expect("Failed to seed vault");
 
     // 2. Seed Policy
     let policy_model = PolicyModel {
@@ -303,7 +319,10 @@ async fn test_end_to_end_event_queue_to_policy_worker_flow() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    policy_repo.upsert(&policy_model).await.expect("Failed to seed policy");
+    policy_repo
+        .upsert(&policy_model)
+        .await
+        .expect("Failed to seed policy");
 
     // 3. Seed Portfolio
     let pos_model = PortfolioModel {
@@ -320,7 +339,10 @@ async fn test_end_to_end_event_queue_to_policy_worker_flow() {
         last_rebalanced_at: None,
         updated_at: Utc::now(),
     };
-    portfolio_repo.upsert_position(&pos_model).await.expect("Failed to seed portfolio");
+    portfolio_repo
+        .upsert_position(&pos_model)
+        .await
+        .expect("Failed to seed portfolio");
 
     // 4. Initialize EventListener with shared queue
     let solana_service = SolanaService::new(
@@ -350,9 +372,7 @@ async fn test_end_to_end_event_queue_to_policy_worker_flow() {
     let notification = LogsNotification {
         signature: "4xyzE2ESolanaTxSignature11111111111111111111".to_string(),
         err: None,
-        logs: vec![
-            format!("Program data: {}", BASE64.encode(&event_bytes)),
-        ],
+        logs: vec![format!("Program data: {}", BASE64.encode(&event_bytes))],
     };
 
     let ingested = listener
@@ -402,4 +422,3 @@ async fn test_end_to_end_event_queue_to_policy_worker_flow() {
         .expect("Event missing");
     assert_eq!(processed_event.status, "PROCESSED");
 }
-

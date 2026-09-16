@@ -91,7 +91,10 @@ async fn test_oracle_service_portfolio_valuation_sync() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
     };
-    vault_repo.create(&vault).await.expect("Vault create failed");
+    vault_repo
+        .create(&vault)
+        .await
+        .expect("Vault create failed");
 
     // 2. Seed 2 positions with initial outdated prices
     let pos_sol = PortfolioModel {
@@ -108,7 +111,10 @@ async fn test_oracle_service_portfolio_valuation_sync() {
         last_rebalanced_at: None,
         updated_at: Utc::now(),
     };
-    port_repo.upsert_position(&pos_sol).await.expect("Failed to seed SOL position");
+    port_repo
+        .upsert_position(&pos_sol)
+        .await
+        .expect("Failed to seed SOL position");
 
     let pos_aapl = PortfolioModel {
         portfolio_id: Uuid::new_v4(),
@@ -124,7 +130,10 @@ async fn test_oracle_service_portfolio_valuation_sync() {
         last_rebalanced_at: None,
         updated_at: Utc::now(),
     };
-    port_repo.upsert_position(&pos_aapl).await.expect("Failed to seed AAPL position");
+    port_repo
+        .upsert_position(&pos_aapl)
+        .await
+        .expect("Failed to seed AAPL position");
 
     // 3. Trigger oracle portfolio valuation sync
     let updated = oracle
@@ -161,8 +170,7 @@ async fn test_oracle_route_http_endpoint() {
     let oracle_service = Arc::new(OracleService::new(pyth_mock, None));
 
     let state = Arc::new(
-        AppState::new(test_config(), pool, None, None)
-            .with_oracle_service(oracle_service),
+        AppState::new(test_config(), pool, None, None).with_oracle_service(oracle_service),
     );
     let app = create_router(state);
 

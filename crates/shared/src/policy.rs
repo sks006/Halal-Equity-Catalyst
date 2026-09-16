@@ -2,7 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::constants::{DEFAULT_REBALANCE_THRESHOLD_BPS, DEFAULT_STOP_LOSS_BPS, DEFAULT_TAKE_PROFIT_BPS};
+use crate::constants::{
+    DEFAULT_REBALANCE_THRESHOLD_BPS, DEFAULT_STOP_LOSS_BPS, DEFAULT_TAKE_PROFIT_BPS,
+};
 use crate::types::{AllocationTarget, BasisPoints, RiskLimits, SignalType};
 
 /// Configured policy definition associated with a vault.
@@ -59,15 +61,24 @@ pub fn evaluate_event_signal(
 }
 
 pub fn is_bullish_event(event_type: &str) -> bool {
-    matches!(event_type, "earnings_beat" | "product_launch" | "guidance_raised")
+    matches!(
+        event_type,
+        "earnings_beat" | "product_launch" | "guidance_raised"
+    )
 }
 
 pub fn is_bearish_event(event_type: &str) -> bool {
-    matches!(event_type, "earnings_miss" | "regulatory_action" | "guidance_lowered")
+    matches!(
+        event_type,
+        "earnings_miss" | "regulatory_action" | "guidance_lowered"
+    )
 }
 
 pub fn is_emergency_event(event_type: &str) -> bool {
-    matches!(event_type, "circuit_breaker" | "exploit_detected" | "extreme_volatility")
+    matches!(
+        event_type,
+        "circuit_breaker" | "exploit_detected" | "extreme_volatility"
+    )
 }
 
 /// Shifts target allocation weights based on policy evaluation
@@ -78,19 +89,17 @@ pub fn evaluate_policy_event(
     sentiment_score: f32,
     policy: &PolicyDefinition,
 ) -> Result<AllocationTarget, crate::validation::ValidationError> {
-    use crate::types::AssetWeight;
     use crate::constants::MAX_BPS;
+    use crate::types::AssetWeight;
 
-    let signal = evaluate_event_signal(event_type, sentiment_score, policy)
-        .unwrap_or(SignalType::Neutral);
+    let signal =
+        evaluate_event_signal(event_type, sentiment_score, policy).unwrap_or(SignalType::Neutral);
 
     match signal {
-        SignalType::EmergencyExit => {
-            AllocationTarget::new(vec![AssetWeight {
-                symbol: "USDC".to_string(),
-                target_weight: BasisPoints(MAX_BPS),
-            }])
-        }
+        SignalType::EmergencyExit => AllocationTarget::new(vec![AssetWeight {
+            symbol: "USDC".to_string(),
+            target_weight: BasisPoints(MAX_BPS),
+        }]),
         SignalType::Bullish => {
             let mut weights = target.weights.clone();
             let delta = 500; // 5.00%

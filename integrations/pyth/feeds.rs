@@ -13,6 +13,7 @@ pub mod known_feeds {
     pub const TSLA_USD: &str = "167776b6f68449c25605d8f6356499711202e0766e4a2d829910d54a165a22d7";
     pub const MSFT_USD: &str = "4a985d8868f7004fdb85427d11129994c502b74fa6a2bc3053ba491a98059fa2";
     pub const NVDA_USD: &str = "3155e714652285e6834d8ef0b3558163f4585c5b9679f222956cf57fb3645391";
+    pub const SPY_USD: &str = "2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b";
 }
 
 /// Dynamic registry mapping token and equity ticker symbols to Pyth feed IDs.
@@ -44,11 +45,17 @@ impl PythFeedRegistry {
         registry.register_feed("WETH", known_feeds::ETH_USD);
         registry.register_feed("USDC", known_feeds::USDC_USD);
 
-        // Seed synthetic equities
+        // Seed synthetic equities and RWA aliases
         registry.register_feed("AAPL", known_feeds::AAPL_USD);
+        registry.register_feed("AAPLX", known_feeds::AAPL_USD);
         registry.register_feed("TSLA", known_feeds::TSLA_USD);
+        registry.register_feed("TSLAX", known_feeds::TSLA_USD);
         registry.register_feed("MSFT", known_feeds::MSFT_USD);
+        registry.register_feed("MSFTX", known_feeds::MSFT_USD);
         registry.register_feed("NVDA", known_feeds::NVDA_USD);
+        registry.register_feed("NVDAX", known_feeds::NVDA_USD);
+        registry.register_feed("SPY", known_feeds::SPY_USD);
+        registry.register_feed("SPYX", known_feeds::SPY_USD);
 
         registry
     }

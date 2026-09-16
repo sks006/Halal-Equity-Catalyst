@@ -26,7 +26,9 @@ pub enum PythError {
         max_staleness_secs: i64,
     },
 
-    #[error("Confidence interval too wide for {symbol}: price={price}, conf={conf}, ratio={ratio:.4}")]
+    #[error(
+        "Confidence interval too wide for {symbol}: price={price}, conf={conf}, ratio={ratio:.4}"
+    )]
     ExcessiveConfidenceInterval {
         symbol: String,
         price: f64,

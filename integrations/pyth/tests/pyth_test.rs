@@ -81,27 +81,23 @@ fn test_feed_registry_lookups_and_custom_registration() {
     let registry = PythFeedRegistry::new();
 
     // Check defaults
-    assert_eq!(
-        registry.get_feed_id("SOL").unwrap(),
-        known_feeds::SOL_USD
-    );
-    assert_eq!(
-        registry.get_feed_id("USDC").unwrap(),
-        known_feeds::USDC_USD
-    );
-    assert_eq!(
-        registry.get_feed_id("AAPL").unwrap(),
-        known_feeds::AAPL_USD
-    );
+    assert_eq!(registry.get_feed_id("SOL").unwrap(), known_feeds::SOL_USD);
+    assert_eq!(registry.get_feed_id("USDC").unwrap(), known_feeds::USDC_USD);
+    assert_eq!(registry.get_feed_id("AAPL").unwrap(), known_feeds::AAPL_USD);
 
     // Dynamic registration
-    registry.register_feed("GOOGL", "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff");
+    registry.register_feed(
+        "GOOGL",
+        "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff",
+    );
     assert_eq!(
         registry.get_feed_id("GOOGL").unwrap(),
         "11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff"
     );
     assert_eq!(
-        registry.get_symbol("11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff").unwrap(),
+        registry
+            .get_symbol("11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff")
+            .unwrap(),
         "GOOGL"
     );
 }
@@ -121,4 +117,50 @@ async fn test_mock_client_price_fetching() {
     assert_eq!(price.symbol, "SOL");
     assert_eq!(price.price_scaled, 150_000_000);
     assert!(!price.is_stale);
+}
+
+#[test]
+fn test_verify_actual_production_pyth_feeds() {
+    let registry = PythFeedRegistry::new();
+
+    let expected_feeds = [
+        ("SOL", known_feeds::SOL_USD),
+        ("WSOL", known_feeds::SOL_USD),
+        ("BTC", known_feeds::BTC_USD),
+        ("ETH", known_feeds::ETH_USD),
+        ("USDC", known_feeds::USDC_USD),
+        ("NVDA", known_feeds::NVDA_USD),
+        ("NVDAX", known_feeds::NVDA_USD),
+        ("AAPL", known_feeds::AAPL_USD),
+        ("AAPLX", known_feeds::AAPL_USD),
+        ("TSLA", known_feeds::TSLA_USD),
+        ("TSLAX", known_feeds::TSLA_USD),
+        ("MSFT", known_feeds::MSFT_USD),
+        ("MSFTX", known_feeds::MSFT_USD),
+        ("SPY", known_feeds::SPY_USD),
+        ("SPYX", known_feeds::SPY_USD),
+    ];
+
+    for (sym, feed_id) in expected_feeds {
+        // Assert valid 64-char hex string (32-byte hash)
+        assert_eq!(
+            feed_id.len(),
+            64,
+            "Feed ID for {} must be 64 hex characters",
+            sym
+        );
+        assert!(
+            feed_id.chars().all(|c| c.is_ascii_hexdigit()),
+            "Feed ID must be hexadecimal"
+        );
+
+        // Assert registry resolves correctly
+        let resolved = registry.get_feed_id(sym);
+        assert_eq!(
+            resolved.as_deref(),
+            Some(feed_id),
+            "Feed resolution mismatch for {}",
+            sym
+        );
+    }
 }

@@ -56,12 +56,17 @@ impl PortfolioRepository {
                 ],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to upsert portfolio: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to upsert portfolio: {}", e))
+            })?;
 
         Ok(PortfolioModel::from(&row))
     }
 
-    pub async fn list_by_vault(&self, vault_address: &str) -> Result<Vec<PortfolioModel>, ApiError> {
+    pub async fn list_by_vault(
+        &self,
+        vault_address: &str,
+    ) -> Result<Vec<PortfolioModel>, ApiError> {
         let client = self.pool.get().await.map_err(|e| {
             ApiError::InternalServerError(format!("Database connection failed: {}", e))
         })?;
@@ -72,7 +77,9 @@ impl PortfolioRepository {
                 &[&vault_address],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to list portfolio: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to list portfolio: {}", e))
+            })?;
 
         Ok(rows.iter().map(PortfolioModel::from).collect())
     }

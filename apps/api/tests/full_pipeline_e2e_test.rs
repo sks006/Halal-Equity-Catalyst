@@ -30,7 +30,9 @@ use borsh::BorshSerialize;
 use chrono::Utc;
 use deadpool_postgres::Pool;
 use equity_catalyst_api::{
-    build_app, config::Config, create_db_pool,
+    build_app,
+    config::Config,
+    create_db_pool,
     engines::{
         decision_engine::{DecisionEngine, ExecutionSigner},
         policy_engine::PolicyEngine,
@@ -119,7 +121,12 @@ async fn test_full_pipeline_end_to_end_flow() {
         .expect("Frontend -> Rust API POST /vaults failed");
 
     assert_eq!(create_vault_resp.status(), StatusCode::CREATED);
-    let body_bytes = create_vault_resp.into_body().collect().await.unwrap().to_bytes();
+    let body_bytes = create_vault_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
     let created_vault_json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
     assert_eq!(created_vault_json["vault_address"], vault_address);
 
@@ -171,7 +178,10 @@ async fn test_full_pipeline_end_to_end_flow() {
         last_rebalanced_at: None,
         updated_at: Utc::now(),
     };
-    portfolio_repo.upsert_position(&nvda_pos).await.expect("Failed to seed initial NVDA position");
+    portfolio_repo
+        .upsert_position(&nvda_pos)
+        .await
+        .expect("Failed to seed initial NVDA position");
 
     let usdc_pos = PortfolioModel {
         portfolio_id: Uuid::new_v4(),
@@ -187,7 +197,10 @@ async fn test_full_pipeline_end_to_end_flow() {
         last_rebalanced_at: None,
         updated_at: Utc::now(),
     };
-    portfolio_repo.upsert_position(&usdc_pos).await.expect("Failed to seed initial USDC position");
+    portfolio_repo
+        .upsert_position(&usdc_pos)
+        .await
+        .expect("Failed to seed initial USDC position");
 
     // =========================================================================
     // STAGE 3: ANCHOR (Smart Contract Event Serialization)
@@ -204,7 +217,9 @@ async fn test_full_pipeline_end_to_end_flow() {
 
     let mut anchor_event_bytes = Vec::new();
     anchor_event_bytes.extend_from_slice(&compute_event_discriminator("Deposit"));
-    anchor_deposit_event.serialize(&mut anchor_event_bytes).expect("Anchor serialization failed");
+    anchor_deposit_event
+        .serialize(&mut anchor_event_bytes)
+        .expect("Anchor serialization failed");
 
     let b64_anchor_log = BASE64.encode(&anchor_event_bytes);
 
@@ -234,8 +249,9 @@ async fn test_full_pipeline_end_to_end_flow() {
         None,
     );
     let queue_name = format!("e2e:pipeline:queue:{}", Uuid::new_v4());
-    let event_listener = EventListener::new(solana_service, event_repo.clone(), redis_client.clone())
-        .with_queue_key(&queue_name);
+    let event_listener =
+        EventListener::new(solana_service, event_repo.clone(), redis_client.clone())
+            .with_queue_key(&queue_name);
 
     let ingested_event = event_listener
         .process_notification(&solana_notification)
@@ -251,18 +267,30 @@ async fn test_full_pipeline_end_to_end_flow() {
     // STAGE 6: POSTGRES (Persistence and State Consistency Verification)
     // =========================================================================
     // Verify Postgres database contains all entities accurately
-    let db_vault = vault_repo.find_by_address(&vault_address).await.unwrap().expect("Vault missing in DB");
+    let db_vault = vault_repo
+        .find_by_address(&vault_address)
+        .await
+        .unwrap()
+        .expect("Vault missing in DB");
     assert_eq!(db_vault.symbol, "E2EV");
     assert!(!db_vault.is_paused);
 
-    let db_policy = policy_repo.find_by_vault(&vault_address).await.unwrap().expect("Policy missing in DB");
+    let db_policy = policy_repo
+        .find_by_vault(&vault_address)
+        .await
+        .unwrap()
+        .expect("Policy missing in DB");
     assert_eq!(db_policy.max_position_bps, 3000);
     assert!(db_policy.is_active);
 
     let db_positions = portfolio_repo.list_by_vault(&vault_address).await.unwrap();
     assert_eq!(db_positions.len(), 2);
 
-    let db_event = event_repo.find_by_id(ingested_event.event_id).await.unwrap().expect("Event missing in DB");
+    let db_event = event_repo
+        .find_by_id(ingested_event.event_id)
+        .await
+        .unwrap()
+        .expect("Event missing in DB");
     assert_eq!(db_event.event_type, "DEPOSIT");
     assert_eq!(db_event.status, "PENDING");
 
@@ -283,13 +311,19 @@ async fn test_full_pipeline_end_to_end_flow() {
         detected_at: Utc::now(),
         processed_at: None,
     };
-    let created_catalyst_event = event_repo.create(&catalyst_event).await.expect("Failed to store catalyst event");
+    let created_catalyst_event = event_repo
+        .create(&catalyst_event)
+        .await
+        .expect("Failed to store catalyst event");
 
     // =========================================================================
     // STAGE 7: POLICY ENGINE (Rule Matching and Target Allocation)
     // =========================================================================
     let policy_engine = PolicyEngine::new();
-    let total_portfolio_usd: u64 = db_positions.iter().map(|p| p.current_value_usd as u64).sum(); // $5,000,000
+    let total_portfolio_usd: u64 = db_positions
+        .iter()
+        .map(|p| p.current_value_usd as u64)
+        .sum(); // $5,000,000
 
     let policy_result = policy_engine
         .evaluate(
@@ -301,8 +335,15 @@ async fn test_full_pipeline_end_to_end_flow() {
         .expect("PolicyEngine failed to evaluate catalyst event");
 
     // Verify PolicyEngine outputs
-    assert!(!policy_result.proposed_trades.is_empty(), "Proposed trades should not be empty");
-    let buy_nvda = policy_result.proposed_trades.iter().find(|t| t.symbol == "NVDA").expect("Expected trade for NVDA");
+    assert!(
+        !policy_result.proposed_trades.is_empty(),
+        "Proposed trades should not be empty"
+    );
+    let buy_nvda = policy_result
+        .proposed_trades
+        .iter()
+        .find(|t| t.symbol == "NVDA")
+        .expect("Expected trade for NVDA");
     assert!(buy_nvda.is_buy, "Earnings beat should trigger buy trade");
     assert!(buy_nvda.trade_value > 0, "Trade value must be positive");
 
@@ -365,7 +406,10 @@ async fn test_full_pipeline_end_to_end_flow() {
 
     assert_eq!(execution_entry.status, "LOGGED");
     assert_eq!(execution_entry.vault_address, vault_address);
-    assert_eq!(execution_entry.event_id, Some(created_catalyst_event.event_id));
+    assert_eq!(
+        execution_entry.event_id,
+        Some(created_catalyst_event.event_id)
+    );
 
     // Verify event transitioned from 'PENDING' -> 'PROCESSED'
     let final_event_state = event_repo

@@ -2,8 +2,12 @@ use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use solana_sdk::{hash::Hash, pubkey::Pubkey, signature::Signature};
-use std::{str::FromStr, sync::atomic::{AtomicU64, Ordering}, time::Duration};
-use tracing::{debug, info, instrument};
+use std::{
+    str::FromStr,
+    sync::atomic::{AtomicU64, Ordering},
+    time::Duration,
+};
+use tracing::{debug, info, instrument, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountInfo {
@@ -32,21 +36,62 @@ pub struct SignatureStatus {
 pub struct SolanaRpcClient {
     client: reqwest::Client,
     rpc_url: String,
+    fallback_urls: Vec<String>,
     commitment: String,
     request_id: AtomicU64,
+    timeout: Duration,
+    max_retries: u32,
 }
 
 impl SolanaRpcClient {
     pub fn new(rpc_url: impl Into<String>) -> Self {
+        Self::new_with_fallbacks(rpc_url, Vec::new())
+    }
+
+    pub fn new_with_fallbacks(
+        primary_url: impl Into<String>,
+        fallback_urls: Vec<String>,
+    ) -> Self {
         Self {
             client: reqwest::Client::builder()
                 .timeout(Duration::from_secs(30))
                 .build()
                 .expect("Failed to build HTTP client"),
-            rpc_url: rpc_url.into(),
+            rpc_url: primary_url.into(),
+            fallback_urls,
             commitment: "confirmed".to_string(),
             request_id: AtomicU64::new(1),
+            timeout: Duration::from_secs(30),
+            max_retries: 2,
         }
+    }
+
+    pub fn with_fallback(mut self, fallback_url: impl Into<String>) -> Self {
+        let url = fallback_url.into();
+        if !url.is_empty() && url != self.rpc_url && !self.fallback_urls.contains(&url) {
+            self.fallback_urls.push(url);
+        }
+        self
+    }
+
+    pub fn with_fallbacks(
+        mut self,
+        fallback_urls: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Self {
+        for fb in fallback_urls {
+            self = self.with_fallback(fb);
+        }
+        self
+    }
+
+    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+        self
+    }
+
+    pub fn with_max_retries(mut self, max_retries: u32) -> Self {
+        self.max_retries = max_retries;
+        self
     }
 
     pub fn with_commitment(mut self, commitment: &str) -> Self {
@@ -58,61 +103,179 @@ impl SolanaRpcClient {
         &self.rpc_url
     }
 
+    pub fn fallback_urls(&self) -> &[String] {
+        &self.fallback_urls
+    }
+
+    pub fn all_endpoints(&self) -> Vec<String> {
+        let mut list = Vec::with_capacity(1 + self.fallback_urls.len());
+        list.push(self.rpc_url.clone());
+        for fb in &self.fallback_urls {
+            if fb != &self.rpc_url && !list.contains(fb) {
+                list.push(fb.clone());
+            }
+        }
+        list
+    }
+
+    pub fn timeout(&self) -> Duration {
+        self.timeout
+    }
+
+    pub fn max_retries(&self) -> u32 {
+        self.max_retries
+    }
+
     pub fn commitment(&self) -> &str {
         &self.commitment
     }
 
-    async fn send_rpc_request(&self, method: &str, params: Value) -> Result<Value, crate::SolanaError> {
-        let id = self.request_id.fetch_add(1, Ordering::Relaxed);
-        let payload = json!({
-            "jsonrpc": "2.0",
-            "id": id,
-            "method": method,
-            "params": params,
-        });
+    async fn send_rpc_request(
+        &self,
+        method: &str,
+        params: Value,
+    ) -> Result<Value, crate::SolanaError> {
+        let endpoints = self.all_endpoints();
+        let total_rounds = self.max_retries.saturating_add(1);
+        let mut last_error: Option<crate::SolanaError> = None;
 
-        debug!(method, id, "Sending Solana RPC request");
-        let resp = self
-            .client
-            .post(&self.rpc_url)
-            .json(&payload)
-            .send()
-            .await
-            .map_err(|e| crate::SolanaError::RpcTransport(e.to_string()))?;
+        for round in 0..total_rounds {
+            if round > 0 {
+                let backoff_ms = (150 * round as u64).min(2000);
+                tokio::time::sleep(Duration::from_millis(backoff_ms)).await;
+            }
 
-        if !resp.status().is_success() {
-            return Err(crate::SolanaError::RpcError {
-                code: resp.status().as_u16() as i64,
-                message: format!("HTTP error: {}", resp.status()),
-            });
+            for endpoint in &endpoints {
+                let id = self.request_id.fetch_add(1, Ordering::Relaxed);
+                let payload = json!({
+                    "jsonrpc": "2.0",
+                    "id": id,
+                    "method": method,
+                    "params": params,
+                });
+
+                debug!(
+                    endpoint = %endpoint,
+                    method,
+                    id,
+                    round,
+                    "Sending Solana RPC request"
+                );
+
+                let send_res = self
+                    .client
+                    .post(endpoint)
+                    .timeout(self.timeout)
+                    .json(&payload)
+                    .send()
+                    .await;
+
+                let resp = match send_res {
+                    Ok(resp) => resp,
+                    Err(e) => {
+                        warn!(
+                            endpoint = %endpoint,
+                            error = %e,
+                            "Solana RPC transport error, attempting next endpoint"
+                        );
+                        last_error = Some(crate::SolanaError::RpcTransport(format!(
+                            "[{}] {}",
+                            endpoint, e
+                        )));
+                        continue;
+                    }
+                };
+
+                let status = resp.status();
+                if !status.is_success() {
+                    let err_msg = format!("HTTP error: {}", status);
+                    warn!(
+                        endpoint = %endpoint,
+                        status = %status,
+                        "Solana RPC HTTP non-success status, attempting next endpoint"
+                    );
+                    last_error = Some(crate::SolanaError::RpcError {
+                        code: status.as_u16() as i64,
+                        message: format!("[{}] {}", endpoint, err_msg),
+                    });
+                    continue;
+                }
+
+                let json_resp: Value = match resp.json().await {
+                    Ok(val) => val,
+                    Err(e) => {
+                        warn!(
+                            endpoint = %endpoint,
+                            error = %e,
+                            "Failed to parse Solana RPC JSON response, attempting next endpoint"
+                        );
+                        last_error = Some(crate::SolanaError::RpcTransport(format!(
+                            "[{}] Failed to parse JSON: {}",
+                            endpoint, e
+                        )));
+                        continue;
+                    }
+                };
+
+                if let Some(err) = json_resp.get("error") {
+                    let code = err.get("code").and_then(|c| c.as_i64()).unwrap_or(-1);
+                    let msg = err
+                        .get("message")
+                        .and_then(|m| m.as_str())
+                        .unwrap_or("Unknown RPC error")
+                        .to_string();
+
+                    let is_retryable_node_issue = code == -32005
+                        || code == -32429
+                        || msg.to_lowercase().contains("rate limit")
+                        || msg.to_lowercase().contains("behind")
+                        || msg.to_lowercase().contains("exceeded");
+
+                    if is_retryable_node_issue && endpoints.len() > 1 {
+                        warn!(
+                            endpoint = %endpoint,
+                            code,
+                            msg = %msg,
+                            "Solana RPC rate-limited or node behind, attempting next endpoint"
+                        );
+                        last_error = Some(crate::SolanaError::RpcError {
+                            code,
+                            message: format!("[{}] {}", endpoint, msg),
+                        });
+                        continue;
+                    } else {
+                        return Err(crate::SolanaError::RpcError { code, message: msg });
+                    }
+                }
+
+                if let Some(result) = json_resp.get("result").cloned() {
+                    return Ok(result);
+                } else {
+                    warn!(
+                        endpoint = %endpoint,
+                        "Missing 'result' in Solana RPC response, attempting next endpoint"
+                    );
+                    last_error = Some(crate::SolanaError::RpcError {
+                        code: -1,
+                        message: format!("[{}] Missing 'result' in RPC response", endpoint),
+                    });
+                    continue;
+                }
+            }
         }
 
-        let json_resp: Value = resp
-            .json()
-            .await
-            .map_err(|e| crate::SolanaError::RpcTransport(e.to_string()))?;
-
-        if let Some(err) = json_resp.get("error") {
-            let code = err.get("code").and_then(|c| c.as_i64()).unwrap_or(-1);
-            let msg = err
-                .get("message")
-                .and_then(|m| m.as_str())
-                .unwrap_or("Unknown RPC error")
-                .to_string();
-            return Err(crate::SolanaError::RpcError { code, message: msg });
-        }
-
-        json_resp
-            .get("result")
-            .cloned()
-            .ok_or_else(|| crate::SolanaError::RpcError {
-                code: -1,
-                message: "Missing 'result' in RPC response".to_string(),
-            })
+        Err(last_error.unwrap_or_else(|| {
+            crate::SolanaError::RpcTransport(
+                "All Solana RPC endpoints exhausted without response".to_string(),
+            )
+        }))
     }
 
     #[instrument(skip(self), fields(pubkey = %pubkey))]
-    pub async fn get_account_info(&self, pubkey: &Pubkey) -> Result<Option<AccountInfo>, crate::SolanaError> {
+    pub async fn get_account_info(
+        &self,
+        pubkey: &Pubkey,
+    ) -> Result<Option<AccountInfo>, crate::SolanaError> {
         let params = json!([
             pubkey.to_string(),
             {
@@ -130,13 +293,19 @@ impl SolanaRpcClient {
         let val = value.unwrap();
         let lamports = val.get("lamports").and_then(|l| l.as_u64()).unwrap_or(0);
         let owner_str = val.get("owner").and_then(|o| o.as_str()).unwrap_or("");
-        let owner = Pubkey::from_str(owner_str).map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?;
-        let executable = val.get("executable").and_then(|e| e.as_bool()).unwrap_or(false);
+        let owner = Pubkey::from_str(owner_str)
+            .map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?;
+        let executable = val
+            .get("executable")
+            .and_then(|e| e.as_bool())
+            .unwrap_or(false);
         let rent_epoch = val.get("rentEpoch").and_then(|r| r.as_u64()).unwrap_or(0);
 
         let data_bytes = if let Some(data_arr) = val.get("data").and_then(|d| d.as_array()) {
             if let Some(b64_str) = data_arr.first().and_then(|s| s.as_str()) {
-                BASE64.decode(b64_str).map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?
+                BASE64
+                    .decode(b64_str)
+                    .map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?
             } else {
                 Vec::new()
             }
@@ -172,7 +341,10 @@ impl SolanaRpcClient {
     }
 
     #[instrument(skip(self), fields(pubkey = %pubkey))]
-    pub async fn get_token_account_balance(&self, pubkey: &Pubkey) -> Result<TokenAccountBalance, crate::SolanaError> {
+    pub async fn get_token_account_balance(
+        &self,
+        pubkey: &Pubkey,
+    ) -> Result<TokenAccountBalance, crate::SolanaError> {
         let params = json!([
             pubkey.to_string(),
             {
@@ -180,7 +352,9 @@ impl SolanaRpcClient {
             }
         ]);
 
-        let result = self.send_rpc_request("getTokenAccountBalance", params).await?;
+        let result = self
+            .send_rpc_request("getTokenAccountBalance", params)
+            .await?;
         let val = result.get("value").unwrap_or(&result);
 
         let amount_str = val.get("amount").and_then(|a| a.as_str()).unwrap_or("0");
@@ -213,8 +387,12 @@ impl SolanaRpcClient {
                 code: -1,
                 message: "Missing blockhash in getLatestBlockhash response".to_string(),
             })?;
-        let hash = Hash::from_str(hash_str).map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?;
-        let last_valid = val.get("lastValidBlockHeight").and_then(|h| h.as_u64()).unwrap_or(0);
+        let hash = Hash::from_str(hash_str)
+            .map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?;
+        let last_valid = val
+            .get("lastValidBlockHeight")
+            .and_then(|h| h.as_u64())
+            .unwrap_or(0);
 
         Ok((hash, last_valid))
     }
@@ -239,7 +417,8 @@ impl SolanaRpcClient {
                 message: "Missing signature in sendTransaction response".to_string(),
             })?;
 
-        Signature::from_str(sig_str).map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))
+        Signature::from_str(sig_str)
+            .map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))
     }
 
     #[instrument(skip(self, tx_bytes))]
@@ -268,7 +447,10 @@ impl SolanaRpcClient {
     }
 
     #[instrument(skip(self), fields(sig = %sig))]
-    pub async fn get_signature_status(&self, sig: &Signature) -> Result<Option<SignatureStatus>, crate::SolanaError> {
+    pub async fn get_signature_status(
+        &self,
+        sig: &Signature,
+    ) -> Result<Option<SignatureStatus>, crate::SolanaError> {
         let params = json!([
             [sig.to_string()],
             {
@@ -276,7 +458,9 @@ impl SolanaRpcClient {
             }
         ]);
 
-        let result = self.send_rpc_request("getSignatureStatuses", params).await?;
+        let result = self
+            .send_rpc_request("getSignatureStatuses", params)
+            .await?;
         let values = result
             .get("value")
             .and_then(|v| v.as_array())
@@ -290,9 +474,15 @@ impl SolanaRpcClient {
                 return Ok(None);
             }
             let slot = first.get("slot").and_then(|s| s.as_u64()).unwrap_or(0);
-            let confirmations = first.get("confirmations").and_then(|c| c.as_u64()).map(|c| c as usize);
+            let confirmations = first
+                .get("confirmations")
+                .and_then(|c| c.as_u64())
+                .map(|c| c as usize);
             let err = first.get("err").cloned().filter(|e| !e.is_null());
-            let confirmation_status = first.get("confirmationStatus").and_then(|s| s.as_str()).map(|s| s.to_string());
+            let confirmation_status = first
+                .get("confirmationStatus")
+                .and_then(|s| s.as_str())
+                .map(|s| s.to_string());
 
             Ok(Some(SignatureStatus {
                 slot,

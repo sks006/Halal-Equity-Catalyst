@@ -55,12 +55,9 @@ impl DecisionEngine {
         let decision_id = Uuid::new_v4();
 
         // 1. Policy Engine evaluation
-        let policy_result = self.policy_engine.evaluate(
-            event,
-            policy,
-            positions,
-            total_value_usd,
-        )?;
+        let policy_result =
+            self.policy_engine
+                .evaluate(event, policy, positions, total_value_usd)?;
 
         // 2. Map RebalanceTrade to TradeOrders
         let trade_orders: Vec<TradeOrder> = policy_result
@@ -90,10 +87,9 @@ impl DecisionEngine {
                     policy_result.signal.reason
                 ),
             ),
-            RiskAssessment::Rejected { reason } => (
-                false,
-                format!("Rejected by Risk Engine: {}", reason),
-            ),
+            RiskAssessment::Rejected { reason } => {
+                (false, format!("Rejected by Risk Engine: {}", reason))
+            }
         };
 
         let action = match policy_result.signal.signal_type {

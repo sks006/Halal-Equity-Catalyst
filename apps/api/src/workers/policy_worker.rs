@@ -12,10 +12,8 @@ use crate::{
     error::ApiError,
     models::{EventModel, ExecutionModel},
     repositories::{
-        event_repository::EventRepository,
-        execution_repository::ExecutionRepository,
-        policy_repository::PolicyRepository,
-        portfolio_repository::PortfolioRepository,
+        event_repository::EventRepository, execution_repository::ExecutionRepository,
+        policy_repository::PolicyRepository, portfolio_repository::PortfolioRepository,
         vault_repository::VaultRepository,
     },
     workers::event_listener::DEFAULT_EVENTS_QUEUE,
@@ -77,13 +75,19 @@ impl PolicyWorker {
         event: &EventModel,
     ) -> Result<ExecutionRequest, ApiError> {
         let vault_addr = event.vault_address.as_deref().ok_or_else(|| {
-            ApiError::BadRequest(format!("Event {} does not have a linked vault_address", event.event_id))
+            ApiError::BadRequest(format!(
+                "Event {} does not have a linked vault_address",
+                event.event_id
+            ))
         })?;
 
         // Idempotency / Replay Guardrail: Prevent processing already-processed events
         if event.status == "PROCESSED" {
             warn!(event_id = %event.event_id, "Idempotency guard: Event has already been processed");
-            return Err(ApiError::BadRequest(format!("Event {} has already been processed", event.event_id)));
+            return Err(ApiError::BadRequest(format!(
+                "Event {} has already been processed",
+                event.event_id
+            )));
         }
 
         // 1. Load Vault
@@ -91,18 +95,25 @@ impl PolicyWorker {
             .vault_repo
             .find_by_address(vault_addr)
             .await?
-            .ok_or_else(|| ApiError::NotFound(format!("Vault not found for address: {}", vault_addr)))?;
+            .ok_or_else(|| {
+                ApiError::NotFound(format!("Vault not found for address: {}", vault_addr))
+            })?;
 
         // 2. Load Policy
         let policy = self
             .policy_repo
             .find_by_vault(vault_addr)
             .await?
-            .ok_or_else(|| ApiError::NotFound(format!("Policy not found for vault: {}", vault_addr)))?;
+            .ok_or_else(|| {
+                ApiError::NotFound(format!("Policy not found for vault: {}", vault_addr))
+            })?;
 
         // 3. Load Portfolio positions
         let positions = self.portfolio_repo.list_by_vault(vault_addr).await?;
-        let total_value_usd: u64 = positions.iter().map(|p| p.current_value_usd.max(0.0) as u64).sum();
+        let total_value_usd: u64 = positions
+            .iter()
+            .map(|p| p.current_value_usd.max(0.0) as u64)
+            .sum();
 
         // 4. Evaluate: Policy Engine -> Risk Engine -> Decision Engine
         let decision = self.decision_engine.process_event(
@@ -126,21 +137,17 @@ impl PolicyWorker {
         );
 
         // 6. Record decision in `executions` audit table with status 'LOGGED'
-        let (input_mint, output_mint, amount_in, amount_out) = if let Some(first_trade) = decision.trades.first() {
-            (
-                vault.deposit_mint.clone(),
-                vault.deposit_mint.clone(),
-                first_trade.usd_value,
-                first_trade.usd_value,
-            )
-        } else {
-            (
-                vault.deposit_mint.clone(),
-                vault.deposit_mint.clone(),
-                0,
-                0,
-            )
-        };
+        let (input_mint, output_mint, amount_in, amount_out) =
+            if let Some(first_trade) = decision.trades.first() {
+                (
+                    vault.deposit_mint.clone(),
+                    vault.deposit_mint.clone(),
+                    first_trade.usd_value,
+                    first_trade.usd_value,
+                )
+            } else {
+                (vault.deposit_mint.clone(), vault.deposit_mint.clone(), 0, 0)
+            };
 
         let execution_record = ExecutionModel {
             execution_id: decision.decision_id,
@@ -152,8 +159,8 @@ impl PolicyWorker {
             amount_in,
             amount_out_expected: amount_out,
             amount_out_actual: None,
-            slippage_bps: 100, // Default 1%
-            tx_signature: None, // Suppressed in dry-run mode
+            slippage_bps: 100,            // Default 1%
+            tx_signature: None,           // Suppressed in dry-run mode
             status: "LOGGED".to_string(), // Explicitly recorded as LOGGED, not broadcast
             error_message: if decision.approved {
                 None

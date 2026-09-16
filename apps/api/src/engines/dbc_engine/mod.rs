@@ -1,20 +1,23 @@
+pub mod adapter;
 pub mod config;
 pub mod curve;
 pub mod graduation;
 pub mod pricing;
+pub mod registry;
 pub mod simulator;
 pub mod validation;
 
+pub use adapter::{DbcError, LiquidityProvider, MeteoraDbcProvider};
 pub use config::{
     CurveSegmentConfig, DbcConfigRequest, DbcConfigResponse, FeeStructureConfig,
     GraduationTargetConfig,
 };
+pub use registry::*;
 pub use simulator::{
     ComparisonSimulationRequest, ComparisonSimulationResponse, DbcSimulationInput,
     DbcSimulationResult, DbcSimulator, SimulationPricePoint, SimulationSegment,
 };
 pub use validation::DbcValidationError;
-
 
 /// Meteora DBC Program ID on Devnet and Mainnet.
 pub const METEORA_DBC_PROGRAM_ID: &str = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN";
@@ -29,7 +32,10 @@ impl DbcEngine {
     }
 
     /// Evaluates and compiles a DBC configuration request into a validated DBC parameter specification.
-    pub fn configure(&self, req: DbcConfigRequest) -> Result<DbcConfigResponse, DbcValidationError> {
+    pub fn configure(
+        &self,
+        req: DbcConfigRequest,
+    ) -> Result<DbcConfigResponse, DbcValidationError> {
         // 1. Validate inputs
         validation::validate_dbc_request(&req)?;
 
@@ -58,10 +64,8 @@ impl DbcEngine {
         };
 
         // 4. Configure graduation to Meteora DAMM v2
-        let graduation = graduation::generate_graduation_config(
-            req.graduation_threshold,
-            quote_decimals,
-        );
+        let graduation =
+            graduation::generate_graduation_config(req.graduation_threshold, quote_decimals);
 
         let summary = format!(
             "Equity Discovery Curve compiled for {} pegged at ${:.2} {}. {} piecewise regimes (weights: 1x -> 4x -> 8x) targeting DAMM v2 migration at ${:.2} liquidity.",

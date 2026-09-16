@@ -55,12 +55,17 @@ impl PolicyRepository {
                 ],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to upsert policy: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to upsert policy: {}", e))
+            })?;
 
         Ok(PolicyModel::from(&row))
     }
 
-    pub async fn find_by_vault(&self, vault_address: &str) -> Result<Option<PolicyModel>, ApiError> {
+    pub async fn find_by_vault(
+        &self,
+        vault_address: &str,
+    ) -> Result<Option<PolicyModel>, ApiError> {
         let client = self.pool.get().await.map_err(|e| {
             ApiError::InternalServerError(format!("Database connection failed: {}", e))
         })?;
@@ -84,7 +89,9 @@ impl PolicyRepository {
         let rows = client
             .query("SELECT * FROM policies ORDER BY created_at DESC", &[])
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to list policies: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to list policies: {}", e))
+            })?;
 
         Ok(rows.iter().map(PolicyModel::from).collect())
     }

@@ -13,7 +13,11 @@ pub fn compute_sqrt_price_q64(price: f64, base_decimals: u8, quote_decimals: u8)
 }
 
 /// Converts a Q64.64 square root price back to regular price float.
-pub fn price_from_sqrt_price_q64(sqrt_price_q64: u128, base_decimals: u8, quote_decimals: u8) -> f64 {
+pub fn price_from_sqrt_price_q64(
+    sqrt_price_q64: u128,
+    base_decimals: u8,
+    quote_decimals: u8,
+) -> f64 {
     let sqrt_price = (sqrt_price_q64 as f64) / Q64;
     let raw_price = sqrt_price * sqrt_price;
     let decimal_adjustment = 10_f64.powi(quote_decimals as i32 - base_decimals as i32);

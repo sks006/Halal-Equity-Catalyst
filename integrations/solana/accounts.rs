@@ -13,6 +13,8 @@ pub fn program_id() -> Pubkey {
 
 pub const SPL_TOKEN_PROGRAM_ID: &str = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 pub const SPL_ASSOCIATED_TOKEN_PROGRAM_ID: &str = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
+pub const JUPITER_V6_PROGRAM_ID: &str = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
+pub const METEORA_DBC_PROGRAM_ID: &str = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN";
 
 // --- Anchor 8-Byte Account Discriminators ---
 pub const VAULT_ACCOUNT_DISCRIMINATOR: [u8; 8] = [211, 8, 232, 43, 2, 152, 117, 119];
@@ -138,10 +140,7 @@ pub struct SplTokenAccount {
 
 /// Derives Vault PDA: `seeds = [b"vault", authority.as_ref(), name.as_bytes()]`
 pub fn find_vault_pda(authority: &Pubkey, name: &str, program_id: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[b"vault", authority.as_ref(), name.as_bytes()],
-        program_id,
-    )
+    Pubkey::find_program_address(&[b"vault", authority.as_ref(), name.as_bytes()], program_id)
 }
 
 /// Derives Policy PDA: `seeds = [b"policy", vault.as_ref()]`
@@ -151,10 +150,7 @@ pub fn find_policy_pda(vault: &Pubkey, program_id: &Pubkey) -> (Pubkey, u8) {
 
 /// Derives UserShares PDA: `seeds = [b"user_shares", vault.as_ref(), user.as_ref()]`
 pub fn find_user_shares_pda(vault: &Pubkey, user: &Pubkey, program_id: &Pubkey) -> (Pubkey, u8) {
-    Pubkey::find_program_address(
-        &[b"user_shares", vault.as_ref(), user.as_ref()],
-        program_id,
-    )
+    Pubkey::find_program_address(&[b"user_shares", vault.as_ref(), user.as_ref()], program_id)
 }
 
 /// Derives Loan PDA: `seeds = [b"loan", vault.as_ref(), borrower.as_ref()]`
@@ -250,11 +246,10 @@ pub fn parse_spl_token(data: &[u8]) -> Result<SplTokenAccount, crate::SolanaErro
         .map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?;
     let owner = Pubkey::try_from(&data[32..64])
         .map_err(|e| crate::SolanaError::DeserializationFailed(e.to_string()))?;
-    let amount = u64::from_le_bytes(
-        data[64..72]
-            .try_into()
-            .map_err(|_| crate::SolanaError::DeserializationFailed("Invalid amount bytes".into()))?,
-    );
+    let amount =
+        u64::from_le_bytes(data[64..72].try_into().map_err(|_| {
+            crate::SolanaError::DeserializationFailed("Invalid amount bytes".into())
+        })?);
     let state = data[108]; // 0 = uninitialized, 1 = initialized, 2 = frozen
 
     Ok(SplTokenAccount {
@@ -368,15 +363,25 @@ pub fn parse_anchor_event(data: &[u8]) -> Option<ParsedProgramEvent> {
     let (disc, body) = data.split_at(8);
 
     if disc == compute_event_discriminator("Deposit") {
-        DepositEvent::try_from_slice(body).ok().map(ParsedProgramEvent::Deposit)
+        DepositEvent::try_from_slice(body)
+            .ok()
+            .map(ParsedProgramEvent::Deposit)
     } else if disc == compute_event_discriminator("Withdraw") {
-        WithdrawEvent::try_from_slice(body).ok().map(ParsedProgramEvent::Withdraw)
+        WithdrawEvent::try_from_slice(body)
+            .ok()
+            .map(ParsedProgramEvent::Withdraw)
     } else if disc == compute_event_discriminator("PolicyUpdated") {
-        PolicyUpdatedEvent::try_from_slice(body).ok().map(ParsedProgramEvent::PolicyUpdated)
+        PolicyUpdatedEvent::try_from_slice(body)
+            .ok()
+            .map(ParsedProgramEvent::PolicyUpdated)
     } else if disc == compute_event_discriminator("VaultPauseToggled") {
-        VaultPauseToggledEvent::try_from_slice(body).ok().map(ParsedProgramEvent::VaultPauseToggled)
+        VaultPauseToggledEvent::try_from_slice(body)
+            .ok()
+            .map(ParsedProgramEvent::VaultPauseToggled)
     } else if disc == compute_event_discriminator("VaultInitialized") {
-        VaultInitializedEvent::try_from_slice(body).ok().map(ParsedProgramEvent::VaultInitialized)
+        VaultInitializedEvent::try_from_slice(body)
+            .ok()
+            .map(ParsedProgramEvent::VaultInitialized)
     } else {
         None
     }
@@ -393,4 +398,3 @@ pub fn parse_program_data_log(log_line: &str) -> Option<ParsedProgramEvent> {
     }
     None
 }
-

@@ -6,6 +6,7 @@ target/
 .env
 .env.*
 !.env.example
+!.env.*.example
 coverage/
 .DS_Store
 *.log
@@ -18,3 +19,4 @@ test-ledger/
 *.pem
 *.secret
 .solana/
+*.tsbuildinfo

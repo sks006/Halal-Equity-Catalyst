@@ -1,7 +1,7 @@
 //! Domain validation primitives for Equity Catalyst.
 
-use thiserror::Error;
 use std::collections::HashSet;
+use thiserror::Error;
 
 use crate::constants::MAX_BPS;
 use crate::types::{AssetWeight, BasisPoints, RiskLimits};
@@ -43,6 +43,30 @@ pub enum ValidationError {
 
     #[error("Invalid vault symbol: {0}")]
     InvalidVaultSymbol(String),
+
+    #[error("Asset symbol cannot be empty")]
+    EmptySymbol,
+
+    #[error("Invalid asset ID: {0}")]
+    InvalidAssetId(String),
+
+    #[error("Missing price feed for asset: {0}")]
+    MissingFeed(String),
+
+    #[error("Unsupported asset provider: {0}")]
+    UnsupportedProvider(String),
+
+    #[error("Unknown asset: {0}")]
+    UnknownAsset(String),
+
+    #[error("Duplicate asset in registry: {0}")]
+    DuplicateAsset(String),
+
+    #[error("Invalid price: {0}")]
+    InvalidPrice(String),
+
+    #[error("Invalid parameter: {0}")]
+    InvalidParam(String),
 }
 
 pub fn validate_bps(bps: u16) -> Result<BasisPoints, ValidationError> {

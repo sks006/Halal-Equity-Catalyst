@@ -1,9 +1,7 @@
 //! Policy rules matching incoming events to operational rule categories.
 
+use super::conditions::{is_bearish_sentiment, is_bullish_sentiment, is_emergency_event};
 use crate::models::{EventModel, PolicyModel};
-use super::conditions::{
-    is_bearish_sentiment, is_bullish_sentiment, is_emergency_event,
-};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PolicyRule {
@@ -15,11 +13,7 @@ pub enum PolicyRule {
 }
 
 /// Evaluates which policy rule applies given an incoming event and active policy.
-pub fn match_rule(
-    event: &EventModel,
-    policy: &PolicyModel,
-    max_drift_bps: u16,
-) -> PolicyRule {
+pub fn match_rule(event: &EventModel, policy: &PolicyModel, max_drift_bps: u16) -> PolicyRule {
     if !policy.is_active {
         return PolicyRule::NoOp;
     }

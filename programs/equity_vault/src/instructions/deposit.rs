@@ -52,7 +52,8 @@ pub fn deposit(ctx: Context<Deposit>, amount: u64) -> Result<()> {
     require!(!vault.is_paused, VaultError::VaultPaused);
     require!(amount >= MIN_DEPOSIT_AMOUNT, VaultError::DepositTooSmall);
 
-    let shares_to_mint = calculate_shares_to_mint(amount, vault.total_deposits, vault.total_shares)?;
+    let shares_to_mint =
+        calculate_shares_to_mint(amount, vault.total_deposits, vault.total_shares)?;
 
     // Transfer tokens from user to vault
     let cpi_accounts = Transfer {

@@ -1,11 +1,6 @@
 //! Health check and system status endpoints.
 
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    Json,
-};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -57,12 +52,10 @@ pub async fn ready_handler(State(state): State<Arc<AppState>>) -> impl IntoRespo
     // Check Redis
     if let Some(ref client) = state.redis_client {
         match client.get_multiplexed_async_connection().await {
-            Ok(mut conn) => {
-                match redis::cmd("PING").query_async::<String>(&mut conn).await {
-                    Ok(resp) if resp == "PONG" => redis_status = "healthy",
-                    _ => is_healthy = false,
-                }
-            }
+            Ok(mut conn) => match redis::cmd("PING").query_async::<String>(&mut conn).await {
+                Ok(resp) if resp == "PONG" => redis_status = "healthy",
+                _ => is_healthy = false,
+            },
             Err(_) => is_healthy = false,
         }
     }

@@ -53,7 +53,9 @@ impl ExecutionRepository {
                 ],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to insert execution: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to insert execution: {}", e))
+            })?;
 
         Ok(ExecutionModel::from(&row))
     }
@@ -69,12 +71,17 @@ impl ExecutionRepository {
                 &[&execution_id],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to query execution: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to query execution: {}", e))
+            })?;
 
         Ok(row_opt.map(|r| ExecutionModel::from(&r)))
     }
 
-    pub async fn list_by_vault(&self, vault_address: &str) -> Result<Vec<ExecutionModel>, ApiError> {
+    pub async fn list_by_vault(
+        &self,
+        vault_address: &str,
+    ) -> Result<Vec<ExecutionModel>, ApiError> {
         let client = self.pool.get().await.map_err(|e| {
             ApiError::InternalServerError(format!("Database connection failed: {}", e))
         })?;
@@ -85,7 +92,9 @@ impl ExecutionRepository {
                 &[&vault_address],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to list executions: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to list executions: {}", e))
+            })?;
 
         Ok(rows.iter().map(ExecutionModel::from).collect())
     }
@@ -124,7 +133,9 @@ impl ExecutionRepository {
                 ],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to update execution: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to update execution: {}", e))
+            })?;
 
         Ok(())
     }
@@ -137,7 +148,9 @@ impl ExecutionRepository {
         let rows = client
             .query("SELECT * FROM executions ORDER BY executed_at DESC", &[])
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to list executions: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to list executions: {}", e))
+            })?;
 
         Ok(rows.iter().map(ExecutionModel::from).collect())
     }

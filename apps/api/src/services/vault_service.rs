@@ -1,10 +1,6 @@
 //! Vault business logic service managing vault lifecycle, deposits, and withdrawals.
 
-use crate::{
-    error::ApiError,
-    models::VaultModel,
-    repositories::VaultRepository,
-};
+use crate::{error::ApiError, models::VaultModel, repositories::VaultRepository};
 
 #[derive(Clone, Debug)]
 pub struct VaultService {
@@ -42,7 +38,9 @@ impl VaultService {
         total_deposits: u64,
         is_paused: bool,
     ) -> Result<(), ApiError> {
-        self.repo.update_totals(address, total_shares, total_deposits).await?;
+        self.repo
+            .update_totals(address, total_shares, total_deposits)
+            .await?;
         self.repo.set_paused(address, is_paused).await?;
         Ok(())
     }

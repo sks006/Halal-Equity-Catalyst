@@ -34,7 +34,10 @@ pub fn update_policy(
     validate_risk_limits(max_ltv_bps, max_position_bps)?;
     require!(stop_loss_bps <= MAX_BPS, VaultError::InvalidRiskLimit);
     require!(take_profit_bps <= MAX_BPS, VaultError::InvalidRiskLimit);
-    require!(rebalance_threshold_bps <= MAX_BPS, VaultError::InvalidRiskLimit);
+    require!(
+        rebalance_threshold_bps <= MAX_BPS,
+        VaultError::InvalidRiskLimit
+    );
 
     let clock = Clock::get()?;
     let now = clock.unix_timestamp;

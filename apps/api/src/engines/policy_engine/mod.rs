@@ -48,7 +48,13 @@ impl PolicyEngine {
         // 1. Calculate maximum drift across current positions
         let max_drift_bps = positions
             .iter()
-            .map(|p| calculate_drift(BasisPoints(p.current_weight_bps as u16), BasisPoints(p.target_weight_bps as u16)).0)
+            .map(|p| {
+                calculate_drift(
+                    BasisPoints(p.current_weight_bps as u16),
+                    BasisPoints(p.target_weight_bps as u16),
+                )
+                .0
+            })
             .max()
             .unwrap_or(0);
 

@@ -1,17 +1,27 @@
 //! Shared deterministic domain logic for Equity Catalyst.
 
+pub mod agent;
 pub mod allocation;
+pub mod asset;
 pub mod constants;
+pub mod liquidity;
 pub mod math;
 pub mod policy;
+pub mod portfolio;
+pub mod provider;
 pub mod risk;
 pub mod types;
 pub mod validation;
 
+pub use agent::*;
 pub use allocation::*;
+pub use asset::*;
 pub use constants::*;
+pub use liquidity::*;
 pub use math::*;
 pub use policy::*;
+pub use portfolio::*;
+pub use provider::*;
 pub use risk::*;
 pub use types::*;
 pub use validation::*;
@@ -122,10 +132,18 @@ mod tests {
         assert!(!is_stop_loss_triggered(entry_price, 97, BasisPoints(500)));
 
         // 16% rise from 100 to 116 -> triggers 15% take profit
-        assert!(is_take_profit_triggered(entry_price, 116, BasisPoints(1_500)));
+        assert!(is_take_profit_triggered(
+            entry_price,
+            116,
+            BasisPoints(1_500)
+        ));
 
         // 10% rise from 100 to 110 -> does not trigger 15% take profit
-        assert!(!is_take_profit_triggered(entry_price, 110, BasisPoints(1_500)));
+        assert!(!is_take_profit_triggered(
+            entry_price,
+            110,
+            BasisPoints(1_500)
+        ));
     }
 
     #[test]
@@ -162,9 +180,15 @@ mod tests {
         let total_portfolio = 1_000_000;
         let threshold = BasisPoints(200); // 2%
 
-        assert!(is_rebalance_needed(&positions, &target, total_portfolio, threshold));
+        assert!(is_rebalance_needed(
+            &positions,
+            &target,
+            total_portfolio,
+            threshold
+        ));
 
-        let plan = calculate_rebalance_plan(&positions, &target, total_portfolio, threshold).unwrap();
+        let plan =
+            calculate_rebalance_plan(&positions, &target, total_portfolio, threshold).unwrap();
         assert_eq!(plan.len(), 2);
 
         let nvda_trade = plan.iter().find(|t| t.symbol == "NVDA").unwrap();
@@ -192,75 +216,151 @@ mod tests {
         // Inactive policy gives None
         let mut inactive_policy = policy.clone();
         inactive_policy.is_active = false;
-        assert_eq!(evaluate_event_signal("earnings_beat", 0.8, &inactive_policy), None);
+        assert_eq!(
+            evaluate_event_signal("earnings_beat", 0.8, &inactive_policy),
+            None
+        );
     }
 
     #[test]
     fn test_math_comprehensive() {
         // compute_bps_amount
         assert_eq!(compute_bps_amount(100_000, BasisPoints(0)).unwrap(), 0);
-        assert_eq!(compute_bps_amount(100_000, BasisPoints(5_000)).unwrap(), 50_000);
-        assert_eq!(compute_bps_amount(100_000, BasisPoints(10_000)).unwrap(), 100_000);
+        assert_eq!(
+            compute_bps_amount(100_000, BasisPoints(5_000)).unwrap(),
+            50_000
+        );
+        assert_eq!(
+            compute_bps_amount(100_000, BasisPoints(10_000)).unwrap(),
+            100_000
+        );
         assert!(compute_bps_amount(100_000, BasisPoints(10_001)).is_err());
 
         // calculate_basis_points
         assert_eq!(calculate_basis_points(0, 1_000).unwrap(), BasisPoints(0));
-        assert_eq!(calculate_basis_points(250, 1_000).unwrap(), BasisPoints(2_500));
-        assert_eq!(calculate_basis_points(1_000, 1_000).unwrap(), BasisPoints(10_000));
+        assert_eq!(
+            calculate_basis_points(250, 1_000).unwrap(),
+            BasisPoints(2_500)
+        );
+        assert_eq!(
+            calculate_basis_points(1_000, 1_000).unwrap(),
+            BasisPoints(10_000)
+        );
         assert_eq!(calculate_basis_points(50, 0).unwrap(), BasisPoints(0)); // Zero total safe
-        assert_eq!(calculate_basis_points(2_000, 1_000).unwrap(), BasisPoints(10_000)); // Capped at MAX
+        assert_eq!(
+            calculate_basis_points(2_000, 1_000).unwrap(),
+            BasisPoints(10_000)
+        ); // Capped at MAX
 
         // calculate_drift
-        assert_eq!(calculate_drift(BasisPoints(2_000), BasisPoints(2_000)), BasisPoints(0));
-        assert_eq!(calculate_drift(BasisPoints(3_500), BasisPoints(2_000)), BasisPoints(1_500));
-        assert_eq!(calculate_drift(BasisPoints(1_000), BasisPoints(2_500)), BasisPoints(1_500));
+        assert_eq!(
+            calculate_drift(BasisPoints(2_000), BasisPoints(2_000)),
+            BasisPoints(0)
+        );
+        assert_eq!(
+            calculate_drift(BasisPoints(3_500), BasisPoints(2_000)),
+            BasisPoints(1_500)
+        );
+        assert_eq!(
+            calculate_drift(BasisPoints(1_000), BasisPoints(2_500)),
+            BasisPoints(1_500)
+        );
 
         // calculate_shares_to_mint
         // Initial deposit 1:1
         assert_eq!(calculate_shares_to_mint(100_000, 0, 0).unwrap(), 100_000);
         // Subsequent deposit when total_deposits == total_shares (share price = 1.0)
-        assert_eq!(calculate_shares_to_mint(50_000, 100_000, 100_000).unwrap(), 50_000);
+        assert_eq!(
+            calculate_shares_to_mint(50_000, 100_000, 100_000).unwrap(),
+            50_000
+        );
         // Share price = 1.25 (total_deposits = 125k, total_shares = 100k) -> 25k deposit yields 20k shares
-        assert_eq!(calculate_shares_to_mint(25_000, 125_000, 100_000).unwrap(), 20_000);
+        assert_eq!(
+            calculate_shares_to_mint(25_000, 125_000, 100_000).unwrap(),
+            20_000
+        );
 
         // calculate_assets_to_withdraw
-        assert_eq!(calculate_assets_to_withdraw(0, 100_000, 100_000).unwrap(), 0);
-        assert_eq!(calculate_assets_to_withdraw(20_000, 125_000, 100_000).unwrap(), 25_000);
-        assert_eq!(calculate_assets_to_withdraw(100_000, 125_000, 100_000).unwrap(), 125_000);
+        assert_eq!(
+            calculate_assets_to_withdraw(0, 100_000, 100_000).unwrap(),
+            0
+        );
+        assert_eq!(
+            calculate_assets_to_withdraw(20_000, 125_000, 100_000).unwrap(),
+            25_000
+        );
+        assert_eq!(
+            calculate_assets_to_withdraw(100_000, 125_000, 100_000).unwrap(),
+            125_000
+        );
 
         // calculate_slippage_bps
-        assert_eq!(calculate_slippage_bps(1_000, 1_000).unwrap(), BasisPoints(0));
-        assert_eq!(calculate_slippage_bps(1_000, 1_050).unwrap(), BasisPoints(0)); // Favorable
-        assert_eq!(calculate_slippage_bps(1_000, 950).unwrap(), BasisPoints(500)); // 5% slippage = 500 bps
+        assert_eq!(
+            calculate_slippage_bps(1_000, 1_000).unwrap(),
+            BasisPoints(0)
+        );
+        assert_eq!(
+            calculate_slippage_bps(1_000, 1_050).unwrap(),
+            BasisPoints(0)
+        ); // Favorable
+        assert_eq!(
+            calculate_slippage_bps(1_000, 950).unwrap(),
+            BasisPoints(500)
+        ); // 5% slippage = 500 bps
     }
 
     #[test]
     fn test_allocation_comprehensive() {
         // Empty weights rejection
-        assert_eq!(AllocationTarget::new(vec![]), Err(ValidationError::EmptyAllocationWeights));
+        assert_eq!(
+            AllocationTarget::new(vec![]),
+            Err(ValidationError::EmptyAllocationWeights)
+        );
 
         // Sum under 10,000 bps
-        let under_weights = vec![AssetWeight { symbol: "SOL".to_string(), target_weight: BasisPoints(9_999) }];
+        let under_weights = vec![AssetWeight {
+            symbol: "SOL".to_string(),
+            target_weight: BasisPoints(9_999),
+        }];
         assert_eq!(
             AllocationTarget::new(under_weights),
-            Err(ValidationError::WeightsDoNotSumTo100Percent { actual: 9_999, expected: 10_000 })
+            Err(ValidationError::WeightsDoNotSumTo100Percent {
+                actual: 9_999,
+                expected: 10_000
+            })
         );
 
         // Sum over 10,000 bps
         let over_weights = vec![
-            AssetWeight { symbol: "SOL".to_string(), target_weight: BasisPoints(6_000) },
-            AssetWeight { symbol: "USDC".to_string(), target_weight: BasisPoints(4_001) },
+            AssetWeight {
+                symbol: "SOL".to_string(),
+                target_weight: BasisPoints(6_000),
+            },
+            AssetWeight {
+                symbol: "USDC".to_string(),
+                target_weight: BasisPoints(4_001),
+            },
         ];
         assert_eq!(
             AllocationTarget::new(over_weights),
-            Err(ValidationError::WeightsDoNotSumTo100Percent { actual: 10_001, expected: 10_000 })
+            Err(ValidationError::WeightsDoNotSumTo100Percent {
+                actual: 10_001,
+                expected: 10_000
+            })
         );
 
         // Rebalance plan within drift threshold produces no trades
         let balanced_target = AllocationTarget::new(vec![
-            AssetWeight { symbol: "SOL".to_string(), target_weight: BasisPoints(5_000) },
-            AssetWeight { symbol: "USDC".to_string(), target_weight: BasisPoints(5_000) },
-        ]).unwrap();
+            AssetWeight {
+                symbol: "SOL".to_string(),
+                target_weight: BasisPoints(5_000),
+            },
+            AssetWeight {
+                symbol: "USDC".to_string(),
+                target_weight: BasisPoints(5_000),
+            },
+        ])
+        .unwrap();
 
         let aligned_positions = vec![
             PositionSnapshot {
@@ -281,7 +381,9 @@ mod tests {
 
         // 100 bps threshold ignores 50 bps drift
         let threshold = BasisPoints(100);
-        let plan = calculate_rebalance_plan(&aligned_positions, &balanced_target, 1_000_000, threshold).unwrap();
+        let plan =
+            calculate_rebalance_plan(&aligned_positions, &balanced_target, 1_000_000, threshold)
+                .unwrap();
         assert_eq!(plan.len(), 0);
     }
 
@@ -301,29 +403,26 @@ mod tests {
 
         let policy = PolicyDefinition::default();
         let target = AllocationTarget::new(vec![
-            AssetWeight { symbol: "NVDA".to_string(), target_weight: BasisPoints(3_000) },
-            AssetWeight { symbol: "USDC".to_string(), target_weight: BasisPoints(7_000) },
-        ]).unwrap();
+            AssetWeight {
+                symbol: "NVDA".to_string(),
+                target_weight: BasisPoints(3_000),
+            },
+            AssetWeight {
+                symbol: "USDC".to_string(),
+                target_weight: BasisPoints(7_000),
+            },
+        ])
+        .unwrap();
 
         // Bullish event increases target asset weight by delta (500 bps)
-        let adjusted_target = evaluate_policy_event(
-            &target,
-            "earnings_beat",
-            "NVDA",
-            0.85,
-            &policy,
-        ).unwrap();
+        let adjusted_target =
+            evaluate_policy_event(&target, "earnings_beat", "NVDA", 0.85, &policy).unwrap();
         assert_eq!(adjusted_target.get_weight("NVDA").unwrap().0, 3_500);
         assert_eq!(adjusted_target.get_weight("USDC").unwrap().0, 6_500);
 
         // Emergency event liquidates risk assets to 100% USDC
-        let emergency_target = evaluate_policy_event(
-            &target,
-            "circuit_breaker",
-            "NVDA",
-            0.0,
-            &policy,
-        ).unwrap();
+        let emergency_target =
+            evaluate_policy_event(&target, "circuit_breaker", "NVDA", 0.0, &policy).unwrap();
         assert_eq!(emergency_target.get_weight("USDC").unwrap().0, 10_000);
     }
 
@@ -372,7 +471,11 @@ mod tests {
         assert!(validate_name_and_symbol("Liquid Growth Vault", "LGV").is_ok());
         assert!(validate_name_and_symbol("", "LGV").is_err()); // Empty name
         assert!(validate_name_and_symbol("Liquid Growth Vault", "").is_err()); // Empty symbol
-        assert!(validate_name_and_symbol("This is an extraordinarily long vault name that exceeds thirty two characters", "LGV").is_err());
+        assert!(validate_name_and_symbol(
+            "This is an extraordinarily long vault name that exceeds thirty two characters",
+            "LGV"
+        )
+        .is_err());
         assert!(validate_name_and_symbol("Liquid Growth Vault", "TOOLONGSYMBOL123").is_err());
     }
 }

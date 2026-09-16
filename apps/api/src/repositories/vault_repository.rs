@@ -57,10 +57,7 @@ impl VaultRepository {
         })?;
 
         let row_opt = client
-            .query_opt(
-                "SELECT * FROM vaults WHERE vault_address = $1",
-                &[&address],
-            )
+            .query_opt("SELECT * FROM vaults WHERE vault_address = $1", &[&address])
             .await
             .map_err(|e| ApiError::InternalServerError(format!("Failed to query vault: {}", e)))?;
 
@@ -100,7 +97,9 @@ impl VaultRepository {
                 &[&address, &(shares as i64), &(deposits as i64)],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to update vault totals: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to update vault totals: {}", e))
+            })?;
 
         Ok(())
     }
@@ -120,7 +119,9 @@ impl VaultRepository {
                 &[&address, &paused],
             )
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Failed to update pause state: {}", e)))?;
+            .map_err(|e| {
+                ApiError::InternalServerError(format!("Failed to update pause state: {}", e))
+            })?;
 
         Ok(())
     }

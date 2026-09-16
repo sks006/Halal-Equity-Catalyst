@@ -47,7 +47,7 @@ pub async fn get_verified_assets_handler() -> Result<impl IntoResponse, ApiError
             supported_quote_mints: vec![
                 "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(), // USDC (Mainnet)
                 "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr".to_string(), // USDC (Devnet)
-                "So11111111111111111111111111111111111111112".to_string(), // WSOL
+                "So11111111111111111111111111111111111111112".to_string(),  // WSOL
             ],
             liquidity_venues: vec![
                 "Jupiter Aggregator".to_string(),

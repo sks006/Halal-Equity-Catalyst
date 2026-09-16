@@ -6,8 +6,8 @@ use equity_catalyst_shared::{
     types::{AllocationTarget, AssetWeight, BasisPoints, PositionSnapshot, SignalType},
 };
 
-use crate::{error::ApiError, models::PortfolioModel};
 use super::signals::PolicySignal;
+use crate::{error::ApiError, models::PortfolioModel};
 
 /// Adjusts target portfolio weights according to the policy signal and generates proposed trades.
 pub fn calculate_target_allocation(
@@ -17,7 +17,9 @@ pub fn calculate_target_allocation(
     rebalance_threshold_bps: u16,
 ) -> Result<(AllocationTarget, Vec<RebalanceTrade>), ApiError> {
     if positions.is_empty() {
-        return Err(ApiError::BadRequest("Portfolio has no active positions".to_string()));
+        return Err(ApiError::BadRequest(
+            "Portfolio has no active positions".to_string(),
+        ));
     }
 
     if signal.signal_type == SignalType::EmergencyExit {

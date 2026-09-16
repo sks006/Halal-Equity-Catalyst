@@ -1,9 +1,6 @@
 use borsh::BorshSerialize;
 use equity_catalyst_solana::{
-    accounts::*,
-    anchor_client::*,
-    rpc::SolanaRpcClient,
-    AnchorClient, SolanaError,
+    accounts::*, anchor_client::*, rpc::SolanaRpcClient, AnchorClient, SolanaError,
 };
 use solana_sdk::{
     pubkey::Pubkey,
@@ -234,7 +231,9 @@ fn test_instruction_builders_layout() {
     assert_eq!(&wdr_ix.data[..8], &WITHDRAW_DISCRIMINATOR);
 
     // 5. Emergency exit
-    let emg_ix = client.build_emergency_exit_ix(&authority, &v_pda, true).unwrap();
+    let emg_ix = client
+        .build_emergency_exit_ix(&authority, &v_pda, true)
+        .unwrap();
     assert_eq!(&emg_ix.data[..8], &EMERGENCY_EXIT_DISCRIMINATOR);
     assert_eq!(emg_ix.accounts.len(), 2);
 }
@@ -266,3 +265,220 @@ async fn test_read_only_mode_guard() {
     client.enable_transaction_submission();
     assert!(client.is_transaction_submission_enabled());
 }
+
+#[test]
+fn test_verified_deployed_program_ids() {
+    use std::str::FromStr;
+
+    // 1. Anchor Equity Vault Program
+    let vault_pid = Pubkey::from_str(PROGRAM_ID_STR).expect("Valid Equity Vault program ID");
+    assert_eq!(
+        vault_pid.to_string(),
+        "8NhtqxR1mwq7a3HTUtcGABNZ3KWzQi9KM3fXu3rHS8LH"
+    );
+
+    // 2. Official Meteora Dynamic Bonding Curve (DBC) Program
+    let dbc_pid = Pubkey::from_str(METEORA_DBC_PROGRAM_ID).expect("Valid Meteora DBC program ID");
+    assert_eq!(
+        dbc_pid.to_string(),
+        "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
+    );
+
+    // 3. Jupiter v6 Swap Program
+    let jup_pid = Pubkey::from_str(JUPITER_V6_PROGRAM_ID).expect("Valid Jupiter program ID");
+    assert_eq!(
+        jup_pid.to_string(),
+        "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4"
+    );
+
+    // 4. SPL Token Program
+    let spl_token = Pubkey::from_str(SPL_TOKEN_PROGRAM_ID).expect("Valid SPL Token program ID");
+    assert_eq!(
+        spl_token.to_string(),
+        "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    );
+
+    // 5. SPL Associated Token Account Program
+    let spl_ata =
+        Pubkey::from_str(SPL_ASSOCIATED_TOKEN_PROGRAM_ID).expect("Valid SPL ATA program ID");
+    assert_eq!(
+        spl_ata.to_string(),
+        "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+    );
+}
+
+#[test]
+fn test_rpc_client_builder_and_endpoints() {
+    use std::time::Duration;
+
+    let primary = "https://api.mainnet-beta.solana.com";
+    let fb1 = "https://rpc.ankr.com/solana";
+    let fb2 = "https://solana-mainnet.g.alchemy.com/v2/demo";
+
+    let client = SolanaRpcClient::new(primary)
+        .with_fallback(fb1)
+        .with_fallback(fb2)
+        // Test deduplication
+        .with_fallback(primary)
+        .with_fallback(fb1)
+        .with_timeout(Duration::from_secs(12))
+        .with_max_retries(3)
+        .with_commitment("finalized");
+
+    assert_eq!(client.rpc_url(), primary);
+    assert_eq!(client.fallback_urls(), &[fb1.to_string(), fb2.to_string()]);
+    assert_eq!(
+        client.all_endpoints(),
+        vec![primary.to_string(), fb1.to_string(), fb2.to_string()]
+    );
+    assert_eq!(client.timeout(), Duration::from_secs(12));
+    assert_eq!(client.max_retries(), 3);
+    assert_eq!(client.commitment(), "finalized");
+}
+
+#[tokio::test]
+async fn test_rpc_client_failover_on_503() {
+    use std::time::Duration;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    // 1. Failing primary server responding with HTTP 503
+    let listener_fail = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port_fail = listener_fail.local_addr().unwrap().port();
+    let fail_url = format!("http://127.0.0.1:{}", port_fail);
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener_fail.accept().await {
+            let mut buf = [0u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            let response = "HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\n\r\n";
+            let _ = socket.write_all(response.as_bytes()).await;
+        }
+    });
+
+    // 2. Healthy fallback server responding with valid getBalance JSON-RPC
+    let listener_ok = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port_ok = listener_ok.local_addr().unwrap().port();
+    let ok_url = format!("http://127.0.0.1:{}", port_ok);
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener_ok.accept().await {
+            let mut buf = [0u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            let body = r#"{"jsonrpc":"2.0","result":{"value":75000000},"id":1}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = socket.write_all(response.as_bytes()).await;
+        }
+    });
+
+    // 3. Client configured with failing primary and healthy fallback
+    let client = SolanaRpcClient::new(fail_url)
+        .with_fallback(ok_url)
+        .with_timeout(Duration::from_secs(2))
+        .with_max_retries(1);
+
+    let dummy_key = Keypair::new().pubkey();
+    let balance = client.get_balance(&dummy_key).await;
+
+    assert!(
+        balance.is_ok(),
+        "Should failover to healthy endpoint successfully: {:?}",
+        balance.err()
+    );
+    assert_eq!(balance.unwrap(), 75_000_000);
+}
+
+#[tokio::test]
+async fn test_rpc_client_failover_on_429() {
+    use std::time::Duration;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    // Failing primary server responding with HTTP 429 Too Many Requests
+    let listener_fail = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port_fail = listener_fail.local_addr().unwrap().port();
+    let fail_url = format!("http://127.0.0.1:{}", port_fail);
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener_fail.accept().await {
+            let mut buf = [0u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            let response = "HTTP/1.1 429 Too Many Requests\r\nContent-Length: 0\r\n\r\n";
+            let _ = socket.write_all(response.as_bytes()).await;
+        }
+    });
+
+    // Healthy fallback server
+    let listener_ok = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port_ok = listener_ok.local_addr().unwrap().port();
+    let ok_url = format!("http://127.0.0.1:{}", port_ok);
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener_ok.accept().await {
+            let mut buf = [0u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            let body = r#"{"jsonrpc":"2.0","result":{"value":123456},"id":1}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            let _ = socket.write_all(response.as_bytes()).await;
+        }
+    });
+
+    let client = SolanaRpcClient::new(fail_url)
+        .with_fallback(ok_url)
+        .with_timeout(Duration::from_secs(2))
+        .with_max_retries(1);
+
+    let dummy_key = Keypair::new().pubkey();
+    let balance = client.get_balance(&dummy_key).await;
+
+    assert!(
+        balance.is_ok(),
+        "Should failover to healthy endpoint after 429: {:?}",
+        balance.err()
+    );
+    assert_eq!(balance.unwrap(), 123_456);
+}
+
+#[tokio::test]
+async fn test_rpc_client_exhaustion_returns_error() {
+    use std::time::Duration;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let url = format!("http://127.0.0.1:{}", port);
+
+    tokio::spawn(async move {
+        while let Ok((mut socket, _)) = listener.accept().await {
+            let mut buf = [0u8; 1024];
+            let _ = socket.read(&mut buf).await;
+            let response = "HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\n\r\n";
+            let _ = socket.write_all(response.as_bytes()).await;
+        }
+    });
+
+    let client = SolanaRpcClient::new(url)
+        .with_timeout(Duration::from_secs(1))
+        .with_max_retries(0);
+
+    let dummy_key = Keypair::new().pubkey();
+    let res = client.get_balance(&dummy_key).await;
+    assert!(res.is_err());
+    match res {
+        Err(SolanaError::RpcError { code, message }) => {
+            assert_eq!(code, 500);
+            assert!(message.contains("500"));
+        }
+        other => panic!("Expected RpcError 500, got {:?}", other),
+    }
+}
+

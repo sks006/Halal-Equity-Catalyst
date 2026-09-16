@@ -1,8 +1,4 @@
-use crate::{
-    accounts::*,
-    rpc::SolanaRpcClient,
-    SolanaError,
-};
+use crate::{accounts::*, rpc::SolanaRpcClient, SolanaError};
 use borsh::BorshSerialize;
 use solana_sdk::{
     instruction::{AccountMeta, Instruction},
@@ -82,7 +78,10 @@ impl AnchorClient {
     }
 
     #[instrument(skip(self), fields(shares_pda = %shares_pda))]
-    pub async fn fetch_user_shares(&self, shares_pda: &Pubkey) -> Result<UserSharesAccount, SolanaError> {
+    pub async fn fetch_user_shares(
+        &self,
+        shares_pda: &Pubkey,
+    ) -> Result<UserSharesAccount, SolanaError> {
         let info = self
             .rpc
             .get_account_info(shares_pda)
@@ -102,7 +101,10 @@ impl AnchorClient {
     }
 
     #[instrument(skip(self), fields(position_pda = %position_pda))]
-    pub async fn fetch_position(&self, position_pda: &Pubkey) -> Result<PositionAccount, SolanaError> {
+    pub async fn fetch_position(
+        &self,
+        position_pda: &Pubkey,
+    ) -> Result<PositionAccount, SolanaError> {
         let info = self
             .rpc
             .get_account_info(position_pda)
@@ -112,7 +114,10 @@ impl AnchorClient {
     }
 
     #[instrument(skip(self), fields(execution_pda = %execution_pda))]
-    pub async fn fetch_execution(&self, execution_pda: &Pubkey) -> Result<ExecutionAccount, SolanaError> {
+    pub async fn fetch_execution(
+        &self,
+        execution_pda: &Pubkey,
+    ) -> Result<ExecutionAccount, SolanaError> {
         let info = self
             .rpc
             .get_account_info(execution_pda)
@@ -122,7 +127,10 @@ impl AnchorClient {
     }
 
     #[instrument(skip(self), fields(token_account = %token_account))]
-    pub async fn fetch_token_account(&self, token_account: &Pubkey) -> Result<SplTokenAccount, SolanaError> {
+    pub async fn fetch_token_account(
+        &self,
+        token_account: &Pubkey,
+    ) -> Result<SplTokenAccount, SolanaError> {
         let info = self
             .rpc
             .get_account_info(token_account)
@@ -150,10 +158,19 @@ impl AnchorClient {
 
         let mut data = Vec::with_capacity(64);
         data.extend_from_slice(&INITIALIZE_VAULT_DISCRIMINATOR);
-        name.to_string().serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
-        symbol.to_string().serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
-        max_ltv_bps.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
-        max_position_bps.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        name.to_string()
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        symbol
+            .to_string()
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        max_ltv_bps
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        max_position_bps
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
 
         let accounts = vec![
             AccountMeta::new(*authority, true),
@@ -173,6 +190,7 @@ impl AnchorClient {
     }
 
     /// 2. Update Policy (or initial policy configuration)
+    #[allow(clippy::too_many_arguments)]
     pub fn build_update_policy_ix(
         &self,
         authority: &Pubkey,
@@ -188,12 +206,24 @@ impl AnchorClient {
 
         let mut data = Vec::with_capacity(32);
         data.extend_from_slice(&UPDATE_POLICY_DISCRIMINATOR);
-        max_ltv_bps.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
-        max_position_bps.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
-        stop_loss_bps.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
-        take_profit_bps.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
-        rebalance_threshold_bps.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
-        is_active.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        max_ltv_bps
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        max_position_bps
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        stop_loss_bps
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        take_profit_bps
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        rebalance_threshold_bps
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        is_active
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
 
         let accounts = vec![
             AccountMeta::new_readonly(*authority, true),
@@ -225,7 +255,9 @@ impl AnchorClient {
 
         let mut data = Vec::with_capacity(16);
         data.extend_from_slice(&DEPOSIT_DISCRIMINATOR);
-        amount.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        amount
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
 
         let accounts = vec![
             AccountMeta::new(*user, true),
@@ -262,7 +294,9 @@ impl AnchorClient {
 
         let mut data = Vec::with_capacity(16);
         data.extend_from_slice(&WITHDRAW_DISCRIMINATOR);
-        shares_to_burn.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        shares_to_burn
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
 
         let accounts = vec![
             AccountMeta::new(*user, true),
@@ -292,7 +326,9 @@ impl AnchorClient {
     ) -> Result<Instruction, SolanaError> {
         let mut data = Vec::with_capacity(9);
         data.extend_from_slice(&EMERGENCY_EXIT_DISCRIMINATOR);
-        is_paused.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        is_paused
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
 
         let accounts = vec![
             AccountMeta::new_readonly(*authority, true),
@@ -307,6 +343,7 @@ impl AnchorClient {
     }
 
     /// 6. Execute Action (rebalance, swap, keeper execution)
+    #[allow(clippy::too_many_arguments)]
     pub fn build_execute_action_ix(
         &self,
         keeper: &Pubkey,
@@ -323,9 +360,15 @@ impl AnchorClient {
 
         let mut data = Vec::with_capacity(32);
         data.extend_from_slice(&disc);
-        action_type.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
-        input_amount.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
-        min_output_amount.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        action_type
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        input_amount
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        min_output_amount
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
 
         let accounts = vec![
             AccountMeta::new_readonly(*keeper, true),
@@ -358,7 +401,9 @@ impl AnchorClient {
 
         let mut data = Vec::with_capacity(16);
         data.extend_from_slice(&disc);
-        amount.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        amount
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
 
         let accounts = vec![
             AccountMeta::new(*borrower, true),
@@ -389,7 +434,9 @@ impl AnchorClient {
 
         let mut data = Vec::with_capacity(16);
         data.extend_from_slice(&disc);
-        amount.serialize(&mut data).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        amount
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
 
         let accounts = vec![
             AccountMeta::new(*borrower, true),
@@ -432,13 +479,15 @@ impl AnchorClient {
             recent_blockhash,
         );
 
-        let tx_bytes = bincode::serialize(&tx)
-            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        let tx_bytes =
+            bincode::serialize(&tx).map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
 
         let sig = self.rpc.send_transaction(&tx_bytes).await?;
         info!(sig = %sig, "Transaction sent to Solana cluster, awaiting confirmation");
 
-        self.rpc.confirm_signature(&sig, Duration::from_secs(45)).await?;
+        self.rpc
+            .confirm_signature(&sig, Duration::from_secs(45))
+            .await?;
         Ok(sig)
     }
 }

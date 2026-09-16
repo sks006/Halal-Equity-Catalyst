@@ -5,8 +5,7 @@ use axum::{
 use chrono::Utc;
 use deadpool_postgres::Pool;
 use equity_catalyst_api::{
-    build_app, config::Config, create_db_pool,
-    models::ExecutionModel,
+    build_app, config::Config, create_db_pool, models::ExecutionModel,
     repositories::ExecutionRepository,
 };
 use http_body_util::BodyExt;
@@ -138,20 +137,23 @@ async fn test_api_post_and_get_policies() {
                 .method("POST")
                 .uri("/vaults")
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(json!({
-                    "vault_address": vault_address,
-                    "authority": authority,
-                    "name": "Policy Test Vault",
-                    "symbol": "PTV",
-                    "deposit_mint": Keypair::new().pubkey().to_string(),
-                    "vault_token_account": Keypair::new().pubkey().to_string(),
-                    "total_shares": 500000,
-                    "total_deposits": 500000,
-                    "is_paused": false,
-                    "bump": 255,
-                    "created_at": Utc::now().to_rfc3339(),
-                    "updated_at": Utc::now().to_rfc3339(),
-                }).to_string()))
+                .body(Body::from(
+                    json!({
+                        "vault_address": vault_address,
+                        "authority": authority,
+                        "name": "Policy Test Vault",
+                        "symbol": "PTV",
+                        "deposit_mint": Keypair::new().pubkey().to_string(),
+                        "vault_token_account": Keypair::new().pubkey().to_string(),
+                        "total_shares": 500000,
+                        "total_deposits": 500000,
+                        "is_paused": false,
+                        "bump": 255,
+                        "created_at": Utc::now().to_rfc3339(),
+                        "updated_at": Utc::now().to_rfc3339(),
+                    })
+                    .to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -237,20 +239,23 @@ async fn test_api_post_and_get_events() {
                 .method("POST")
                 .uri("/vaults")
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(json!({
-                    "vault_address": vault_address,
-                    "authority": Keypair::new().pubkey().to_string(),
-                    "name": "Event Test Vault",
-                    "symbol": "ETV",
-                    "deposit_mint": Keypair::new().pubkey().to_string(),
-                    "vault_token_account": Keypair::new().pubkey().to_string(),
-                    "total_shares": 100000,
-                    "total_deposits": 100000,
-                    "is_paused": false,
-                    "bump": 255,
-                    "created_at": Utc::now().to_rfc3339(),
-                    "updated_at": Utc::now().to_rfc3339(),
-                }).to_string()))
+                .body(Body::from(
+                    json!({
+                        "vault_address": vault_address,
+                        "authority": Keypair::new().pubkey().to_string(),
+                        "name": "Event Test Vault",
+                        "symbol": "ETV",
+                        "deposit_mint": Keypair::new().pubkey().to_string(),
+                        "vault_token_account": Keypair::new().pubkey().to_string(),
+                        "total_shares": 100000,
+                        "total_deposits": 100000,
+                        "is_paused": false,
+                        "bump": 255,
+                        "created_at": Utc::now().to_rfc3339(),
+                        "updated_at": Utc::now().to_rfc3339(),
+                    })
+                    .to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -314,7 +319,12 @@ async fn test_api_post_and_get_events() {
         .expect("Failed to execute GET /vaults/:address/events");
 
     assert_eq!(vault_events_resp.status(), StatusCode::OK);
-    let body = vault_events_resp.into_body().collect().await.unwrap().to_bytes();
+    let body = vault_events_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(json.as_array().unwrap().len(), 1);
 }
@@ -331,20 +341,23 @@ async fn test_api_get_executions() {
                 .method("POST")
                 .uri("/vaults")
                 .header(header::CONTENT_TYPE, "application/json")
-                .body(Body::from(json!({
-                    "vault_address": vault_address,
-                    "authority": Keypair::new().pubkey().to_string(),
-                    "name": "Execution Test Vault",
-                    "symbol": "XTV",
-                    "deposit_mint": Keypair::new().pubkey().to_string(),
-                    "vault_token_account": Keypair::new().pubkey().to_string(),
-                    "total_shares": 100000,
-                    "total_deposits": 100000,
-                    "is_paused": false,
-                    "bump": 255,
-                    "created_at": Utc::now().to_rfc3339(),
-                    "updated_at": Utc::now().to_rfc3339(),
-                }).to_string()))
+                .body(Body::from(
+                    json!({
+                        "vault_address": vault_address,
+                        "authority": Keypair::new().pubkey().to_string(),
+                        "name": "Execution Test Vault",
+                        "symbol": "XTV",
+                        "deposit_mint": Keypair::new().pubkey().to_string(),
+                        "vault_token_account": Keypair::new().pubkey().to_string(),
+                        "total_shares": 100000,
+                        "total_deposits": 100000,
+                        "is_paused": false,
+                        "bump": 255,
+                        "created_at": Utc::now().to_rfc3339(),
+                        "updated_at": Utc::now().to_rfc3339(),
+                    })
+                    .to_string(),
+                ))
                 .unwrap(),
         )
         .await
@@ -368,7 +381,10 @@ async fn test_api_get_executions() {
         executed_at: Utc::now(),
         confirmed_at: Some(Utc::now()),
     };
-    exec_repo.create(&exec_model).await.expect("Failed to seed execution");
+    exec_repo
+        .create(&exec_model)
+        .await
+        .expect("Failed to seed execution");
 
     // 1. GET /executions
     let list_resp = app
@@ -399,7 +415,12 @@ async fn test_api_get_executions() {
         .expect("Failed to execute GET /vaults/:address/executions");
 
     assert_eq!(vault_exec_resp.status(), StatusCode::OK);
-    let body = vault_exec_resp.into_body().collect().await.unwrap().to_bytes();
+    let body = vault_exec_resp
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes();
     let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(json.as_array().unwrap().len(), 1);
     assert_eq!(json[0]["action"], "BUY");
@@ -436,14 +457,18 @@ async fn test_api_post_dbc_configure() {
     assert_eq!(json["asset"], "TOKENIZED_STOCK");
     assert_eq!(json["quote_token"], "USDC");
     assert_eq!(json["initial_price"], 100.0);
-    assert_eq!(json["program_id"], "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN");
+    assert_eq!(
+        json["program_id"],
+        "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN"
+    );
     assert_eq!(json["graduation"]["migration_option"], "MET_DAMM_V2");
     assert_eq!(json["graduation"]["migration_quote_threshold"], 750.0);
 
-    let segments = json["segments"].as_array().expect("Segments must be an array");
+    let segments = json["segments"]
+        .as_array()
+        .expect("Segments must be an array");
     assert_eq!(segments.len(), 3);
     assert_eq!(segments[0]["liquidity_weight"], 1);
     assert_eq!(segments[1]["liquidity_weight"], 4);
     assert_eq!(segments[2]["liquidity_weight"], 8);
 }
-

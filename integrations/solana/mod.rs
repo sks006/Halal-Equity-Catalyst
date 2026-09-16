@@ -16,10 +16,7 @@ pub enum SolanaError {
     AccountDataTooShort { expected: usize, actual: usize },
 
     #[error("Invalid Anchor account discriminator: expected {expected:?}, got {actual:?}")]
-    InvalidDiscriminator {
-        expected: [u8; 8],
-        actual: [u8; 8],
-    },
+    InvalidDiscriminator { expected: [u8; 8], actual: [u8; 8] },
 
     #[error("Account not found: {0}")]
     AccountNotFound(String),
@@ -40,10 +37,7 @@ pub enum SolanaError {
     WebSocketTransport(String),
 
     #[error("Transaction execution failed on-chain ({signature}): {error}")]
-    TransactionExecutionFailed {
-        signature: String,
-        error: String,
-    },
+    TransactionExecutionFailed { signature: String, error: String },
 
     #[error("Transaction confirmation timed out for signature {signature} after {timeout_secs}s")]
     ConfirmationTimeout {
