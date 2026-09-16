@@ -18,3 +18,4 @@ test-ledger/
 *.pem
 *.secret
 .solana/
+*.tsbuildinfo
