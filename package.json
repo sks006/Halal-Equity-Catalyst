@@ -28,6 +28,7 @@
     "typescript": "^5.5.4"
   },
   "overrides": {
-    "uuid": "9.0.1"
+    "uuid": "^9.0.1",
+    "stream-json": "^3.5.0"
   }
 }

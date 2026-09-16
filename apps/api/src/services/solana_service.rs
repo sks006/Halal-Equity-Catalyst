@@ -58,8 +58,7 @@ impl SolanaService {
         timeout: Duration,
     ) -> Self {
         let rpc = Arc::new(
-            SolanaRpcClient::new_with_fallbacks(rpc_url, fallback_urls)
-                .with_timeout(timeout),
+            SolanaRpcClient::new_with_fallbacks(rpc_url, fallback_urls).with_timeout(timeout),
         );
         let ws = Arc::new(SolanaWebSocketClient::new(ws_url));
         let p_id = program_id_opt.unwrap_or_else(program_id);
