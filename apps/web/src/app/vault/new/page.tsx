@@ -60,7 +60,7 @@ export default function NewVaultPage() {
   const [customMint, setCustomMint] = useState<string>("");
   const [isCustomMint, setIsCustomMint] = useState<boolean>(false);
 
-  const [maxLtvPct, setMaxLtvPct] = useState<number>(65);
+  const [minCashPct, setMinCashPct] = useState<number>(10);
   const [maxPositionPct, setMaxPositionPct] = useState<number>(25);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [errorFeedback, setErrorFeedback] = useState<string | null>(null);
@@ -93,8 +93,8 @@ export default function NewVaultPage() {
     } catch {
       return false;
     }
-    return maxLtvPct > 0 && maxLtvPct <= 90 && maxPositionPct > 0 && maxPositionPct <= 100;
-  }, [connected, publicKey, name, symbol, effectiveMint, maxLtvPct, maxPositionPct]);
+    return minCashPct >= 5 && minCashPct <= 100 && maxPositionPct > 0 && maxPositionPct <= 100;
+  }, [connected, publicKey, name, symbol, effectiveMint, minCashPct, maxPositionPct]);
 
   const handleCreateVault = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -113,7 +113,7 @@ export default function NewVaultPage() {
         name: name.trim(),
         symbol: symbol.trim().toUpperCase(),
         assetMint: assetMintPubkey,
-        maxLtvBps: Math.round(maxLtvPct * 100),
+        minCashBps: Math.round(minCashPct * 100),
         maxPositionBps: Math.round(maxPositionPct * 100),
       });
 
@@ -308,17 +308,17 @@ export default function NewVaultPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="space-y-3">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-medium text-slate-700">Max Loan-to-Value (LTV)</span>
-                  <Badge variant="cyan" className="font-mono font-bold">{maxLtvPct}%</Badge>
+                  <span className="font-medium text-slate-700">Min Cash Reserve Ratio</span>
+                  <Badge variant="cyan" className="font-mono font-bold">{minCashPct}%</Badge>
                 </div>
                 <Slider
-                  min={10}
-                  max={85}
-                  step={5}
-                  value={[maxLtvPct]}
-                  onValueChange={(val) => setMaxLtvPct(val[0])}
+                  min={5}
+                  max={50}
+                  step={1}
+                  value={[minCashPct]}
+                  onValueChange={(val) => setMinCashPct(val[0])}
                 />
-                <p className="text-[11px] text-slate-400">Maximum allowable borrowing against collateral.</p>
+                <p className="text-[11px] text-slate-400">Mandatory unencumbered liquid reserve (100% spot equity, zero borrowing).</p>
               </div>
 
               <div className="space-y-3">

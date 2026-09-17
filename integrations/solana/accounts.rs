@@ -21,7 +21,6 @@ pub const VAULT_ACCOUNT_DISCRIMINATOR: [u8; 8] = [211, 8, 232, 43, 2, 152, 117, 
 pub const POLICY_ACCOUNT_DISCRIMINATOR: [u8; 8] = [222, 135, 7, 163, 235, 177, 33, 68];
 pub const USER_SHARES_ACCOUNT_DISCRIMINATOR: [u8; 8] = [148, 201, 81, 76, 109, 139, 152, 190];
 pub const POSITION_ACCOUNT_DISCRIMINATOR: [u8; 8] = [170, 188, 143, 228, 122, 64, 247, 208];
-pub const LOAN_ACCOUNT_DISCRIMINATOR: [u8; 8] = [20, 195, 70, 117, 165, 227, 182, 1];
 pub const EXECUTION_ACCOUNT_DISCRIMINATOR: [u8; 8] = [50, 148, 225, 163, 129, 33, 229, 40];
 
 /// Compute standard Anchor account discriminator: Sha256("account:<AccountName>")[..8]
@@ -208,10 +207,6 @@ pub fn parse_user_shares(data: &[u8]) -> Result<UserSharesAccount, crate::Solana
 
 pub fn parse_position(data: &[u8]) -> Result<PositionAccount, crate::SolanaError> {
     parse_anchor_account(data, &POSITION_ACCOUNT_DISCRIMINATOR)
-}
-
-pub fn parse_loan(data: &[u8]) -> Result<LoanAccount, crate::SolanaError> {
-    parse_anchor_account(data, &LOAN_ACCOUNT_DISCRIMINATOR)
 }
 
 pub fn parse_execution(data: &[u8]) -> Result<ExecutionAccount, crate::SolanaError> {

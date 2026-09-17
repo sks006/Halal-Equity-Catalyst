@@ -45,13 +45,13 @@ export class PoliciesClient {
   ): TransactionInstruction {
     const [policyPda] = findPolicyPda(params.vault, this.programId);
 
-    // Args: max_ltv(2) + max_pos(2) + stop_loss(2) + take_profit(2) + rebalance(2) + is_active(1)
+    // Args: min_cash(2) + max_pos(2) + stop_loss(2) + take_profit(2) + rebalance(2) + is_active(1)
     const data = Buffer.alloc(8 + 2 + 2 + 2 + 2 + 2 + 1);
     let offset = 0;
     UPDATE_POLICY_DISCRIMINATOR.copy(data, offset);
     offset += 8;
 
-    data.writeUInt16LE(params.maxLtvBps, offset);
+    data.writeUInt16LE(params.minCashBps, offset);
     offset += 2;
     data.writeUInt16LE(params.maxPositionBps, offset);
     offset += 2;

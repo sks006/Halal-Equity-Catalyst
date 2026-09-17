@@ -85,7 +85,7 @@ export const APP_NAVIGATION: NavItem[] = [
     label: "Risk",
     href: "/risk",
     icon: ShieldAlert,
-    description: "Position exposure limits, portfolio drawdowns, LTV thresholds, and circuit breakers",
+    description: "Position exposure limits, portfolio drawdowns, unencumbered cash reserves, and spot circuit breakers",
   },
   {
     id: "settings",

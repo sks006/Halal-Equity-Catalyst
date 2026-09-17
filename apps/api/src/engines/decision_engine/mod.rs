@@ -50,7 +50,7 @@ impl DecisionEngine {
         policy: &PolicyModel,
         positions: &[PortfolioModel],
         total_value_usd: u64,
-        total_debt_usd: u64,
+        available_cash_usd: u64,
     ) -> Result<ExecutionRequest, ApiError> {
         let decision_id = Uuid::new_v4();
 
@@ -76,7 +76,7 @@ impl DecisionEngine {
             positions,
             policy,
             total_value_usd,
-            total_debt_usd,
+            available_cash_usd,
         );
 
         let (approved, rationale) = match risk_assessment {

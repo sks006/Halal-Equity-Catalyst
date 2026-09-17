@@ -1,6 +1,5 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 
-import { CreditClient } from "./credit";
 import { EventsClient } from "./events";
 import { ExecutionClient } from "./execution";
 import { PoliciesClient } from "./policies";
@@ -31,7 +30,6 @@ export class EquityCatalystClient {
   public readonly events: EventsClient;
   public readonly execution: ExecutionClient;
   public readonly portfolio: PortfolioClient;
-  public readonly credit: CreditClient;
 
   constructor(config: ClientConfig = {}) {
     const rpcUrl = config.rpcUrl || "https://api.devnet.solana.com";
@@ -44,7 +42,6 @@ export class EquityCatalystClient {
     this.events = new EventsClient(this.connection, this.programId, this.apiUrl);
     this.execution = new ExecutionClient(this.connection, this.programId, this.apiUrl);
     this.portfolio = new PortfolioClient(this.connection, this.programId, this.apiUrl);
-    this.credit = new CreditClient(this.connection, this.programId, this.apiUrl);
   }
 
   /** Factory constructor for Solana Devnet */

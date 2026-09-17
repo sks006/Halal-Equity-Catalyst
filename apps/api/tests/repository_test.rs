@@ -91,7 +91,7 @@ async fn test_full_repository_lifecycle() {
         policy_address: policy_address.clone(),
         vault_address: vault_address.clone(),
         authority: authority.clone(),
-        max_ltv_bps: 7_500,
+        min_cash_bps: 1_000,
         max_position_bps: 2_500,
         stop_loss_bps: 500,
         take_profit_bps: 1_500,
@@ -107,7 +107,7 @@ async fn test_full_repository_lifecycle() {
         .await
         .expect("Failed to upsert policy");
     assert_eq!(upserted_policy.policy_address, policy_address);
-    assert_eq!(upserted_policy.max_ltv_bps, 7_500);
+    assert_eq!(upserted_policy.min_cash_bps, 1_000);
 
     let fetched_policy = policy_repo
         .find_by_vault(&vault_address)

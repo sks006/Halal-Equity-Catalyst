@@ -82,7 +82,7 @@ export class VaultsClient {
     const nameBytes = Buffer.from(params.name);
     const symbolBytes = Buffer.from(params.symbol);
 
-    // Serialization: disc(8) + name_len(4) + name + sym_len(4) + sym + max_ltv(2) + max_pos(2)
+    // Serialization: disc(8) + name_len(4) + name + sym_len(4) + sym + min_cash(2) + max_pos(2)
     const data = Buffer.alloc(8 + 4 + nameBytes.length + 4 + symbolBytes.length + 2 + 2);
     let offset = 0;
     INITIALIZE_VAULT_DISCRIMINATOR.copy(data, offset);
@@ -98,7 +98,7 @@ export class VaultsClient {
     symbolBytes.copy(data, offset);
     offset += symbolBytes.length;
 
-    data.writeUInt16LE(params.maxLtvBps, offset);
+    data.writeUInt16LE(params.minCashBps, offset);
     offset += 2;
     data.writeUInt16LE(params.maxPositionBps, offset);
 

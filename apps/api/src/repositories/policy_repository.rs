@@ -23,14 +23,14 @@ impl PolicyRepository {
             .query_one(
                 r#"
                 INSERT INTO policies (
-                    policy_address, vault_address, authority, max_ltv_bps,
+                    policy_address, vault_address, authority, min_cash_bps,
                     max_position_bps, stop_loss_bps, take_profit_bps,
                     rebalance_threshold_bps, is_active, bump, created_at, updated_at
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
                 ON CONFLICT (vault_address) DO UPDATE SET
                     authority = EXCLUDED.authority,
-                    max_ltv_bps = EXCLUDED.max_ltv_bps,
+                    min_cash_bps = EXCLUDED.min_cash_bps,
                     max_position_bps = EXCLUDED.max_position_bps,
                     stop_loss_bps = EXCLUDED.stop_loss_bps,
                     take_profit_bps = EXCLUDED.take_profit_bps,
@@ -43,7 +43,7 @@ impl PolicyRepository {
                     &policy.policy_address,
                     &policy.vault_address,
                     &policy.authority,
-                    &policy.max_ltv_bps,
+                    &policy.min_cash_bps,
                     &policy.max_position_bps,
                     &policy.stop_loss_bps,
                     &policy.take_profit_bps,

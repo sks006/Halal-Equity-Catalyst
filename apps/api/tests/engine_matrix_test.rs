@@ -34,7 +34,7 @@ fn create_sample_policy(is_active: bool) -> PolicyModel {
         policy_address: "pol-001-EQTY".to_string(),
         vault_address: "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4".to_string(),
         authority: "auth99X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6".to_string(),
-        max_ltv_bps: 6500,            // 65.00%
+        min_cash_bps: 1000,           // 10.00% minimum cash reserve
         max_position_bps: 2500,       // 25.00%
         stop_loss_bps: 800,           // 8.00%
         take_profit_bps: 2000,        // 20.00%
@@ -222,7 +222,7 @@ fn test_risk_engine_approve_case() {
     let policy = create_sample_policy(true);
     let positions = create_sample_positions();
     let total_portfolio = 4_850_000;
-    let total_debt = 0;
+    let available_cash = 1_208_760;
 
     // Normal trade: Buy $242,500 NVDA (post trade = $1,038,580 = 21.41% <= 25.00% max position)
     let trades = vec![RebalanceTrade {
@@ -239,7 +239,7 @@ fn test_risk_engine_approve_case() {
         &positions,
         &policy,
         total_portfolio,
-        total_debt,
+        available_cash,
     );
 
     assert_eq!(assessment, RiskAssessment::Approved);
@@ -251,6 +251,7 @@ fn test_risk_engine_reject_cases() {
     let policy = create_sample_policy(true);
     let positions = create_sample_positions();
     let total_portfolio = 4_850_000;
+    let available_cash = 1_208_760;
 
     // Case A: Position Exposure Limit Rejection
     // Buy $600,000 NVDA -> post trade = $1,396,080 = 28.78% > 25.00% max limit
@@ -268,7 +269,7 @@ fn test_risk_engine_reject_cases() {
         &positions,
         &policy,
         total_portfolio,
-        0,
+        available_cash,
     );
     match res_exposure {
         RiskAssessment::Rejected { reason } => {
@@ -294,7 +295,7 @@ fn test_risk_engine_reject_cases() {
         &positions,
         &high_limit_policy,
         total_portfolio,
-        0,
+        available_cash,
     );
     match res_limit {
         RiskAssessment::Rejected { reason } => {
@@ -303,35 +304,27 @@ fn test_risk_engine_reject_cases() {
         _ => panic!("Expected rejection on trade limit"),
     }
 
-    // Case C: LTV Limit Rejection (Debt $3.5M on $4.85M = 72.16% > 65.00% max LTV)
-    let _res_ltv = risk_engine.evaluate_proposed_trades(
-        &[],
-        &positions,
-        &policy,
-        total_portfolio,
-        3_500_000, // Excessive debt
-    );
-    // If empty trades, LTV is evaluated when trades are present
+    // Case C: Cash Reserve Inadequacy Rejection (cash $100k < $242.5k trade + $485k min cash)
     let normal_trades = vec![RebalanceTrade {
         symbol: "NVDA".to_string(),
         is_buy: true,
         current_value: 796_080,
-        target_value: 850_000,
-        trade_value: 53_920,
-        drift_bps: BasisPoints(100),
+        target_value: 1_038_580,
+        trade_value: 242_500,
+        drift_bps: BasisPoints(500),
     }];
-    let res_ltv_with_trades = risk_engine.evaluate_proposed_trades(
+    let res_cash_with_trades = risk_engine.evaluate_proposed_trades(
         &normal_trades,
         &positions,
         &policy,
         total_portfolio,
-        3_500_000,
+        100_000, // Insufficient cash
     );
-    match res_ltv_with_trades {
+    match res_cash_with_trades {
         RiskAssessment::Rejected { reason } => {
-            assert!(reason.contains("LTV"), "Reason: {}", reason);
+            assert!(reason.contains("Cash reserve breach"), "Reason: {}", reason);
         }
-        _ => panic!("Expected rejection on LTV limit"),
+        _ => panic!("Expected rejection on cash reserve"),
     }
 
     // Case D: Stop-Loss Breach Rejection (Position down -10.00% > 8.00% stop)
@@ -355,7 +348,7 @@ fn test_risk_engine_reject_cases() {
         &loss_positions,
         &policy,
         total_portfolio,
-        0,
+        available_cash,
     );
     match res_stop {
         RiskAssessment::Rejected { reason } => {
@@ -394,7 +387,7 @@ fn test_decision_engine_approve_case() {
     };
 
     let request = decision_engine
-        .process_event(&event, &vault, &policy, &positions, 4_850_000, 0)
+        .process_event(&event, &vault, &policy, &positions, 4_850_000, 1_208_760)
         .expect("Decision process should succeed");
 
     assert!(request.approved);
@@ -425,7 +418,7 @@ fn test_decision_engine_reject_cases() {
     // Case 1: Preflight rejection on paused vault
     let paused_vault = create_sample_vault(true);
     let paused_err =
-        decision_engine.process_event(&event, &paused_vault, &policy, &positions, 4_850_000, 0);
+        decision_engine.process_event(&event, &paused_vault, &policy, &positions, 4_850_000, 1_208_760);
     assert!(matches!(paused_err, Err(ApiError::BadRequest(msg)) if msg.contains("paused")));
 
     // Case 2: Preflight rejection on inactive policy
@@ -437,7 +430,7 @@ fn test_decision_engine_reject_cases() {
         &inactive_policy,
         &positions,
         4_850_000,
-        0,
+        1_208_760,
     );
     assert!(matches!(inactive_err, Err(ApiError::BadRequest(msg)) if msg.contains("inactive")));
 }

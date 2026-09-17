@@ -96,7 +96,7 @@ fn test_policy_engine_event_to_allocation_flow() {
         policy_address: "Policy11111111111111111111111111111111111111".to_string(),
         vault_address: "Vault111111111111111111111111111111111111111".to_string(),
         authority: "Auth1111111111111111111111111111111111111111".to_string(),
-        max_ltv_bps: 7_500,
+        min_cash_bps: 1_000,
         max_position_bps: 5_000,
         stop_loss_bps: 500,
         take_profit_bps: 1_500,
@@ -179,7 +179,7 @@ fn test_risk_engine_defense_lines() {
         policy_address: "P1".to_string(),
         vault_address: "V1".to_string(),
         authority: "A1".to_string(),
-        max_ltv_bps: 7_500,      // 75% max LTV
+        min_cash_bps: 1_000,     // 10% minimum cash reserve
         max_position_bps: 3_000, // 30% max position cap
         stop_loss_bps: 500,      // 5% stop loss
         take_profit_bps: 1_500,
@@ -194,11 +194,11 @@ fn test_risk_engine_defense_lines() {
         portfolio_id: Uuid::new_v4(),
         vault_address: "V1".to_string(),
         asset_symbol: "NVDA".to_string(),
-        asset_mint: "M1".to_string(),
-        amount: 100,
+        asset_mint: "NVDA_MINT_11111111111111111111111111111111111".to_string(),
+        amount: 250,
         entry_price_usd: 100.0,
         current_price_usd: 100.0,
-        current_value_usd: 25_000.0, // 25% of 100,000
+        current_value_usd: 25_000.0,
         target_weight_bps: 2_500,
         current_weight_bps: 2_500,
         last_rebalanced_at: None,
@@ -207,7 +207,7 @@ fn test_risk_engine_defense_lines() {
 
     let total_portfolio_usd = 100_000;
 
-    // 1. Valid trade within limits: Buy $4,000 NVDA (total $29,000 <= 30% max position)
+    // 1. Compliant trade: Buy $4,000 NVDA (total $29,000 <= 30% max position) with ample cash ($30,000)
     let compliant_trades = vec![RebalanceTrade {
         symbol: "NVDA".to_string(),
         is_buy: true,
@@ -221,7 +221,7 @@ fn test_risk_engine_defense_lines() {
         &positions,
         &policy,
         total_portfolio_usd,
-        0,
+        30_000,
     );
     assert_eq!(assessment, RiskAssessment::Approved);
 
@@ -239,19 +239,19 @@ fn test_risk_engine_defense_lines() {
         &positions,
         &policy,
         total_portfolio_usd,
-        0,
+        30_000,
     );
     assert!(matches!(assessment_breach, RiskAssessment::Rejected { .. }));
 
-    // 3. LTV breach: Debt $80,000 on $100,000 portfolio (80% > 75% limit)
-    let assessment_ltv = engine.evaluate_proposed_trades(
+    // 3. Cash reserve breach: Available cash $12,000 is insufficient for $4,000 outlay + $10,000 required reserve
+    let assessment_cash = engine.evaluate_proposed_trades(
         &compliant_trades,
         &positions,
         &policy,
         total_portfolio_usd,
-        80_000,
+        12_000,
     );
-    assert!(matches!(assessment_ltv, RiskAssessment::Rejected { .. }));
+    assert!(matches!(assessment_cash, RiskAssessment::Rejected { .. }));
 }
 
 #[test]
@@ -278,7 +278,7 @@ fn test_decision_engine_end_to_end_pipeline() {
         policy_address: "PolicyABC1111111111111111111111111111111111".to_string(),
         vault_address: vault.vault_address.clone(),
         authority: vault.authority.clone(),
-        max_ltv_bps: 7_500,
+        min_cash_bps: 1_000,
         max_position_bps: 5_000, // 50% max position
         stop_loss_bps: 500,
         take_profit_bps: 1_500,
@@ -333,8 +333,9 @@ fn test_decision_engine_end_to_end_pipeline() {
     };
 
     let total_value = 500_000;
+    let available_cash = 380_000;
     let request = decision_engine
-        .process_event(&event, &vault, &policy, &positions, total_value, 0)
+        .process_event(&event, &vault, &policy, &positions, total_value, available_cash)
         .expect("Decision pipeline failed");
 
     assert!(request.approved);

@@ -5,8 +5,8 @@ import BN from "bn.js";
 import {
   DEFAULT_PROGRAM_ID,
   EquityCatalystClient,
+  EquityPythLazerService,
   findExecutionPda,
-  findLoanPda,
   findPolicyPda,
   findPositionPda,
   findUserSharesPda,
@@ -53,13 +53,6 @@ describe("Equity Catalyst TypeScript SDK", () => {
       expect(bump).to.be.a("number");
     });
 
-    it("should derive Loan PDA matching on-chain seeds", () => {
-      const [vaultPda] = findVaultPda(authority, vaultName);
-      const [loanPda, bump] = findLoanPda(vaultPda, user);
-      expect(loanPda).to.be.instanceOf(PublicKey);
-      expect(bump).to.be.a("number");
-    });
-
     it("should derive Execution PDA matching on-chain seeds", () => {
       const [vaultPda] = findVaultPda(authority, vaultName);
       const [execPda, bump] = findExecutionPda(vaultPda, 1042);
@@ -75,7 +68,7 @@ describe("Equity Catalyst TypeScript SDK", () => {
         assetMint,
         name: vaultName,
         symbol: "CAT-A",
-        maxLtvBps: 7500,
+        minCashBps: 1000,
         maxPositionBps: 2500,
       });
 
@@ -131,7 +124,7 @@ describe("Equity Catalyst TypeScript SDK", () => {
       const ix = client.policies.buildUpdatePolicyIx({
         authority,
         vault: vaultPda,
-        maxLtvBps: 8000,
+        minCashBps: 1200,
         maxPositionBps: 3000,
         stopLossBps: 600,
         takeProfitBps: 1800,
@@ -182,33 +175,6 @@ describe("Equity Catalyst TypeScript SDK", () => {
       expect(ix.data[0]).to.equal(167);
       expect(ix.data[1]).to.equal(100);
     });
-
-    it("should build valid borrow and repay instructions", () => {
-      const [vaultPda] = findVaultPda(authority, vaultName);
-      const collateralMint = Keypair.generate().publicKey;
-
-      const borrowIx = client.credit.buildBorrowIx({
-        borrower: user,
-        vault: vaultPda,
-        borrowAssetMint: assetMint,
-        collateralMint,
-        collateralAmount: 200_000,
-        borrowAmount: 100_000,
-      });
-      expect(borrowIx.keys.length).to.equal(5);
-      expect(borrowIx.data[0]).to.equal(228);
-
-      const repayIx = client.credit.buildRepayIx({
-        borrower: user,
-        vault: vaultPda,
-        borrowAssetMint: assetMint,
-        collateralMint,
-        repayAmount: 100_000,
-        collateralToRelease: 200_000,
-      });
-      expect(repayIx.keys.length).to.equal(4);
-      expect(repayIx.data[0]).to.equal(234);
-    });
   });
 
   describe("3. Transaction Creators", () => {
@@ -218,7 +184,7 @@ describe("Equity Catalyst TypeScript SDK", () => {
         assetMint,
         name: vaultName,
         symbol: "CAT-A",
-        maxLtvBps: 7500,
+        minCashBps: 1000,
         maxPositionBps: 2500,
       });
 
@@ -250,7 +216,6 @@ describe("Equity Catalyst TypeScript SDK", () => {
       expect(client.events).to.be.ok;
       expect(client.execution).to.be.ok;
       expect(client.portfolio).to.be.ok;
-      expect(client.credit).to.be.ok;
       expect(client.programId.toBase58()).to.equal(DEFAULT_PROGRAM_ID.toBase58());
     });
   });
@@ -372,3 +337,38 @@ describe("6. REST API Client Integration", () => {
     expect(verdict.expected_amount_out).to.equal(145000000);
   });
 });
+
+describe("7. Pyth Lazer Streaming Service Integration", () => {
+  it("should initialize Pyth Lazer service with default parameters", () => {
+    const lazer = new EquityPythLazerService({
+      feedIds: [1, 2],
+    });
+
+    expect(lazer.getStatus()).to.equal("disconnected");
+    expect(lazer.getAllLatestPrices().size).to.equal(0);
+  });
+
+  it("should support subscribing to price updates and status changes", () => {
+    const lazer = new EquityPythLazerService({
+      token: "mock-token",
+      feedIds: [1, 2],
+    });
+
+    let lastStatus = "";
+    const unsubStatus = lazer.onStatusChange((status) => {
+      lastStatus = status;
+    });
+
+    let lastUpdate: any = null;
+    const unsubPrice = lazer.onPriceUpdate((update) => {
+      lastUpdate = update;
+    });
+
+    expect(typeof unsubStatus).to.equal("function");
+    expect(typeof unsubPrice).to.equal("function");
+
+    unsubStatus();
+    unsubPrice();
+  });
+});
+

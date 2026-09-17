@@ -325,7 +325,7 @@ impl SolanaService {
         asset_mint: &Pubkey,
         name: &str,
         symbol: &str,
-        max_ltv_bps: u16,
+        min_cash_bps: u16,
         max_position_bps: u16,
     ) -> Result<(Signature, Pubkey, Pubkey), ApiError> {
         let (ix, vault_pda, policy_pda) = self
@@ -335,7 +335,7 @@ impl SolanaService {
                 asset_mint,
                 name,
                 symbol,
-                max_ltv_bps,
+                min_cash_bps,
                 max_position_bps,
             )
             .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
@@ -351,7 +351,7 @@ impl SolanaService {
         &self,
         authority: &Keypair,
         vault_pda: &Pubkey,
-        max_ltv_bps: u16,
+        min_cash_bps: u16,
         max_position_bps: u16,
         stop_loss_bps: u16,
         take_profit_bps: u16,
@@ -363,7 +363,7 @@ impl SolanaService {
             .build_update_policy_ix(
                 &authority.pubkey(),
                 vault_pda,
-                max_ltv_bps,
+                min_cash_bps,
                 max_position_bps,
                 stop_loss_bps,
                 take_profit_bps,

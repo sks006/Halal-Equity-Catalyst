@@ -43,8 +43,8 @@ export function PolicyBuilder({
   const [maxPositionPct, setMaxPositionPct] = useState<number>(
     initialPolicy ? initialPolicy.max_position_bps / 100 : 25
   );
-  const [maxLtvPct, setMaxLtvPct] = useState<number>(
-    initialPolicy ? initialPolicy.max_ltv_bps / 100 : 65
+  const [minCashPct, setMinCashPct] = useState<number>(
+    initialPolicy ? initialPolicy.min_cash_bps / 100 : 10
   );
   const [stopLossPct, setStopLossPct] = useState<number>(
     initialPolicy ? initialPolicy.stop_loss_bps / 100 : 8
@@ -71,8 +71,8 @@ export function PolicyBuilder({
   if (maxPositionPct <= 0 || maxPositionPct > 100) {
     validationErrors.push("Max position exposure must be between 1% and 100%");
   }
-  if (maxLtvPct <= 0 || maxLtvPct > 90) {
-    validationErrors.push("Max LTV must be between 1% and 90%");
+  if (minCashPct < 5 || minCashPct > 100) {
+    validationErrors.push("Minimum unencumbered cash reserve must be between 5% and 100%");
   }
   if (stopLossPct <= 0 || stopLossPct > 50) {
     validationErrors.push("Stop loss must be between 0.1% and 50%");
@@ -87,19 +87,19 @@ export function PolicyBuilder({
   const applyPreset = (tier: "conservative" | "balanced" | "aggressive") => {
     if (tier === "conservative") {
       setMaxPositionPct(15);
-      setMaxLtvPct(45);
+      setMinCashPct(25);
       setStopLossPct(5);
       setTakeProfitPct(15);
       setRebalanceThresholdPct(1.0);
     } else if (tier === "balanced") {
       setMaxPositionPct(25);
-      setMaxLtvPct(65);
+      setMinCashPct(15);
       setStopLossPct(8);
       setTakeProfitPct(25);
       setRebalanceThresholdPct(1.5);
     } else if (tier === "aggressive") {
       setMaxPositionPct(40);
-      setMaxLtvPct(80);
+      setMinCashPct(10);
       setStopLossPct(12);
       setTakeProfitPct(40);
       setRebalanceThresholdPct(2.5);
@@ -111,7 +111,7 @@ export function PolicyBuilder({
     setApiFeedback(null);
     setIsSubmitting(true);
 
-    const maxLtvBps = Math.round(maxLtvPct * 100);
+    const minCashBps = Math.round(minCashPct * 100);
     const maxPositionBps = Math.round(maxPositionPct * 100);
     const stopLossBps = Math.round(stopLossPct * 100);
     const takeProfitBps = Math.round(takeProfitPct * 100);
@@ -126,7 +126,7 @@ export function PolicyBuilder({
         const ix = sdk.policies.buildUpdatePolicyIx({
           vault: vaultPubkey,
           authority: publicKey,
-          maxLtvBps,
+          minCashBps,
           maxPositionBps,
           stopLossBps,
           takeProfitBps,
@@ -141,7 +141,7 @@ export function PolicyBuilder({
         policy_address: initialPolicy?.policy_address || `pol-${Date.now()}`,
         vault_address: vaultAddress,
         authority: publicKey ? publicKey.toBase58() : initialPolicy?.authority || "",
-        max_ltv_bps: maxLtvBps,
+        min_cash_bps: minCashBps,
         max_position_bps: maxPositionBps,
         stop_loss_bps: stopLossBps,
         take_profit_bps: takeProfitBps,
@@ -185,11 +185,16 @@ export function PolicyBuilder({
               <Sliders className="w-4 h-4" />
             </div>
             <div>
-              <CardTitle className="text-base font-bold text-slate-900">
-                Autonomous Policy Engine Configuration
-              </CardTitle>
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-base font-bold text-slate-900">
+                  Autonomous Policy Engine Configuration
+                </CardTitle>
+                <Badge variant="success" className="text-[10px] font-semibold tracking-wide">
+                  100% Spot Only
+                </Badge>
+              </div>
               <p className="text-xs text-slate-500">
-                Programmatic guardrails executed by the risk defense engine and synchronized via Redux.
+                Non-leveraged Shariah-compliant guardrails enforced on-chain and synchronized via Redux.
               </p>
             </div>
           </div>
@@ -250,23 +255,23 @@ export function PolicyBuilder({
             </p>
           </div>
 
-          {/* 2. Max LTV */}
+          {/* 2. Minimum Cash Reserve */}
           <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
             <div className="flex justify-between items-center text-xs">
-              <span className="font-semibold text-slate-700">Max Loan-to-Value (LTV)</span>
+              <span className="font-semibold text-slate-700">Min Cash Reserve Ratio</span>
               <Badge variant="cyan" className="font-mono text-xs font-bold">
-                {maxLtvPct}% ({maxLtvPct * 100} bps)
+                {minCashPct}% ({minCashPct * 100} bps)
               </Badge>
             </div>
             <Slider
-              min={10}
-              max={85}
+              min={5}
+              max={50}
               step={1}
-              value={[maxLtvPct]}
-              onValueChange={(val) => setMaxLtvPct(val[0])}
+              value={[minCashPct]}
+              onValueChange={(val) => setMinCashPct(val[0])}
             />
             <p className="text-[11px] text-slate-500">
-              Ceiling on flash-borrow and margin borrowing against vault collateral.
+              Mandatory unencumbered liquid reserve (zero borrowing, 100% non-leveraged spot only).
             </p>
           </div>
 

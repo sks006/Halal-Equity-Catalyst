@@ -114,6 +114,11 @@ impl PolicyWorker {
             .iter()
             .map(|p| p.current_value_usd.max(0.0) as u64)
             .sum();
+        let available_cash_usd: u64 = positions
+            .iter()
+            .find(|p| p.asset_symbol == "USDC")
+            .map(|p| p.current_value_usd.max(0.0) as u64)
+            .unwrap_or(0);
 
         // 4. Evaluate: Policy Engine -> Risk Engine -> Decision Engine
         let decision = self.decision_engine.process_event(
@@ -122,7 +127,7 @@ impl PolicyWorker {
             &policy,
             &positions,
             total_value_usd,
-            0,
+            available_cash_usd,
         )?;
 
         // 5. DRY-RUN LOGGING (Crucial: First log the decision, do not execute)
