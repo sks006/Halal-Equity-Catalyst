@@ -21,14 +21,14 @@ pub mod equity_vault {
         ctx: Context<InitializeVault>,
         name: String,
         symbol: String,
-        max_ltv_bps: u16,
+        min_cash_bps: u16,
         max_position_bps: u16,
     ) -> Result<()> {
         instructions::initialize_vault::initialize_vault(
             ctx,
             name,
             symbol,
-            max_ltv_bps,
+            min_cash_bps,
             max_position_bps,
         )
     }
@@ -43,7 +43,7 @@ pub mod equity_vault {
 
     pub fn update_policy(
         ctx: Context<UpdatePolicy>,
-        max_ltv_bps: u16,
+        min_cash_bps: u16,
         max_position_bps: u16,
         stop_loss_bps: u16,
         take_profit_bps: u16,
@@ -52,7 +52,7 @@ pub mod equity_vault {
     ) -> Result<()> {
         instructions::update_policy::update_policy(
             ctx,
-            max_ltv_bps,
+            min_cash_bps,
             max_position_bps,
             stop_loss_bps,
             take_profit_bps,

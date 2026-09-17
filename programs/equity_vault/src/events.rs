@@ -8,7 +8,7 @@ pub struct VaultInitialized {
     pub asset_mint: Pubkey,
     pub name: String,
     pub symbol: String,
-    pub max_ltv_bps: u16,
+    pub min_cash_bps: u16,
     pub max_position_bps: u16,
     pub timestamp: i64,
 }
@@ -35,7 +35,7 @@ pub struct Withdraw {
 pub struct PolicyUpdated {
     pub vault: Pubkey,
     pub policy: Pubkey,
-    pub max_ltv_bps: u16,
+    pub min_cash_bps: u16,
     pub max_position_bps: u16,
     pub stop_loss_bps: u16,
     pub take_profit_bps: u16,

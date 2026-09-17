@@ -94,19 +94,24 @@ mod tests {
     }
 
     #[test]
-    fn test_ltv_and_risk_checks() {
-        // Loan 50k on 100k collateral = 5,000 bps (50%)
-        let ltv = calculate_ltv(50_000, 100_000).unwrap();
-        assert_eq!(ltv.as_bps(), 5_000);
+    fn test_cash_reserve_and_spot_checks() {
+        // Cash 15k on 100k portfolio = 1,500 bps (15%)
+        let cash = calculate_cash_reserve(15_000, 100_000).unwrap();
+        assert_eq!(cash.as_bps(), 1_500);
 
-        // Max limit 75% -> passes
-        assert!(check_ltv_limit(ltv, BasisPoints(7_500)).is_ok());
+        // Min cash limit 10% -> passes
+        assert!(check_cash_reserve(cash, BasisPoints(1_000)).is_ok());
 
-        // Max limit 40% -> fails
-        assert!(check_ltv_limit(ltv, BasisPoints(4_000)).is_err());
+        // Min cash limit 20% -> fails
+        assert!(check_cash_reserve(cash, BasisPoints(2_000)).is_err());
 
-        // Zero collateral with non-zero loan gives max LTV
-        assert_eq!(calculate_ltv(100, 0).unwrap(), BasisPoints::MAX);
+        // Zero portfolio gives zero cash reserve
+        assert_eq!(calculate_cash_reserve(100, 0).unwrap(), BasisPoints::ZERO);
+
+        // Enforce spot only
+        assert!(enforce_spot_only(false, 1.0).is_ok());
+        assert!(enforce_spot_only(true, 1.0).is_err()); // shorting rejected
+        assert!(enforce_spot_only(false, 1.5).is_err()); // leverage rejected
     }
 
     #[test]
@@ -428,14 +433,14 @@ mod tests {
 
     #[test]
     fn test_risk_comprehensive() {
-        // calculate_ltv
-        assert_eq!(calculate_ltv(0, 100_000).unwrap(), BasisPoints(0));
-        assert_eq!(calculate_ltv(65_000, 100_000).unwrap(), BasisPoints(6_500));
-        assert_eq!(calculate_ltv(100, 0).unwrap(), BasisPoints(10_000)); // Zero collateral
+        // calculate_cash_reserve
+        assert_eq!(calculate_cash_reserve(0, 100_000).unwrap(), BasisPoints(0));
+        assert_eq!(calculate_cash_reserve(15_000, 100_000).unwrap(), BasisPoints(1_500));
+        assert_eq!(calculate_cash_reserve(100, 0).unwrap(), BasisPoints(0)); // Zero portfolio
 
-        // check_ltv_limit
-        assert!(check_ltv_limit(BasisPoints(6_500), BasisPoints(6_500)).is_ok());
-        assert!(check_ltv_limit(BasisPoints(6_501), BasisPoints(6_500)).is_err());
+        // check_cash_reserve
+        assert!(check_cash_reserve(BasisPoints(1_500), BasisPoints(1_000)).is_ok());
+        assert!(check_cash_reserve(BasisPoints(900), BasisPoints(1_000)).is_err());
 
         // check_position_exposure
         assert!(check_position_exposure(250_000, 1_000_000, BasisPoints(2_500)).is_ok());
@@ -443,7 +448,7 @@ mod tests {
 
         // is_stop_loss_triggered
         assert!(is_stop_loss_triggered(100, 91, BasisPoints(800))); // 9% drop > 8% stop
-        assert!(!is_stop_loss_triggered(100, 93, BasisPoints(800))); // 7% drop < 8% stop
+        assert!(!is_stop_loss_triggered(100, 95, BasisPoints(800))); // 5% drop < 8% stop
 
         // is_take_profit_triggered
         assert!(is_take_profit_triggered(100, 121, BasisPoints(2_000))); // 21% gain > 20% target

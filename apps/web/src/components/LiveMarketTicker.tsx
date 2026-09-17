@@ -70,7 +70,7 @@ export function LiveMarketTicker() {
         </div>
 
         {/* Scrolling Ticker Track */}
-        <div className="overflow-hidden relative flex-1 mask-radial">
+        <div className="overflow-hidden relative flex-1 min-w-0 mask-radial">
           <div className="animate-marquee flex items-center gap-6">
             {displayItems.map((item, idx) => {
               const isPositive = item.change24h >= 0;

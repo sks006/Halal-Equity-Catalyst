@@ -337,7 +337,7 @@ export default function AssetsPage() {
                     ${selectedAsset.priceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div className="flex items-center justify-end gap-2 text-xs text-slate-500">
-                    <span>$\pm${selectedAsset.confidenceUsd.toFixed(2)} (95% CI)</span>
+                    <span>±${selectedAsset.confidenceUsd.toFixed(2)} (95% CI)</span>
                     <span className="text-slate-300">•</span>
                     <span className={selectedAsset.change24hPct >= 0 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
                       {selectedAsset.change24hPct >= 0 ? "+" : ""}{selectedAsset.change24hPct.toFixed(2)}% (24h)
@@ -362,7 +362,7 @@ export default function AssetsPage() {
 
                   <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
                     <div className="text-slate-500 text-[11px]">Confidence Interval</div>
-                    <div className="font-bold text-slate-900 font-mono text-sm mt-1">$\pm${selectedAsset.confidenceUsd.toFixed(2)}</div>
+                    <div className="font-bold text-slate-900 font-mono text-sm mt-1">±${selectedAsset.confidenceUsd.toFixed(2)}</div>
                     <div className="text-[10px] text-slate-500 mt-0.5 font-mono">Hermes v2 Bound</div>
                   </div>
 

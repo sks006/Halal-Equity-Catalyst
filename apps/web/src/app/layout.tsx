@@ -21,8 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} min-h-screen flex flex-col bg-slate-50/50 text-slate-900 selection:bg-emerald-100 selection:text-emerald-900`}>
+    <html lang="en" className="overflow-x-hidden">
+      <body className={`${inter.className} min-h-screen flex flex-col bg-slate-50/50 text-slate-900 selection:bg-emerald-100 selection:text-emerald-900 overflow-x-hidden w-full max-w-full`}>
         <StoreProvider>
           <WalletProvider>
             <Navbar />

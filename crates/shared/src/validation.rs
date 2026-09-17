@@ -14,14 +14,23 @@ pub enum ValidationError {
     #[error("Portfolio weights sum to {actual} bps, but must sum to {expected} bps (100.00%)")]
     WeightsDoNotSumTo100Percent { actual: u16, expected: u16 },
 
-    #[error("Loan-to-value ratio {actual} bps exceeds maximum policy limit {limit} bps")]
-    ExceedsMaxLtv { actual: u16, limit: u16 },
+    #[error("Cash reserve {actual} bps is below minimum required policy limit {limit} bps")]
+    BelowMinCashReserve { actual: u16, limit: u16 },
+
+    #[error("Portfolio exposure {actual} bps exceeds maximum policy limit {limit} bps")]
+    ExceedsMaxPortfolioExposure { actual: u16, limit: u16 },
 
     #[error("Position exposure {actual} bps exceeds maximum policy limit {limit} bps")]
     ExceedsMaxPosition { actual: u16, limit: u16 },
 
     #[error("Slippage {actual} bps exceeds maximum limit {limit} bps")]
     ExceedsMaxSlippage { actual: u16, limit: u16 },
+
+    #[error("Short selling or leverage is strictly prohibited in spot Shariah trading")]
+    ProhibitedLeverageOrShort,
+
+    #[error("Asset '{0}' does not satisfy Shariah screening eligibility criteria")]
+    IneligibleShariahAsset(String),
 
     #[error("Allocation target cannot have empty weights")]
     EmptyAllocationWeights,
@@ -104,7 +113,7 @@ pub fn validate_weights_sum(weights: &[AssetWeight]) -> Result<(), ValidationErr
 }
 
 pub fn validate_risk_limits(limits: &RiskLimits) -> Result<(), ValidationError> {
-    validate_bps(limits.max_ltv_bps.0)?;
+    validate_bps(limits.min_cash_bps.0)?;
     validate_bps(limits.max_position_bps.0)?;
     validate_bps(limits.max_slippage_bps.0)?;
     Ok(())

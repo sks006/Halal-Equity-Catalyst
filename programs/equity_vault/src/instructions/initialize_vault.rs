@@ -7,7 +7,7 @@ use crate::state::{Policy, Vault};
 use crate::utils::validation::{validate_risk_limits, validate_vault_params};
 
 #[derive(Accounts)]
-#[instruction(name: String, symbol: String, max_ltv_bps: u16, max_position_bps: u16)]
+#[instruction(name: String, symbol: String, min_cash_bps: u16, max_position_bps: u16)]
 pub struct InitializeVault<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
@@ -39,11 +39,11 @@ pub fn initialize_vault(
     ctx: Context<InitializeVault>,
     name: String,
     symbol: String,
-    max_ltv_bps: u16,
+    min_cash_bps: u16,
     max_position_bps: u16,
 ) -> Result<()> {
     validate_vault_params(&name, &symbol)?;
-    validate_risk_limits(max_ltv_bps, max_position_bps)?;
+    validate_risk_limits(min_cash_bps, max_position_bps)?;
 
     let clock = Clock::get()?;
     let now = clock.unix_timestamp;
@@ -64,7 +64,7 @@ pub fn initialize_vault(
     let policy = &mut ctx.accounts.policy;
     policy.vault = vault.key();
     policy.authority = ctx.accounts.authority.key();
-    policy.max_ltv_bps = max_ltv_bps;
+    policy.min_cash_bps = min_cash_bps;
     policy.max_position_bps = max_position_bps;
     policy.stop_loss_bps = 500; // default 5%
     policy.take_profit_bps = 1500; // default 15%
@@ -80,7 +80,7 @@ pub fn initialize_vault(
         asset_mint: ctx.accounts.asset_mint.key(),
         name,
         symbol,
-        max_ltv_bps,
+        min_cash_bps,
         max_position_bps,
         timestamp: now,
     });

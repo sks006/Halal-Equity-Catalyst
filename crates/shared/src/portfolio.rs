@@ -251,7 +251,7 @@ impl Portfolio {
             let total_exposure_usd = self.total_position_value_usd();
             let total_exposure_bps = ((total_exposure_usd / total) * 10_000.0).round() as u16;
             if total_exposure_bps > self.limits.max_portfolio_exposure_bps.0 {
-                return Err(ValidationError::ExceedsMaxLtv {
+                return Err(ValidationError::ExceedsMaxPortfolioExposure {
                     actual: total_exposure_bps,
                     limit: self.limits.max_portfolio_exposure_bps.0,
                 });

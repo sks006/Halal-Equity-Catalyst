@@ -65,7 +65,7 @@ pub struct VaultAccount {
 pub struct PolicyAccount {
     pub vault: Pubkey,
     pub authority: Pubkey,
-    pub max_ltv_bps: u16,
+    pub min_cash_bps: u16,
     pub max_position_bps: u16,
     pub stop_loss_bps: u16,
     pub take_profit_bps: u16,
@@ -91,21 +91,6 @@ pub struct PositionAccount {
     pub amount: u64,
     pub entry_price: u64,
     pub current_value: u64,
-    pub is_active: bool,
-    pub bump: u8,
-    pub created_at: i64,
-    pub updated_at: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
-pub struct LoanAccount {
-    pub vault: Pubkey,
-    pub borrower: Pubkey,
-    pub collateral_mint: Pubkey,
-    pub collateral_amount: u64,
-    pub borrowed_amount: u64,
-    pub ltv_bps: u16,
-    pub interest_rate_bps: u16,
     pub is_active: bool,
     pub bump: u8,
     pub created_at: i64,
