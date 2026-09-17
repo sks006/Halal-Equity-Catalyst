@@ -427,7 +427,7 @@ export default function AgentPage() {
                       ${selectedDecision.inputs.currentPriceUsd.toFixed(2)}
                     </div>
                     <div className="text-[10px] text-slate-400 font-mono mt-0.5">
-                      $\pm${selectedDecision.inputs.oracleConfidenceUsd.toFixed(2)}
+                      ±${selectedDecision.inputs.oracleConfidenceUsd.toFixed(2)}
                     </div>
                   </div>
 

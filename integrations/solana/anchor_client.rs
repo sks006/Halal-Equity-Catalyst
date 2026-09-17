@@ -90,16 +90,6 @@ impl AnchorClient {
         parse_user_shares(&info.data)
     }
 
-    #[instrument(skip(self), fields(loan_pda = %loan_pda))]
-    pub async fn fetch_loan(&self, loan_pda: &Pubkey) -> Result<LoanAccount, SolanaError> {
-        let info = self
-            .rpc
-            .get_account_info(loan_pda)
-            .await?
-            .ok_or_else(|| SolanaError::AccountNotFound(loan_pda.to_string()))?;
-        parse_loan(&info.data)
-    }
-
     #[instrument(skip(self), fields(position_pda = %position_pda))]
     pub async fn fetch_position(
         &self,
@@ -150,7 +140,7 @@ impl AnchorClient {
         asset_mint: &Pubkey,
         name: &str,
         symbol: &str,
-        max_ltv_bps: u16,
+        min_cash_bps: u16,
         max_position_bps: u16,
     ) -> Result<(Instruction, Pubkey, Pubkey), SolanaError> {
         let (vault_pda, _) = find_vault_pda(authority, name, &self.program_id);
@@ -165,7 +155,7 @@ impl AnchorClient {
             .to_string()
             .serialize(&mut data)
             .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
-        max_ltv_bps
+        min_cash_bps
             .serialize(&mut data)
             .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
         max_position_bps
@@ -195,7 +185,7 @@ impl AnchorClient {
         &self,
         authority: &Pubkey,
         vault_pda: &Pubkey,
-        max_ltv_bps: u16,
+        min_cash_bps: u16,
         max_position_bps: u16,
         stop_loss_bps: u16,
         take_profit_bps: u16,
@@ -206,7 +196,7 @@ impl AnchorClient {
 
         let mut data = Vec::with_capacity(32);
         data.extend_from_slice(&UPDATE_POLICY_DISCRIMINATOR);
-        max_ltv_bps
+        min_cash_bps
             .serialize(&mut data)
             .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
         max_position_bps

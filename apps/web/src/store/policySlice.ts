@@ -49,7 +49,7 @@ export const savePolicy = createAsyncThunk(
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            max_ltv_bps: policyData.max_ltv_bps,
+            min_cash_bps: policyData.min_cash_bps,
             max_position_bps: policyData.max_position_bps,
             stop_loss_bps: policyData.stop_loss_bps,
             take_profit_bps: policyData.take_profit_bps,

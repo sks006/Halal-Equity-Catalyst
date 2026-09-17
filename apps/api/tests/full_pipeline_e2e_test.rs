@@ -136,7 +136,7 @@ async fn test_full_pipeline_end_to_end_flow() {
         "policy_address": policy_address,
         "vault_address": vault_address,
         "authority": authority_pubkey,
-        "max_ltv_bps": 7000,          // 70.00% max LTV
+        "min_cash_bps": 1000,          // 10.00% min unencumbered cash reserve
         "max_position_bps": 3000,     // 30.00% max single-asset concentration
         "stop_loss_bps": 800,         // 8.00% stop loss
         "take_profit_bps": 2000,      // 20.00% take profit
@@ -348,17 +348,17 @@ async fn test_full_pipeline_end_to_end_flow() {
     assert!(buy_nvda.trade_value > 0, "Trade value must be positive");
 
     // =========================================================================
-    // STAGE 8: RISK ENGINE (Exposure, Limits, LTV, Stop Loss Verification)
+    // STAGE 8: RISK ENGINE (Exposure, Limits, Cash Reserve, Stop Loss Verification)
     // =========================================================================
     let risk_engine = RiskEngine::new();
-    let total_debt_usd = 0; // Unlevered vault
+    let available_cash_usd = 1_208_760; // Settled USDC cash
 
     let risk_assessment = risk_engine.evaluate_proposed_trades(
         &policy_result.proposed_trades,
         &db_positions,
         &db_policy,
         total_portfolio_usd,
-        total_debt_usd,
+        available_cash_usd,
     );
 
     assert_eq!(

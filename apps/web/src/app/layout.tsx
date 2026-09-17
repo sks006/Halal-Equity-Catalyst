@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 
 import "./globals.css";
 import { Navbar } from "../components/Navbar";
+import { LiveMarketTicker } from "../components/LiveMarketTicker";
 import { WalletProvider } from "../components/WalletProvider";
 import { StoreProvider } from "../components/StoreProvider";
 
@@ -20,11 +21,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${inter.className} min-h-screen flex flex-col bg-white text-slate-900 selection:bg-emerald-100 selection:text-emerald-900`}>
+    <html lang="en" className="overflow-x-hidden">
+      <body className={`${inter.className} min-h-screen flex flex-col bg-slate-50/50 text-slate-900 selection:bg-emerald-100 selection:text-emerald-900 overflow-x-hidden w-full max-w-full`}>
         <StoreProvider>
           <WalletProvider>
             <Navbar />
+            <LiveMarketTicker />
             <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
               {children}
             </main>

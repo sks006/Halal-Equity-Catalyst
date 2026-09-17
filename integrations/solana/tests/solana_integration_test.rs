@@ -27,10 +27,6 @@ fn test_anchor_discriminators_match_idl() {
         compute_account_discriminator("Position")
     );
     assert_eq!(
-        LOAN_ACCOUNT_DISCRIMINATOR,
-        compute_account_discriminator("Loan")
-    );
-    assert_eq!(
         EXECUTION_ACCOUNT_DISCRIMINATOR,
         compute_account_discriminator("Execution")
     );
@@ -131,7 +127,7 @@ fn test_policy_account_deserialization() {
     let policy = PolicyAccount {
         vault,
         authority,
-        max_ltv_bps: 7500,
+        min_cash_bps: 1000,
         max_position_bps: 2500,
         stop_loss_bps: 500,
         take_profit_bps: 1500,

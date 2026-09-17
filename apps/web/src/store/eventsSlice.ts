@@ -149,11 +149,11 @@ export const NVDA_PIPELINE: DetailedEventPipeline = {
       subtitle: "Multi-Factor Defensive Risk Shield Verification",
       status: "completed",
       timestamp: "14:30:00.345 UTC",
-      description: "RiskEngine evaluated proposed trade across four independent defense limits: Position Exposure, Trade Drift, LTV, and Stop-Loss.",
+      description: "RiskEngine evaluated proposed trade across four independent defense limits: Position Exposure, Trade Drift, Cash Reserve, and Stop-Loss.",
       metrics: {
         "1. Position Exposure": "21.41% <= 25.00% Max Limit (PASSED)",
         "2. Max Trade Drift": "5.00% <= 10.00% Single Limit (PASSED)",
-        "3. Vault LTV / Debt": "0.00% <= 65.00% Max LTV (PASSED)",
+        "3. Cash Reserve Buffer": "100.00% >= 10.00% Min Cash (PASSED, 0% Debt)",
         "4. Stop-Loss Drawdown": "+8.35% > -8.00% Stop Trigger (PASSED)",
         "Risk Verdict": "RiskAssessment::Approved ✓",
       },

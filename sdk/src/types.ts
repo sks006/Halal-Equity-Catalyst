@@ -36,7 +36,7 @@ export interface VaultAccount {
 export interface PolicyAccount {
   vault: PublicKey;
   authority: PublicKey;
-  maxLtvBps: number;
+  minCashBps: number;
   maxPositionBps: number;
   stopLossBps: number;
   takeProfitBps: number;
@@ -66,20 +66,6 @@ export interface PositionAccount {
   updatedAt: BN;
 }
 
-export interface LoanAccount {
-  vault: PublicKey;
-  borrower: PublicKey;
-  collateralMint: PublicKey;
-  collateralAmount: BN;
-  borrowedAmount: BN;
-  ltvBps: number;
-  interestRateBps: number;
-  isActive: boolean;
-  bump: number;
-  createdAt: BN;
-  updatedAt: BN;
-}
-
 export interface ExecutionAccount {
   vault: PublicKey;
   executionId: BN;
@@ -101,7 +87,7 @@ export interface InitializeVaultParams {
   assetMint: PublicKey;
   name: string;
   symbol: string;
-  maxLtvBps: number;
+  minCashBps: number;
   maxPositionBps: number;
 }
 
@@ -122,7 +108,7 @@ export interface WithdrawParams {
 export interface UpdatePolicyParams {
   authority: PublicKey;
   vault: PublicKey;
-  maxLtvBps: number;
+  minCashBps: number;
   maxPositionBps: number;
   stopLossBps: number;
   takeProfitBps: number;
@@ -145,24 +131,6 @@ export interface ExecuteActionParams {
   targetMint: PublicKey;
   inputAmount: BN | number | string;
   minOutputAmount: BN | number | string;
-}
-
-export interface BorrowParams {
-  borrower: PublicKey;
-  vault: PublicKey;
-  borrowAssetMint: PublicKey;
-  collateralMint: PublicKey;
-  collateralAmount: BN | number | string;
-  borrowAmount: BN | number | string;
-}
-
-export interface RepayParams {
-  borrower: PublicKey;
-  vault: PublicKey;
-  borrowAssetMint: PublicKey;
-  collateralMint: PublicKey;
-  repayAmount: BN | number | string;
-  collateralToRelease: BN | number | string;
 }
 
 // --- Backend REST API Types ---
@@ -237,7 +205,7 @@ export interface PolicyModel {
   policy_address: string;
   vault_address: string;
   authority: string;
-  max_ltv_bps: number;
+  min_cash_bps: number;
   max_position_bps: number;
   stop_loss_bps: number;
   take_profit_bps: number;

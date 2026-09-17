@@ -2,12 +2,10 @@
 
 pub mod exposure;
 pub mod limits;
-pub mod ltv;
 pub mod stops;
 
 pub use exposure::validate_position_exposure;
 pub use limits::validate_trade_limits;
-pub use ltv::validate_ltv;
 pub use stops::validate_stop_conditions;
 
 use equity_catalyst_shared::allocation::RebalanceTrade;
@@ -28,15 +26,15 @@ impl RiskEngine {
         Self
     }
 
-    /// Evaluates proposed trades through the complete risk pipeline:
-    /// Proposed Action -> Position Exposure -> Policy Limits -> LTV -> Stop Conditions -> Approve / Reject
+    /// Evaluates proposed trades through the complete spot risk pipeline:
+    /// Proposed Action -> Position Exposure -> Policy Limits -> Cash Reserve Adequacy -> Stop Conditions -> Approve / Reject
     pub fn evaluate_proposed_trades(
         &self,
         trades: &[RebalanceTrade],
         positions: &[PortfolioModel],
         policy: &PolicyModel,
         total_portfolio_usd: u64,
-        total_debt_usd: u64,
+        available_cash_usd: u64,
     ) -> RiskAssessment {
         if trades.is_empty() {
             return RiskAssessment::Approved;
@@ -67,13 +65,16 @@ impl RiskEngine {
             return RiskAssessment::Rejected { reason };
         }
 
-        // 3. LTV check
-        if let Err(reason) = validate_ltv(
-            total_debt_usd,
-            total_portfolio_usd,
-            policy.max_ltv_bps as u16,
-        ) {
-            return RiskAssessment::Rejected { reason };
+        // 3. Minimum Cash Reserve check (spot solvency without leverage)
+        let required_cash_usd = (total_portfolio_usd as f64 * (policy.min_cash_bps as f64 / 10_000.0)).round() as u64;
+        let total_buy_outflow: u64 = trades.iter().filter(|t| t.is_buy).map(|t| t.trade_value).sum();
+        if available_cash_usd < total_buy_outflow || (available_cash_usd - total_buy_outflow) < required_cash_usd {
+            return RiskAssessment::Rejected {
+                reason: format!(
+                    "Cash reserve breach: available cash ${} is insufficient for buy outlay ${} while maintaining minimum required reserve ${} ({} bps)",
+                    available_cash_usd, total_buy_outflow, required_cash_usd, policy.min_cash_bps
+                ),
+            };
         }
 
         // 4. Stop conditions check

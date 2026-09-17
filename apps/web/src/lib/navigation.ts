@@ -68,24 +68,24 @@ export const APP_NAVIGATION: NavItem[] = [
   },
   {
     id: "proposals",
-    label: "Trade Proposals",
+    label: "Proposals",
     href: "/proposals",
     icon: FileCheck2,
     description: "6-stage proposal review: Proposed, Validated, Approved, Simulated, Executed, Failed",
   },
   {
     id: "executions",
-    label: "Execution History",
+    label: "Executions",
     href: "/executions",
     icon: History,
     description: "On-chain transaction signatures, confirmation receipts, and slippage reconciliation",
   },
   {
     id: "risk",
-    label: "Risk Monitor",
+    label: "Risk",
     href: "/risk",
     icon: ShieldAlert,
-    description: "Position exposure limits, portfolio drawdowns, LTV thresholds, and circuit breakers",
+    description: "Position exposure limits, portfolio drawdowns, unencumbered cash reserves, and spot circuit breakers",
   },
   {
     id: "settings",

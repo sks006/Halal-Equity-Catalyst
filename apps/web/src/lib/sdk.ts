@@ -79,7 +79,7 @@ export const DEMO_POLICY: PolicyModel = {
   policy_address: "pol-001-EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
   vault_address: "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
   authority: "auth99X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6",
-  max_ltv_bps: 6500, // 65%
+  min_cash_bps: 1000, // 10% minimum cash reserve
   max_position_bps: 2500, // 25%
   stop_loss_bps: 800, // 8%
   take_profit_bps: 2000, // 20%

@@ -11,32 +11,40 @@ use crate::validation::ValidationError;
 pub struct RiskAssessment {
     pub is_approved: bool,
     pub rejection_reason: Option<String>,
-    pub evaluated_ltv: BasisPoints,
+    pub evaluated_cash_bps: BasisPoints,
     pub evaluated_exposure: BasisPoints,
 }
 
-/// Calculate Loan-to-Value (LTV) ratio in basis points.
-/// ltv = (loan_amount * 10,000) / collateral_value
-pub fn calculate_ltv(
-    loan_amount: u64,
-    collateral_value: u64,
+/// Calculate unencumbered cash reserve ratio in basis points.
+/// cash_bps = (cash_amount * 10,000) / total_portfolio_value
+pub fn calculate_cash_reserve(
+    cash_amount: u64,
+    total_portfolio_value: u64,
 ) -> Result<BasisPoints, ValidationError> {
-    if collateral_value == 0 {
-        if loan_amount > 0 {
-            return Ok(BasisPoints::MAX);
-        }
+    if total_portfolio_value == 0 {
         return Ok(BasisPoints::ZERO);
     }
-    calculate_basis_points(loan_amount, collateral_value)
+    calculate_basis_points(cash_amount, total_portfolio_value)
 }
 
-/// Verify that current LTV does not breach maximum LTV limit.
-pub fn check_ltv_limit(ltv: BasisPoints, max_ltv: BasisPoints) -> Result<(), ValidationError> {
-    if ltv > max_ltv {
-        return Err(ValidationError::ExceedsMaxLtv {
-            actual: ltv.0,
-            limit: max_ltv.0,
+/// Verify that available cash reserve meets or exceeds the required minimum policy threshold.
+pub fn check_cash_reserve(
+    cash_bps: BasisPoints,
+    min_cash_bps: BasisPoints,
+) -> Result<(), ValidationError> {
+    if cash_bps < min_cash_bps {
+        return Err(ValidationError::BelowMinCashReserve {
+            actual: cash_bps.0,
+            limit: min_cash_bps.0,
         });
+    }
+    Ok(())
+}
+
+/// Enforce that only spot trading is permitted (no short selling, margin borrowing, or leverage).
+pub fn enforce_spot_only(is_short: bool, leverage_multiple: f64) -> Result<(), ValidationError> {
+    if is_short || leverage_multiple > 1.0 {
+        return Err(ValidationError::ProhibitedLeverageOrShort);
     }
     Ok(())
 }

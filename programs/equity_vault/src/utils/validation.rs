@@ -10,8 +10,8 @@ pub fn validate_vault_params(name: &str, symbol: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn validate_risk_limits(max_ltv_bps: u16, max_position_bps: u16) -> Result<()> {
-    require!(max_ltv_bps <= MAX_BPS, VaultError::InvalidRiskLimit);
+pub fn validate_risk_limits(min_cash_bps: u16, max_position_bps: u16) -> Result<()> {
+    require!(min_cash_bps <= MAX_BPS, VaultError::InvalidRiskLimit);
     require!(max_position_bps <= MAX_BPS, VaultError::InvalidRiskLimit);
     Ok(())
 }

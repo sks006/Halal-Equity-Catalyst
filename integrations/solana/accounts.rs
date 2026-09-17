@@ -21,7 +21,6 @@ pub const VAULT_ACCOUNT_DISCRIMINATOR: [u8; 8] = [211, 8, 232, 43, 2, 152, 117, 
 pub const POLICY_ACCOUNT_DISCRIMINATOR: [u8; 8] = [222, 135, 7, 163, 235, 177, 33, 68];
 pub const USER_SHARES_ACCOUNT_DISCRIMINATOR: [u8; 8] = [148, 201, 81, 76, 109, 139, 152, 190];
 pub const POSITION_ACCOUNT_DISCRIMINATOR: [u8; 8] = [170, 188, 143, 228, 122, 64, 247, 208];
-pub const LOAN_ACCOUNT_DISCRIMINATOR: [u8; 8] = [20, 195, 70, 117, 165, 227, 182, 1];
 pub const EXECUTION_ACCOUNT_DISCRIMINATOR: [u8; 8] = [50, 148, 225, 163, 129, 33, 229, 40];
 
 /// Compute standard Anchor account discriminator: Sha256("account:<AccountName>")[..8]
@@ -65,7 +64,7 @@ pub struct VaultAccount {
 pub struct PolicyAccount {
     pub vault: Pubkey,
     pub authority: Pubkey,
-    pub max_ltv_bps: u16,
+    pub min_cash_bps: u16,
     pub max_position_bps: u16,
     pub stop_loss_bps: u16,
     pub take_profit_bps: u16,
@@ -91,21 +90,6 @@ pub struct PositionAccount {
     pub amount: u64,
     pub entry_price: u64,
     pub current_value: u64,
-    pub is_active: bool,
-    pub bump: u8,
-    pub created_at: i64,
-    pub updated_at: i64,
-}
-
-#[derive(Debug, Clone, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
-pub struct LoanAccount {
-    pub vault: Pubkey,
-    pub borrower: Pubkey,
-    pub collateral_mint: Pubkey,
-    pub collateral_amount: u64,
-    pub borrowed_amount: u64,
-    pub ltv_bps: u16,
-    pub interest_rate_bps: u16,
     pub is_active: bool,
     pub bump: u8,
     pub created_at: i64,
@@ -225,10 +209,6 @@ pub fn parse_position(data: &[u8]) -> Result<PositionAccount, crate::SolanaError
     parse_anchor_account(data, &POSITION_ACCOUNT_DISCRIMINATOR)
 }
 
-pub fn parse_loan(data: &[u8]) -> Result<LoanAccount, crate::SolanaError> {
-    parse_anchor_account(data, &LOAN_ACCOUNT_DISCRIMINATOR)
-}
-
 pub fn parse_execution(data: &[u8]) -> Result<ExecutionAccount, crate::SolanaError> {
     parse_anchor_account(data, &EXECUTION_ACCOUNT_DISCRIMINATOR)
 }
@@ -281,7 +261,7 @@ pub struct VaultInitializedEvent {
     pub asset_mint: Pubkey,
     pub name: String,
     pub symbol: String,
-    pub max_ltv_bps: u16,
+    pub min_cash_bps: u16,
     pub max_position_bps: u16,
     pub timestamp: i64,
 }
@@ -308,7 +288,7 @@ pub struct WithdrawEvent {
 pub struct PolicyUpdatedEvent {
     pub vault: Pubkey,
     pub policy: Pubkey,
-    pub max_ltv_bps: u16,
+    pub min_cash_bps: u16,
     pub max_position_bps: u16,
     pub stop_loss_bps: u16,
     pub take_profit_bps: u16,

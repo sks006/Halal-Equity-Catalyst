@@ -8,22 +8,23 @@ import { Badge } from "../../components/ui/badge";
 import { Progress } from "../../components/ui/progress";
 
 interface Props {
-  currentLtvBps: number;
-  maxLtvBps: number;
+  currentCashBps?: number;
+  minCashBps?: number;
+  currentLtvBps?: number;
+  maxLtvBps?: number;
   currentPositionBps: number;
   maxPositionBps: number;
 }
 
 export function RiskMeter({
-  currentLtvBps,
-  maxLtvBps,
+  currentCashBps = 3500, // 35% unencumbered cash reserve
+  minCashBps = 1000,     // 10% minimum threshold
   currentPositionBps,
   maxPositionBps,
 }: Props) {
-  const ltvUsagePct = maxLtvBps > 0 ? (currentLtvBps / maxLtvBps) * 100 : 0;
+  // Cash reserve health: healthy when currentCashBps >= minCashBps
+  const isCashLow = currentCashBps < minCashBps;
   const positionUsagePct = maxPositionBps > 0 ? (currentPositionBps / maxPositionBps) * 100 : 0;
-
-  const isLtvHigh = ltvUsagePct > 80;
   const isPosHigh = positionUsagePct > 85;
 
   return (
@@ -38,11 +39,11 @@ export function RiskMeter({
               <CardTitle className="text-sm font-bold text-slate-900">
                 On-Chain Risk Defense Line
               </CardTitle>
-              <p className="text-xs text-slate-500">Autonomous risk constraints verified before execution</p>
+              <p className="text-xs text-slate-500">Spot-only non-leveraged constraints verified before execution</p>
             </div>
           </div>
 
-          {isLtvHigh || isPosHigh ? (
+          {isCashLow || isPosHigh ? (
             <Badge variant="warning" className="flex items-center gap-1 font-medium">
               <AlertTriangle className="w-3 h-3" />
               <span>Limit Warning</span>
@@ -50,25 +51,29 @@ export function RiskMeter({
           ) : (
             <Badge variant="success" className="flex items-center gap-1 font-medium">
               <CheckCircle2 className="w-3 h-3" />
-              <span>Within Policy</span>
+              <span>100% Spot Compliant</span>
             </Badge>
           )}
         </div>
       </CardHeader>
 
       <CardContent className="p-5 pt-2 space-y-4">
-        {/* LTV Meter */}
+        {/* Cash Reserve Meter */}
         <div className="space-y-1.5">
           <div className="flex justify-between text-xs font-mono">
-            <span className="text-slate-600 font-medium">Loan-to-Value (LTV) Usage</span>
+            <span className="text-slate-600 font-medium">Unencumbered Cash Reserve</span>
             <span className="text-slate-900 font-bold">
-              {(currentLtvBps / 100).toFixed(1)}% / {(maxLtvBps / 100).toFixed(1)}% Max
+              {(currentCashBps / 100).toFixed(1)}% / {(minCashBps / 100).toFixed(1)}% Min
             </span>
           </div>
           <Progress
-            value={Math.min(ltvUsagePct, 100)}
-            indicatorClassName={isLtvHigh ? "bg-rose-500" : ltvUsagePct > 60 ? "bg-amber-500" : "bg-emerald-600"}
+            value={Math.min((currentCashBps / 5000) * 100, 100)}
+            indicatorClassName={isCashLow ? "bg-rose-500" : "bg-emerald-600"}
           />
+          <div className="flex justify-between text-[11px] text-slate-400 font-mono">
+            <span>Borrowing: 0.00 USDC</span>
+            <span className="text-emerald-600 font-semibold">Zero Leverage / Zero Debt</span>
+          </div>
         </div>
 
         {/* Single Position Exposure Meter */}

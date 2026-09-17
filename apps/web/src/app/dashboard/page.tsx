@@ -337,7 +337,7 @@ export default function DashboardPage() {
             <h2 className="text-sm font-bold text-slate-900 tracking-tight">Pyth Pro Verified Market Feeds</h2>
             <Badge variant="cyan" className="text-[10px] font-mono py-0.5">Sub-Second Hermes v2</Badge>
           </div>
-          <span className="text-[11px] text-slate-500 font-mono">Confidence bounded $\pm$0.05%</span>
+          <span className="text-[11px] text-slate-500 font-mono">Confidence bounded ±0.05%</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -356,7 +356,7 @@ export default function DashboardPage() {
                     ${p.price_usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   <div className="mt-1 flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                    <span>$\pm${p.confidence_usd.toFixed(2)}</span>
+                    <span>±${p.confidence_usd.toFixed(2)}</span>
                     <span className="text-emerald-600 font-semibold">Active</span>
                   </div>
                 </CardContent>
@@ -480,7 +480,7 @@ export default function DashboardPage() {
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
               <span>Auto-Rebalance Trigger Threshold:</span>
-              <span className="font-mono font-bold text-slate-800">$\pm$300 bps (3.0%)</span>
+              <span className="font-mono font-bold text-slate-800">±300 bps (3.0%)</span>
             </div>
           </Card>
         </div>

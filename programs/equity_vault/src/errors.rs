@@ -10,10 +10,10 @@ pub enum VaultError {
     DepositTooSmall,
     #[msg("Insufficient vault shares for withdrawal")]
     InsufficientShares,
-    #[msg("Loan to value ratio exceeds maximum allowed")]
-    LtvExceeded,
-    #[msg("Borrow health factor is below minimum safety threshold")]
-    UnsafeHealthFactor,
+    #[msg("Cash reserve is below minimum required policy limit")]
+    CashReserveTooLow,
+    #[msg("Leverage, borrowing, and short selling are strictly prohibited")]
+    ProhibitedLeverage,
     #[msg("Oracle price feed is stale or invalid")]
     StaleOraclePrice,
     #[msg("Slippage exceeded the maximum specified limit")]

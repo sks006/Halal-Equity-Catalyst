@@ -508,8 +508,8 @@ export default function VaultDetailPage() {
         {/* Risk Meter & Protection Status */}
         <div className="lg:col-span-2 space-y-4">
           <RiskMeter
-            currentLtvBps={3800} // 38%
-            maxLtvBps={policy?.max_ltv_bps || 6500}
+            currentCashBps={3800} // 38%
+            minCashBps={policy?.min_cash_bps || 1000}
             currentPositionBps={positions[0]?.current_weight_bps || 4456}
             maxPositionBps={policy?.max_position_bps || 5000}
           />

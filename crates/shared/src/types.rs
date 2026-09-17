@@ -44,7 +44,7 @@ impl fmt::Display for BasisPoints {
 /// Portfolio risk boundary constraints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RiskLimits {
-    pub max_ltv_bps: BasisPoints,
+    pub min_cash_bps: BasisPoints,
     pub max_position_bps: BasisPoints,
     pub max_slippage_bps: BasisPoints,
 }
@@ -52,7 +52,7 @@ pub struct RiskLimits {
 impl Default for RiskLimits {
     fn default() -> Self {
         Self {
-            max_ltv_bps: BasisPoints(7_500),      // 75.00%
+            min_cash_bps: BasisPoints(1_000),     // 10.00% unencumbered cash
             max_position_bps: BasisPoints(2_500), // 25.00%
             max_slippage_bps: BasisPoints(100),   // 1.00%
         }

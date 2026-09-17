@@ -164,7 +164,7 @@ async fn test_api_post_and_get_policies() {
         "policy_address": policy_address,
         "vault_address": vault_address,
         "authority": authority,
-        "max_ltv_bps": 6500,
+        "min_cash_bps": 1000,
         "max_position_bps": 2500,
         "stop_loss_bps": 800,
         "take_profit_bps": 2000,
@@ -223,7 +223,7 @@ async fn test_api_post_and_get_policies() {
     assert_eq!(get_resp.status(), StatusCode::OK);
     let get_body = get_resp.into_body().collect().await.unwrap().to_bytes();
     let get_json: serde_json::Value = serde_json::from_slice(&get_body).unwrap();
-    assert_eq!(get_json["max_ltv_bps"], 6500);
+    assert_eq!(get_json["min_cash_bps"], 1000);
 }
 
 #[tokio::test]
