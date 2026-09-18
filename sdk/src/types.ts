@@ -169,6 +169,30 @@ export interface QuoteExecutionRequest {
   target_symbol?: string;
 }
 
+export interface FeeBreakdown {
+  pool_fee: number | string;
+  platform_fee: number | string;
+  network_fee: number | string;
+  total_fee: number | string;
+  fee_calculation_version: string;
+  pool_fee_usd?: number;
+  platform_fee_usd?: number;
+  network_fee_usd?: number;
+  total_fee_usd?: number;
+}
+
+export interface LiquidityQuoteResponse {
+  pool_address: string;
+  amount_in: number;
+  expected_amount_out: number;
+  min_amount_out: number;
+  price_impact_bps: number;
+  fee_amount: number;
+  current_price_usd: number;
+  effective_execution_price_usd: number;
+  fee_breakdown: FeeBreakdown;
+}
+
 export interface QuoteExecutionVerdict {
   execution_id: string;
   vault_address: string;
@@ -184,6 +208,7 @@ export interface QuoteExecutionVerdict {
   evaluated_exposure_bps?: number | null;
   is_dry_run: boolean;
   evaluated_at: string;
+  fee_breakdown?: FeeBreakdown;
 }
 
 export interface VaultModel {

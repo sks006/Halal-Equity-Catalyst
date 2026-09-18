@@ -240,6 +240,124 @@
           "type": "bool"
         }
       ]
+    },
+    {
+      "name": "set_asset_compliance",
+      "discriminator": [
+        41,
+        131,
+        99,
+        238,
+        155,
+        69,
+        159,
+        226
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "asset_mint"
+        },
+        {
+          "name": "compliance",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "status",
+          "type": "u8"
+        },
+        {
+          "name": "policy_version",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "evidence_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        },
+        {
+          "name": "valid_until",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "execute_action",
+      "discriminator": [
+        246,
+        137,
+        105,
+        113,
+        247,
+        6,
+        223,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "keeper",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "execution",
+          "writable": true
+        },
+        {
+          "name": "input_mint"
+        },
+        {
+          "name": "output_mint"
+        },
+        {
+          "name": "compliance"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "execution_id",
+          "type": "u64"
+        },
+        {
+          "name": "action_type",
+          "type": "u8"
+        },
+        {
+          "name": "input_amount",
+          "type": "u64"
+        },
+        {
+          "name": "min_output_amount",
+          "type": "u64"
+        }
+      ]
     }
   ],
   "accounts": [
@@ -306,6 +424,19 @@
         139,
         152,
         190
+      ]
+    },
+    {
+      "name": "AssetCompliance",
+      "discriminator": [
+        73,
+        62,
+        45,
+        77,
+        227,
+        43,
+        88,
+        33
       ]
     }
   ],
@@ -389,6 +520,21 @@
       "code": 6015,
       "name": "SymbolTooLong",
       "msg": "Vault symbol exceeds maximum allowed length"
+    },
+    {
+      "code": 6016,
+      "name": "AssetNotApproved",
+      "msg": "Asset Shariah compliance status is not Approved"
+    },
+    {
+      "code": 6017,
+      "name": "ComplianceExpired",
+      "msg": "Asset Shariah review has expired"
+    },
+    {
+      "code": 6018,
+      "name": "ComplianceMintMismatch",
+      "msg": "Compliance PDA does not match the traded asset mint"
     }
   ],
   "types": [
@@ -607,6 +753,48 @@
           },
           {
             "name": "executed_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AssetCompliance",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "asset_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": "u8"
+          },
+          {
+            "name": "policy_version",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "evidence_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "valid_until",
             "type": "i64"
           },
           {

@@ -64,4 +64,36 @@ pub mod equity_vault {
     pub fn emergency_exit(ctx: Context<EmergencyExit>, is_paused: bool) -> Result<()> {
         instructions::emergency_exit::emergency_exit(ctx, is_paused)
     }
+
+    pub fn set_asset_compliance(
+        ctx: Context<SetAssetCompliance>,
+        status: u8,
+        policy_version: [u8; 32],
+        evidence_hash: [u8; 32],
+        valid_until: i64,
+    ) -> Result<()> {
+        instructions::set_asset_compliance::set_asset_compliance(
+            ctx,
+            status,
+            policy_version,
+            evidence_hash,
+            valid_until,
+        )
+    }
+
+    pub fn execute_action(
+        ctx: Context<ExecuteAction>,
+        execution_id: u64,
+        action_type: u8,
+        input_amount: u64,
+        min_output_amount: u64,
+    ) -> Result<()> {
+        instructions::execute_action::execute_action(
+            ctx,
+            execution_id,
+            action_type,
+            input_amount,
+            min_output_amount,
+        )
+    }
 }

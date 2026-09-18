@@ -22,6 +22,7 @@ pub const POLICY_ACCOUNT_DISCRIMINATOR: [u8; 8] = [222, 135, 7, 163, 235, 177, 3
 pub const USER_SHARES_ACCOUNT_DISCRIMINATOR: [u8; 8] = [148, 201, 81, 76, 109, 139, 152, 190];
 pub const POSITION_ACCOUNT_DISCRIMINATOR: [u8; 8] = [170, 188, 143, 228, 122, 64, 247, 208];
 pub const EXECUTION_ACCOUNT_DISCRIMINATOR: [u8; 8] = [50, 148, 225, 163, 129, 33, 229, 40];
+pub const ASSET_COMPLIANCE_ACCOUNT_DISCRIMINATOR: [u8; 8] = [73, 62, 45, 77, 227, 43, 88, 33];
 
 /// Compute standard Anchor account discriminator: Sha256("account:<AccountName>")[..8]
 pub fn compute_account_discriminator(account_name: &str) -> [u8; 8] {
@@ -111,6 +112,16 @@ pub struct ExecutionAccount {
     pub bump: u8,
 }
 
+#[derive(Debug, Clone, PartialEq, BorshDeserialize, BorshSerialize, Serialize, Deserialize)]
+pub struct AssetComplianceAccount {
+    pub asset_mint: Pubkey,
+    pub status: u8,
+    pub policy_version: [u8; 32],
+    pub evidence_hash: [u8; 32],
+    pub valid_until: i64,
+    pub bump: u8,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SplTokenAccount {
     pub mint: Pubkey,
@@ -121,6 +132,11 @@ pub struct SplTokenAccount {
 }
 
 // --- PDA Derivations ---
+
+/// Derives Asset Compliance PDA: `seeds = [b"compliance", asset_mint.as_ref()]`
+pub fn find_compliance_pda(asset_mint: &Pubkey, program_id: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[b"compliance", asset_mint.as_ref()], program_id)
+}
 
 /// Derives Vault PDA: `seeds = [b"vault", authority.as_ref(), name.as_bytes()]`
 pub fn find_vault_pda(authority: &Pubkey, name: &str, program_id: &Pubkey) -> (Pubkey, u8) {
@@ -211,6 +227,10 @@ pub fn parse_position(data: &[u8]) -> Result<PositionAccount, crate::SolanaError
 
 pub fn parse_execution(data: &[u8]) -> Result<ExecutionAccount, crate::SolanaError> {
     parse_anchor_account(data, &EXECUTION_ACCOUNT_DISCRIMINATOR)
+}
+
+pub fn parse_asset_compliance(data: &[u8]) -> Result<AssetComplianceAccount, crate::SolanaError> {
+    parse_anchor_account(data, &ASSET_COMPLIANCE_ACCOUNT_DISCRIMINATOR)
 }
 
 /// Decodes standard 165-byte SPL Token account

@@ -177,8 +177,10 @@ impl LiquidityProvider for MeteoraDbcProvider {
             pool.current_price_usd * (1.0 - (impact_ratio * 0.5)).max(0.01)
         };
 
-        // Standard 25 bps base fee
-        let fee_amount = ((request.amount_in as f64) * 0.0025).round() as u64;
+        // Deterministic Shariah fee breakdown (15 bps pool + 5 bps platform)
+        let fee_schedule = equity_catalyst_shared::fees::FeeSchedule::standard_v1();
+        let fee_breakdown = fee_schedule.calculate_fees(request.amount_in, 6, None);
+        let fee_amount = fee_breakdown.total_fee;
         let net_amount_in = request.amount_in.saturating_sub(fee_amount);
 
         // Expected output tokens
@@ -220,6 +222,7 @@ impl LiquidityProvider for MeteoraDbcProvider {
             fee_amount,
             current_price_usd: pool.current_price_usd,
             effective_execution_price_usd,
+            fee_breakdown,
         })
     }
 
@@ -306,6 +309,10 @@ mod tests {
         assert!(quote.expected_amount_out > 0);
         assert!(quote.min_amount_out <= quote.expected_amount_out);
         assert!(quote.effective_execution_price_usd >= 100.0);
+        assert_eq!(quote.fee_breakdown.pool_fee, 1_500_000);
+        assert_eq!(quote.fee_breakdown.platform_fee, 500_000);
+        assert_eq!(quote.fee_breakdown.total_fee, 2_000_000);
+        assert_eq!(quote.fee_amount, 2_000_000);
     }
 
     #[tokio::test]

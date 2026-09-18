@@ -6,6 +6,7 @@ pub const POLICY_SEED: &[u8] = b"policy";
 pub const LOAN_SEED: &[u8] = b"loan";
 pub const EXECUTION_SEED: &[u8] = b"execution";
 pub const USER_SHARES_SEED: &[u8] = b"user_shares";
+pub const COMPLIANCE_SEED: &[u8] = b"compliance";
 
 pub const MAX_NAME_LEN: usize = 32;
 pub const MAX_SYMBOL_LEN: usize = 12;

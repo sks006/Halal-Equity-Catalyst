@@ -180,20 +180,23 @@ async fn test_anchor_instruction_builders_via_service() {
     assert_eq!(&exit_ix.data[..8], &EMERGENCY_EXIT_DISCRIMINATOR);
 
     // 6. Execute action instruction
+    let (compliance_pda, _) = equity_catalyst_solana::accounts::find_compliance_pda(&asset_mint, service.program_id());
     let (action_ix, _) = service
         .anchor_client()
         .build_execute_action_ix(
             &authority.pubkey(),
             &vault_pda,
             1,
-            0,
+            1, // Spot Swap
             &asset_mint,
             &asset_mint,
+            &compliance_pda,
             1_000_000,
             990_000,
         )
         .expect("Failed to build execute_action ix");
     assert_eq!(action_ix.accounts[0].pubkey, authority.pubkey());
+    assert_eq!(action_ix.accounts[5].pubkey, compliance_pda);
 
     // 7. Borrow instruction
     let borrower = Keypair::new();
