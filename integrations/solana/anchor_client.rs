@@ -348,9 +348,11 @@ impl AnchorClient {
     }
 
     /// 6. Set Asset Shariah Compliance (on-chain gate configuration)
+    #[allow(clippy::too_many_arguments)]
     pub fn build_set_asset_compliance_ix(
         &self,
         authority: &Pubkey,
+        vault_pda: &Pubkey,
         asset_mint: &Pubkey,
         status: u8,
         policy_version: [u8; 32],
@@ -376,6 +378,7 @@ impl AnchorClient {
 
         let accounts = vec![
             AccountMeta::new(*authority, true),
+            AccountMeta::new_readonly(*vault_pda, false),
             AccountMeta::new_readonly(*asset_mint, false),
             AccountMeta::new(compliance_pda, false),
             AccountMeta::new_readonly(system_program::id(), false),

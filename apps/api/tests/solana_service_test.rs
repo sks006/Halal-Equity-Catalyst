@@ -180,7 +180,8 @@ async fn test_anchor_instruction_builders_via_service() {
     assert_eq!(&exit_ix.data[..8], &EMERGENCY_EXIT_DISCRIMINATOR);
 
     // 6. Execute action instruction
-    let (compliance_pda, _) = equity_catalyst_solana::accounts::find_compliance_pda(&asset_mint, service.program_id());
+    let (compliance_pda, _) =
+        equity_catalyst_solana::accounts::find_compliance_pda(&asset_mint, service.program_id());
     let (action_ix, _) = service
         .anchor_client()
         .build_execute_action_ix(

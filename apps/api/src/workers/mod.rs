@@ -2,6 +2,8 @@
 
 pub mod event_listener;
 pub mod policy_worker;
+pub mod supervisor;
 
 pub use event_listener::{EventListener, DEFAULT_EVENTS_CHANNEL, DEFAULT_EVENTS_QUEUE};
 pub use policy_worker::PolicyWorker;
+pub use supervisor::{SupervisorConfig, WorkerSupervisor};

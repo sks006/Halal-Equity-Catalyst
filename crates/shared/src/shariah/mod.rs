@@ -75,10 +75,7 @@ mod tests {
     #[test]
     fn test_screening_standard_serialization() {
         let standards = vec![
-            (
-                ScreeningStandard::BoardApprovedV1,
-                "\"BoardApprovedV1\"",
-            ),
+            (ScreeningStandard::BoardApprovedV1, "\"BoardApprovedV1\""),
             (ScreeningStandard::Aaoifi21, "\"Aaoifi21\""),
             (
                 ScreeningStandard::Custom("DJIM".to_string()),
@@ -128,10 +125,7 @@ mod tests {
                 ShariahRejectionReason::MissingEvidence,
                 "\"MissingEvidence\"",
             ),
-            (
-                ShariahRejectionReason::ReviewExpired,
-                "\"ReviewExpired\"",
-            ),
+            (ShariahRejectionReason::ReviewExpired, "\"ReviewExpired\""),
             (
                 ShariahRejectionReason::Other("Non-compliant asset rehypothecation".to_string()),
                 "{\"Other\":\"Non-compliant asset rehypothecation\"}",
@@ -175,6 +169,7 @@ mod tests {
             BasisPoints(3_300),
             BasisPoints(3_300),
             BasisPoints(500),
+            ThresholdComparison::LessThanOrEqual,
         )
         .expect("Failed to build custom policy");
 
@@ -187,6 +182,10 @@ mod tests {
             custom_policy.interest_bearing_cash_limit_bps,
             BasisPoints(3_300)
         );
+        assert_eq!(
+            custom_policy.comparison,
+            ThresholdComparison::LessThanOrEqual
+        );
 
         // Construction via from_raw_bps
         let raw_policy = ScreeningPolicy::from_raw_bps(
@@ -195,9 +194,11 @@ mod tests {
             2_500,
             2_500,
             300,
+            ThresholdComparison::StrictLessThan,
         )
         .expect("Valid raw policy");
         assert_eq!(raw_policy.debt_limit_bps, BasisPoints(2_500));
+        assert_eq!(raw_policy.comparison, ThresholdComparison::StrictLessThan);
     }
 
     #[test]
@@ -209,6 +210,7 @@ mod tests {
             BasisPoints(10_001),
             BasisPoints(3_000),
             BasisPoints(500),
+            ThresholdComparison::LessThanOrEqual,
         );
         assert!(matches!(
             invalid_debt,
@@ -222,6 +224,7 @@ mod tests {
             BasisPoints(3_000),
             BasisPoints(3_000),
             BasisPoints(500),
+            ThresholdComparison::LessThanOrEqual,
         );
         assert!(matches!(
             invalid_version,
@@ -235,6 +238,7 @@ mod tests {
             BasisPoints(3_000),
             BasisPoints(3_000),
             BasisPoints(500),
+            ThresholdComparison::LessThanOrEqual,
         );
         assert!(matches!(
             invalid_custom,
@@ -281,8 +285,7 @@ mod tests {
 
         // Under AAOIFI Standard 21 (30% limit), this must be REJECTED with ExcessDebt
         let aaoifi_policy = ScreeningPolicy::aaoifi_21("2024");
-        let (status_aaoifi, reasons_aaoifi) =
-            evaluate_shariah_compliance(&aaoifi_policy, &input);
+        let (status_aaoifi, reasons_aaoifi) = evaluate_shariah_compliance(&aaoifi_policy, &input);
         assert_eq!(status_aaoifi, ShariahStatus::Rejected);
         assert_eq!(reasons_aaoifi, vec![ShariahRejectionReason::ExcessDebt]);
 
@@ -293,11 +296,11 @@ mod tests {
             BasisPoints(3_300),
             BasisPoints(3_300),
             BasisPoints(500),
+            ThresholdComparison::LessThanOrEqual,
         )
         .unwrap();
 
-        let (status_custom, reasons_custom) =
-            evaluate_shariah_compliance(&custom_policy, &input);
+        let (status_custom, reasons_custom) = evaluate_shariah_compliance(&custom_policy, &input);
         assert_eq!(status_custom, ShariahStatus::Approved);
         assert!(reasons_custom.is_empty());
     }
@@ -401,11 +404,13 @@ mod tests {
             status: ShariahStatus::Approved,
             standard: ScreeningStandard::BoardApprovedV1,
             business_activity_approved: true,
-            debt_ratio_bps: 1_500, // 15% < 30%
+            debt_ratio_bps: 1_500,            // 15% < 30%
             interest_bearing_cash_bps: 1_200, // 12% < 30%
-            impure_income_bps: 200, // 2% < 5%
+            impure_income_bps: 200,           // 2% < 5%
             ownership_verified: true,
-            evidence_hash: "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
+            evidence_hash:
+                "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                    .to_string(),
             reviewed_at: 1_700_000_000,
             expires_at: 1_710_000_000,
             policy_version: "v1.0".to_string(),
@@ -437,7 +442,9 @@ mod tests {
         let res = eligibility.validate_eligibility(now);
         assert!(res.is_err());
         let reasons = res.unwrap_err();
-        assert!(reasons.iter().any(|r| matches!(r, ShariahRejectionReason::Other(msg) if msg.contains("Rejected"))));
+        assert!(reasons
+            .iter()
+            .any(|r| matches!(r, ShariahRejectionReason::Other(msg) if msg.contains("Rejected"))));
     }
 
     #[test]
@@ -540,7 +547,9 @@ mod tests {
             BasisPoints(3_300),
             BasisPoints(3_300),
             BasisPoints(500),
-        ).unwrap();
+            ThresholdComparison::LessThanOrEqual,
+        )
+        .unwrap();
         assert!(eligibility.is_currently_eligible_under_policy(&custom_policy, now));
     }
 
@@ -982,9 +991,9 @@ mod tests {
             expires_at: 1_710_000_000,
         };
         let clean_financials = ShariahFinancialMetrics {
-            debt_ratio_bps: 1_500, // 15% < 30%
+            debt_ratio_bps: 1_500,                  // 15% < 30%
             interest_bearing_cash_ratio_bps: 1_200, // 12% < 30%
-            impure_income_ratio_bps: 100, // 1% < 5%
+            impure_income_ratio_bps: 100,           // 1% < 5%
         };
         let now = 1_705_000_000;
 
@@ -1006,10 +1015,7 @@ mod tests {
         assert_eq!(registered.eligibility.status, ShariahStatus::Approved);
         assert!(registry.is_tradeable("NVDA", now));
         assert!(registered.is_tradeable(now));
-        assert_eq!(
-            get_eligibility(&registered).status,
-            ShariahStatus::Approved
-        );
+        assert_eq!(get_eligibility(&registered).status, ShariahStatus::Approved);
 
         // Duplicate registration fails
         let dup_err = registry.register(
@@ -1096,10 +1102,7 @@ mod tests {
             &policy,
             expired_now,
         );
-        assert!(matches!(
-            expired_err,
-            Err(RegistryError::ReviewExpired(_))
-        ));
+        assert!(matches!(expired_err, Err(RegistryError::ReviewExpired(_))));
 
         // When registered asset reaches expiration time, is_tradeable becomes false
         assert!(!registry.is_tradeable("NVDA", expired_now));
@@ -1110,6 +1113,65 @@ mod tests {
         assert_eq!(
             registry.get_eligibility("backed:NVDAx").unwrap().status,
             ShariahStatus::Revoked
+        );
+    }
+
+    #[test]
+    fn test_threshold_comparison_semantics_strict_vs_inclusive() {
+        let policy_inclusive = ScreeningPolicy::board_approved_v1(); // LessThanOrEqual, debt limit 3,000 bps
+        assert_eq!(
+            policy_inclusive.comparison,
+            ThresholdComparison::LessThanOrEqual
+        );
+
+        let policy_strict = ScreeningPolicy::aaoifi_21("2024"); // StrictLessThan, debt limit 3,000 bps
+        assert_eq!(
+            policy_strict.comparison,
+            ThresholdComparison::StrictLessThan
+        );
+
+        // Case 1: Exact boundary (3,000 bps)
+        let boundary_metrics = ShariahFinancialMetrics {
+            debt_ratio_bps: 3_000,
+            interest_bearing_cash_ratio_bps: 2_000,
+            impure_income_ratio_bps: 100,
+        };
+
+        // Under LessThanOrEqual: 3,000 <= 3,000 is COMPLIANT (Pass)
+        assert!(screen_financial_metrics(&boundary_metrics, &policy_inclusive).is_ok());
+
+        // Under StrictLessThan: 3,000 < 3,000 is NOT compliant (Fail -> ExcessDebt)
+        assert_eq!(
+            screen_financial_metrics(&boundary_metrics, &policy_strict),
+            Err(ShariahRejectionReason::ExcessDebt)
+        );
+
+        // Case 2: Just below boundary (2,999 bps)
+        let below_boundary = ShariahFinancialMetrics {
+            debt_ratio_bps: 2_999,
+            interest_bearing_cash_ratio_bps: 2_000,
+            impure_income_ratio_bps: 100,
+        };
+
+        // Both LessThanOrEqual and StrictLessThan pass for 2,999 bps
+        assert!(screen_financial_metrics(&below_boundary, &policy_inclusive).is_ok());
+        assert!(screen_financial_metrics(&below_boundary, &policy_strict).is_ok());
+
+        // Case 3: Just above boundary (3,001 bps)
+        let above_boundary = ShariahFinancialMetrics {
+            debt_ratio_bps: 3_001,
+            interest_bearing_cash_ratio_bps: 2_000,
+            impure_income_ratio_bps: 100,
+        };
+
+        // Both fail for 3,001 bps
+        assert_eq!(
+            screen_financial_metrics(&above_boundary, &policy_inclusive),
+            Err(ShariahRejectionReason::ExcessDebt)
+        );
+        assert_eq!(
+            screen_financial_metrics(&above_boundary, &policy_strict),
+            Err(ShariahRejectionReason::ExcessDebt)
         );
     }
 }

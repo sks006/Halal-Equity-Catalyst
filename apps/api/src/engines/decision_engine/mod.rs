@@ -36,8 +36,23 @@ pub enum ShariahGateAssessment {
     Rejected { symbol: String, reason: String },
 }
 
-/// Builds the canonical in-memory Shariah registry containing all verified mainnet spot equities.
-pub fn canonical_shariah_registry() -> ShariahAssetRegistry {
+// ============================================================================
+// TEST FIXTURE DATA
+// ============================================================================
+// Synthetic test fixtures used for deterministic unit and integration tests.
+//
+// WARNING: Strings such as "test_fixture:cert_backed_nvda" are synthetic test
+// identifiers and MUST NEVER be treated or described as real cryptographic hashes.
+//
+// ============================================================================
+// PRODUCTION VERIFIED DATA
+// ============================================================================
+// Production compliance requires genuine SHA-256 cryptographic digests of
+// verified statutory ownership certificates and audited corporate financial
+// filings supplied through the authoritative verification pipeline.
+
+/// Builds the deterministic test fixture Shariah registry for local tests and development.
+pub fn test_fixture_shariah_registry() -> ShariahAssetRegistry {
     let mut registry = ShariahAssetRegistry::new();
     let policy = ScreeningPolicy::board_approved_v1();
     let verified = verified_mainnet_assets();
@@ -46,27 +61,28 @@ pub fn canonical_shariah_registry() -> ShariahAssetRegistry {
     let base_expires_at = 2_000_000_000; // Audited window valid through year 2033
 
     for asset in verified {
+        // TEST FIXTURE DATA: Synthetic financial ratios and mock fixture hashes for test execution.
         let (business, debt, cash, impure, cert_hash) = match asset.symbol() {
             "NVDA" => (
                 BusinessCategory::Technology,
-                1_500, // 15.00% < 30.00%
-                1_200, // 12.00% < 30.00%
-                100,   // 1.00% < 5.00%
-                "sha256:cert_backed_nvda_verified",
+                1_500, // 15.00% <= 30.00%
+                1_200, // 12.00% <= 30.00%
+                100,   // 1.00% <= 5.00%
+                "test_fixture_hash:cert_backed_nvda",
             ),
             "AAPL" => (
                 BusinessCategory::Technology,
-                2_100, // 21.00% < 30.00%
-                1_400, // 14.00% < 30.00%
-                120,   // 1.20% < 5.00%
-                "sha256:cert_backed_aapl_verified",
+                2_100, // 21.00% <= 30.00%
+                1_400, // 14.00% <= 30.00%
+                120,   // 1.20% <= 5.00%
+                "test_fixture_hash:cert_backed_aapl",
             ),
             "SPYx" => (
                 BusinessCategory::Manufacturing,
-                2_500, // 25.00% < 30.00%
-                2_000, // 20.00% < 30.00%
-                200,   // 2.00% < 5.00%
-                "sha256:cert_backed_spyx_verified",
+                2_500, // 25.00% <= 30.00%
+                2_000, // 20.00% <= 30.00%
+                200,   // 2.00% <= 5.00%
+                "test_fixture_hash:cert_backed_spyx",
             ),
             _ => continue,
         };
@@ -99,6 +115,12 @@ pub fn canonical_shariah_registry() -> ShariahAssetRegistry {
     }
 
     registry
+}
+
+/// Convenience alias referencing `test_fixture_shariah_registry` for development and test harnesses.
+/// For production environments, inject `production_shariah_registry` populated with verified cryptographic evidence.
+pub fn canonical_shariah_registry() -> ShariahAssetRegistry {
+    test_fixture_shariah_registry()
 }
 
 #[derive(Clone, Debug)]
@@ -213,10 +235,7 @@ impl DecisionEngine {
             if !eligibility.ownership_verified {
                 return ShariahGateAssessment::Rejected {
                     symbol: symbol.to_string(),
-                    reason: format!(
-                        "Asset '{}' custodial ownership is unverified",
-                        symbol
-                    ),
+                    reason: format!("Asset '{}' custodial ownership is unverified", symbol),
                 };
             }
 

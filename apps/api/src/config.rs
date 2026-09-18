@@ -51,6 +51,8 @@ pub struct Config {
     pub read_only: bool,
     pub max_trade_size_usd: u64,
     pub max_slippage_bps: u16,
+    pub admin_api_key: String,
+    pub rate_limit_requests_per_minute: u32,
 }
 
 impl Config {
@@ -74,6 +76,8 @@ impl Config {
             read_only: false,
             max_trade_size_usd: 100_000,
             max_slippage_bps: 100,
+            admin_api_key: "catalyst-admin-secret-dev".to_string(),
+            rate_limit_requests_per_minute: 120,
         }
     }
 
@@ -98,6 +102,8 @@ impl Config {
             read_only: true, // Simulation safe default
             max_trade_size_usd: 50_000,
             max_slippage_bps: 50,
+            admin_api_key: "catalyst-admin-secret-dev".to_string(),
+            rate_limit_requests_per_minute: 120,
         }
     }
 
@@ -144,6 +150,11 @@ impl Config {
             read_only: true, // Requires explicit operational override to submit transactions
             max_trade_size_usd: 25_000, // Conservative production limit
             max_slippage_bps: 30, // Strict 30 bps maximum
+            admin_api_key: env::var("ADMIN_API_KEY").unwrap_or_default(),
+            rate_limit_requests_per_minute: env::var("RATE_LIMIT_PER_MINUTE")
+                .ok()
+                .and_then(|v| v.parse::<u32>().ok())
+                .unwrap_or(60),
         }
     }
 
@@ -202,6 +213,11 @@ impl Config {
             .ok()
             .and_then(|v| v.parse::<u16>().ok())
             .unwrap_or(default.max_slippage_bps);
+        let admin_api_key = env::var("ADMIN_API_KEY").unwrap_or(default.admin_api_key);
+        let rate_limit_requests_per_minute = env::var("RATE_LIMIT_PER_MINUTE")
+            .ok()
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(default.rate_limit_requests_per_minute);
 
         Self {
             environment: target_env,
@@ -220,6 +236,8 @@ impl Config {
             read_only,
             max_trade_size_usd,
             max_slippage_bps,
+            admin_api_key,
+            rate_limit_requests_per_minute,
         }
     }
 

@@ -7,10 +7,19 @@ use uuid::Uuid;
 
 /// Isolated cryptographic signer for executing authorized vault decisions.
 /// Kept strictly separate from public HTTP request handlers.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct ExecutionSigner {
     signer_pubkey: String,
     key_material: Vec<u8>,
+}
+
+impl std::fmt::Debug for ExecutionSigner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ExecutionSigner")
+            .field("signer_pubkey", &self.signer_pubkey)
+            .field("key_material", &"[REDACTED]")
+            .finish()
+    }
 }
 
 impl ExecutionSigner {
@@ -90,4 +99,20 @@ fn shellexpand(path: &str) -> String {
 
 fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_signer_debug_masks_key_material() {
+        let signer = ExecutionSigner::load_or_generate("/nonexistent/path/signer.json");
+        let debug_str = format!("{:?}", signer);
+
+        assert!(debug_str.contains("[REDACTED]"));
+        assert!(debug_str.contains(&signer.signer_pubkey));
+        // Verify key bytes (e.g. 42) are not shown as raw numbers
+        assert!(!debug_str.contains("key_material: ["));
+    }
 }

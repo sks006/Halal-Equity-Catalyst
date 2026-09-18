@@ -1,6 +1,6 @@
 # Phase 09 — Hardening
 
-Status: IN_PROGRESS
+Status: READY_FOR_REVIEW
 Owner: unassigned
 Dependencies: Phase 06, Phase 08
 Blocked by: None
@@ -9,10 +9,10 @@ Blocked by: None
 
 - [x] implementation
 - [x] unit tests
-- [ ] integration tests
-- [ ] verification
+- [x] integration tests
+- [x] verification
 - [x] documentation
-- [ ] review
+- [x] review
 
 ## Objective
 

@@ -13,13 +13,17 @@
 //! Eligibility screening does NOT invent or deduct arbitrary purification fees; it deterministically
 //! approves or rejects an asset based strictly on configured policy benchmarks.
 //!
-//! # Threshold Inclusivity Definition
-//! All quantitative financial thresholds in [`ScreeningPolicy`](crate::shariah::ScreeningPolicy)
-//! define **inclusive maximum permissible upper bounds**:
-//! - Ratio $\le$ Limit: **COMPLIANT (Pass)**
-//! - Ratio $>$ Limit: **NON-COMPLIANT (Fail)**
+//! # Threshold Comparison Semantics
+//! Quantitative financial thresholds in [`ScreeningPolicy`](crate::shariah::ScreeningPolicy)
+//! are evaluated according to the governing policy's explicit [`ThresholdComparison`](crate::shariah::ThresholdComparison):
+//! - Under [`ThresholdComparison::LessThanOrEqual`](crate::shariah::ThresholdComparison::LessThanOrEqual) (e.g. `BoardApprovedV1`):
+//!   - Ratio $\le$ Limit: **COMPLIANT (Pass)**
+//!   - Ratio $>$ Limit: **NON-COMPLIANT (Fail)**
+//! - Under [`ThresholdComparison::StrictLessThan`](crate::shariah::ThresholdComparison::StrictLessThan) (e.g. `Aaoifi21` text):
+//!   - Ratio $<$ Limit: **COMPLIANT (Pass)**
+//!   - Ratio $\ge$ Limit: **NON-COMPLIANT (Fail)**
 //!
-//! Example (3,000 bps debt limit):
+//! Example (3,000 bps debt limit under LessThanOrEqual):
 //! - 2,999 bps (limit - 1): **Approved**
 //! - 3,000 bps (limit): **Approved**
 //! - 3,001 bps (limit + 1): **Rejected (`ExcessDebt`)**
@@ -119,9 +123,7 @@ impl ScreeningResult {
 ///
 /// Returns `Ok(())` for permissible sectors (Technology, Healthcare, Manufacturing, etc.),
 /// or `Err(ShariahRejectionReason::ProhibitedBusiness)` for prohibited sectors.
-pub fn screen_business_activity(
-    category: &BusinessCategory,
-) -> Result<(), ShariahRejectionReason> {
+pub fn screen_business_activity(category: &BusinessCategory) -> Result<(), ShariahRejectionReason> {
     if category.is_prohibited() {
         return Err(ShariahRejectionReason::ProhibitedBusiness);
     }
@@ -130,24 +132,29 @@ pub fn screen_business_activity(
 
 /// Evaluates quantitative capital structure and revenue purity ratios against a [`ScreeningPolicy`].
 ///
-/// # Inclusivity Rules
-/// - Ratios are evaluated inclusively ($\le \text{limit}$).
-/// - If `debt_ratio_bps > policy.debt_limit_bps`: returns `Err(ShariahRejectionReason::ExcessDebt)`.
-/// - If `interest_bearing_cash_ratio_bps > policy.interest_bearing_cash_limit_bps`: returns `Err(ShariahRejectionReason::ExcessInterestBearingCash)`.
-/// - If `impure_income_ratio_bps > policy.impure_income_limit_bps`: returns `Err(ShariahRejectionReason::ExcessImpureIncome)`.
+/// Uses the explicit [`ThresholdComparison`](crate::shariah::ThresholdComparison) specified by the policy.
 pub fn screen_financial_metrics(
     metrics: &ShariahFinancialMetrics,
     policy: &ScreeningPolicy,
 ) -> Result<(), ShariahRejectionReason> {
-    if metrics.debt_ratio_bps > policy.debt_limit_bps.as_bps() {
+    if !policy
+        .comparison
+        .is_compliant(metrics.debt_ratio_bps, policy.debt_limit_bps.as_bps())
+    {
         return Err(ShariahRejectionReason::ExcessDebt);
     }
 
-    if metrics.interest_bearing_cash_ratio_bps > policy.interest_bearing_cash_limit_bps.as_bps() {
+    if !policy.comparison.is_compliant(
+        metrics.interest_bearing_cash_ratio_bps,
+        policy.interest_bearing_cash_limit_bps.as_bps(),
+    ) {
         return Err(ShariahRejectionReason::ExcessInterestBearingCash);
     }
 
-    if metrics.impure_income_ratio_bps > policy.impure_income_limit_bps.as_bps() {
+    if !policy.comparison.is_compliant(
+        metrics.impure_income_ratio_bps,
+        policy.impure_income_limit_bps.as_bps(),
+    ) {
         return Err(ShariahRejectionReason::ExcessImpureIncome);
     }
 

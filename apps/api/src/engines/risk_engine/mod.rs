@@ -54,7 +54,9 @@ impl RiskEngine {
 
                 let available = if avail_amount == 0 { 0 } else { avail_value };
 
-                if let Err(err) = validate_spot_ownership(&trade.symbol, trade.trade_value, available) {
+                if let Err(err) =
+                    validate_spot_ownership(&trade.symbol, trade.trade_value, available)
+                {
                     return RiskAssessment::Rejected {
                         reason: format!(
                             "Spot ownership check failed for '{}': {}",
@@ -91,7 +93,11 @@ impl RiskEngine {
         }
 
         // 4. Spot Funding check (100% equity-funded, no leverage, no debt)
-        let total_buy_outflow: u64 = trades.iter().filter(|t| t.is_buy).map(|t| t.trade_value).sum();
+        let total_buy_outflow: u64 = trades
+            .iter()
+            .filter(|t| t.is_buy)
+            .map(|t| t.trade_value)
+            .sum();
         if total_buy_outflow > 0 {
             if let Err(err) = validate_spot_funding(total_buy_outflow, available_cash_usd, 1.0, 0) {
                 return RiskAssessment::Rejected {
@@ -101,8 +107,11 @@ impl RiskEngine {
         }
 
         // 5. Minimum Cash Reserve check (spot solvency without leverage)
-        let required_cash_usd = (total_portfolio_usd as f64 * (policy.min_cash_bps as f64 / 10_000.0)).round() as u64;
-        if available_cash_usd < total_buy_outflow || (available_cash_usd - total_buy_outflow) < required_cash_usd {
+        let required_cash_usd =
+            (total_portfolio_usd as f64 * (policy.min_cash_bps as f64 / 10_000.0)).round() as u64;
+        if available_cash_usd < total_buy_outflow
+            || (available_cash_usd - total_buy_outflow) < required_cash_usd
+        {
             return RiskAssessment::Rejected {
                 reason: format!(
                     "Cash reserve breach: available cash ${} is insufficient for buy outlay ${} while maintaining minimum required reserve ${} ({} bps)",

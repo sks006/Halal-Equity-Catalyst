@@ -392,7 +392,8 @@ fn test_risk_engine_reject_cases() {
     match res_funding {
         RiskAssessment::Rejected { reason } => {
             assert!(
-                reason.contains("Spot funding check failed") && reason.contains("Insufficient settled cash"),
+                reason.contains("Spot funding check failed")
+                    && reason.contains("Insufficient settled cash"),
                 "Reason: {}",
                 reason
             );
@@ -474,7 +475,8 @@ fn test_risk_engine_reject_cases() {
     match res_zero_qty {
         RiskAssessment::Rejected { reason } => {
             assert!(
-                reason.contains("Spot ownership check failed for 'NVDA'") && reason.contains("must be positive"),
+                reason.contains("Spot ownership check failed for 'NVDA'")
+                    && reason.contains("must be positive"),
                 "Reason: {}",
                 reason
             );
@@ -538,8 +540,14 @@ fn test_decision_engine_reject_cases() {
 
     // Case 1: Preflight rejection on paused vault
     let paused_vault = create_sample_vault(true);
-    let paused_err =
-        decision_engine.process_event(&event, &paused_vault, &policy, &positions, 4_850_000, 1_208_760);
+    let paused_err = decision_engine.process_event(
+        &event,
+        &paused_vault,
+        &policy,
+        &positions,
+        4_850_000,
+        1_208_760,
+    );
     assert!(matches!(paused_err, Err(ApiError::BadRequest(msg)) if msg.contains("paused")));
 
     // Case 2: Preflight rejection on inactive policy
@@ -561,8 +569,12 @@ fn test_decision_engine_reject_cases() {
         .expect("Decision pipeline should return ExecutionRequest");
     assert!(!zero_cash_request.approved);
     assert!(
-        zero_cash_request.rationale.contains("Rejected by Risk Engine")
-            && zero_cash_request.rationale.contains("Spot funding check failed"),
+        zero_cash_request
+            .rationale
+            .contains("Rejected by Risk Engine")
+            && zero_cash_request
+                .rationale
+                .contains("Spot funding check failed"),
         "Rationale: {}",
         zero_cash_request.rationale
     );
@@ -610,12 +622,23 @@ fn test_decision_engine_reject_cases() {
         processed_at: None,
     };
     let unowned_sell_request = decision_engine
-        .process_event(&exit_event, &active_vault, &policy, &ghost_positions, 4_850_000, 1_208_760)
+        .process_event(
+            &exit_event,
+            &active_vault,
+            &policy,
+            &ghost_positions,
+            4_850_000,
+            1_208_760,
+        )
         .expect("Decision pipeline should return ExecutionRequest");
     assert!(!unowned_sell_request.approved);
     assert!(
-        unowned_sell_request.rationale.contains("Rejected by Risk Engine")
-            && unowned_sell_request.rationale.contains("Spot ownership check failed"),
+        unowned_sell_request
+            .rationale
+            .contains("Rejected by Risk Engine")
+            && unowned_sell_request
+                .rationale
+                .contains("Spot ownership check failed"),
         "Rationale: {}",
         unowned_sell_request.rationale
     );
@@ -699,7 +722,9 @@ fn test_decision_engine_shariah_gate_approval_and_rejections() {
     assert!(req_revoked.rationale.contains("Revoked"));
 
     // 3. Expired asset blocked by ShariahGate
-    let mut engine_expired = DecisionEngine::new(ExecutionSigner::load_or_generate("~/.config/solana/id.json"));
+    let mut engine_expired = DecisionEngine::new(ExecutionSigner::load_or_generate(
+        "~/.config/solana/id.json",
+    ));
     engine_expired
         .registry_mut()
         .expire_asset("backed:NVDAx")
@@ -712,4 +737,3 @@ fn test_decision_engine_shariah_gate_approval_and_rejections() {
     assert!(req_expired.rationale.contains("Rejected by ShariahGate"));
     assert!(req_expired.rationale.contains("Expired"));
 }
-

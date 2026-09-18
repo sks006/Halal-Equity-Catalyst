@@ -2,12 +2,18 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::Mint;
 
 use crate::constants::COMPLIANCE_SEED;
-use crate::state::AssetCompliance;
+use crate::errors::VaultError;
+use crate::state::{AssetCompliance, Vault};
 
 #[derive(Accounts)]
 pub struct SetAssetCompliance<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
+
+    #[account(
+        has_one = authority @ VaultError::UnauthorizedKeeper
+    )]
+    pub vault: Account<'info, Vault>,
 
     pub asset_mint: Account<'info, Mint>,
 

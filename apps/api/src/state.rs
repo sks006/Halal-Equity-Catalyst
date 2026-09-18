@@ -19,6 +19,7 @@ pub struct AppState {
     pub solana_service: Option<SolanaService>,
     pub oracle_service: Option<Arc<OracleService>>,
     pub quote_service: Option<Arc<QuoteExecutionService>>,
+    pub rate_limiter: Arc<crate::middleware::RateLimiter>,
 }
 
 impl std::fmt::Debug for AppState {
@@ -42,6 +43,10 @@ impl AppState {
         redis_client: Option<redis::Client>,
         solana_service: Option<SolanaService>,
     ) -> Self {
+        let rate_limiter = Arc::new(crate::middleware::RateLimiter::new(
+            config.rate_limit_requests_per_minute,
+            std::time::Duration::from_secs(60),
+        ));
         Self {
             config,
             start_time: Utc::now(),
@@ -51,7 +56,17 @@ impl AppState {
             solana_service,
             oracle_service: None,
             quote_service: None,
+            rate_limiter,
         }
+    }
+
+    pub fn with_rate_limiter(mut self, rate_limiter: Arc<crate::middleware::RateLimiter>) -> Self {
+        self.rate_limiter = rate_limiter;
+        self
+    }
+
+    pub fn rate_limiter(&self) -> &crate::middleware::RateLimiter {
+        &self.rate_limiter
     }
 
     pub fn with_oracle_service(mut self, oracle_service: Arc<OracleService>) -> Self {

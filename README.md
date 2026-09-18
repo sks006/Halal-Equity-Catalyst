@@ -1,24 +1,29 @@
-# Equity Catalyst (Halal Edition)
+# Equity Catalyst: Halal-by-Design Spot Liquidity Engine
 
-> **Halal-by-Design Autonomous Liquidity Engine, Dynamic Bonding Curve Controller & Programmable Spot Equity Vaults on Solana**
+> **Programmable Spot Equity Vaults, Dynamic Bonding Curve Price Discovery & Shariah-Screened Autonomous Liquidity on Solana**
 
 [![Solana](https://img.shields.io/badge/Solana-Anchor%20v0.30.1-14F195?logo=solana)](https://solana.com)
 [![Rust](https://img.shields.io/badge/Rust-1.75%2B-DEA584?logo=rust)](https://www.rust-lang.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?logo=typescript)](https://www.typescriptlang.org)
 [![Next.js](https://img.shields.io/badge/Next.js-14%2B-000000?logo=next.js)](https://nextjs.org)
-[![Shariah Compliance](https://img.shields.io/badge/Shariah-AAOIFI%20Std%2021%20%7C%20IIFA%2063(1%2F7)-059669)](./docs/02-shariah-design-rules.md)
-[![Oracle](https://img.shields.io/badge/Pyth%20Lazer-200ms%20Streams-9945FF)](https://pyth.network)
+[![Shariah Design](https://img.shields.io/badge/Shariah-Designed%20for%20AAOIFI%2021-059669)](./docs/02-shariah-design-rules.md)
+[![Oracle](https://img.shields.io/badge/Pyth%20Hermes-Live%20Feeds-9945FF)](https://pyth.network)
 [![DEX](https://img.shields.io/badge/Meteora-Dynamic%20Bonding%20Curves-FE4A55)](https://meteora.ag)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0)
+
+> [!IMPORTANT]
+> **Shariah Screening Disclaimer**: Equity Catalyst provides deterministic software screening based on AAOIFI Shariah Standard No. 21 and IIFA Resolution No. 63 (1/7) quantitative and sectoral criteria. This software implementation is **designed for Shariah compliance** and does *not* constitute formal religious certification (*Fatwa*) by an accredited Shariah Supervisory Board.
 
 ---
 
 ## Executive Overview
 
-**Equity Catalyst** makes tokenized real-world equities (RWAs), pre-IPO assets, and statutory securities fully programmable and liquid on Solana under strict Islamic commercial jurisprudence (*Fiqh al-Mu'amalat*). Rather than treating tokenized equities (such as Backed Finance `NVDAx`, `AAPLx`, `MSFTx`, `SPYx`, PreStocks private equities, or Tessera fractional assets) as static tokens or subjecting them to conventional debt-ridden DeFi primitives, Equity Catalyst provides non-custodial, policy-governed smart vaults that dynamically discover fair price, provide automated spot liquidity via **Meteora Dynamic Bonding Curves (DBC)**, and deterministically rebalance portfolios using real-time market data from **Pyth Lazer (200ms streaming)** and Pyth Hermes.
+**Equity Catalyst** is a Solana/Rust system for programmable spot liquidity around tokenized real-world equities (RWAs), combining real-time market data from **Pyth Network**, automated spot liquidity discovery via **Meteora Dynamic Bonding Curves (DBC)**, deterministic Shariah-oriented screening, dual-line spot risk controls, bounded AI advisory proposals, and isolated keeper execution.
+
+Rather than treating tokenized equities (such as Backed Finance `NVDAx`, `AAPLx`, `MSFTx`, `SPYx`) as static tokens or subjecting them to conventional debt-ridden DeFi primitives, Equity Catalyst provides non-custodial, policy-governed smart vaults that dynamically discover fair price, provide automated spot liquidity, and deterministically rebalance portfolios using real-time market data from Pyth Hermes.
 
 ### Why Halal-by-Design?
-Conventional algorithmic vaults and prime brokerages rely fundamentally on interest-bearing debt (*Riba*), speculative margin loans, naked short-selling (*Bay' ma la Yamlik*), and leveraged synthetic contracts (*Gharar* & *Maysir*). Equity Catalyst has been re-architected from first principles into a **100% equity-capitalized ($0\%$ leverage) spot liquidity engine** compliant with **AAOIFI Shariah Standard No. 21** (*Financial Papers: Shares & Sukuk*) and **International Islamic Fiqh Academy (IIFA) Resolution No. 63 (1/7)**.
+Conventional algorithmic vaults rely fundamentally on interest-bearing debt (*Riba*), speculative margin loans, naked short-selling (*Bay' ma la Yamlik*), and leveraged synthetic contracts (*Gharar* & *Maysir*). Equity Catalyst has been re-architected from first principles into a **100% equity-capitalized ($0\%$ leverage) spot liquidity engine** adhering to **AAOIFI Shariah Standard No. 21** (*Financial Papers: Shares & Sukuk*) and **International Islamic Fiqh Academy (IIFA) Resolution No. 63 (1/7)** principles.
 
 All loan accounts, dynamic LTV debt logic, and synthetic short engines have been permanently purged and replaced by on-chain **Minimum Cash Reserve requirements (`min_cash_bps >= 10%`)**, spot delivery verification (*Taqaabud*), and direct non-custodial wallet custody fulfilling constructive possession (*Qabd Hukmi*).
 
@@ -310,7 +315,7 @@ docker run -d --name equity-redis \
 ```
 
 ### 3. Run Database Migrations
-Execute all migrations sequentially (including `008_remove_ltv_spot_policy.sql` to enforce minimum cash reserve):
+Execute all migrations sequentially (001_initial through 009_dead_letters):
 ```bash
 for file in $(ls db/migrations/*.sql | sort); do
   docker exec -i equity-postgres psql -U postgres -d equity_catalyst < "$file"
@@ -322,21 +327,30 @@ done
 # Verify formatting across all workspace members
 cargo fmt --all -- --check
 
+# Compile Rust workspace
+cargo check --workspace
+
 # Enforce zero compiler or linter warnings
 cargo clippy --workspace -- -D warnings
 
-# Run shared domain tests (spot checks, cash reserve, Shariah rules)
-cargo test -p equity-catalyst-shared
+# Run all workspace tests (138+ unit, property, and integration tests)
+cargo test --workspace
 
-# Run specialized security audit test suites
-cargo test --test agent_security_audit_test
+# Run Shariah and fee mathematical property test suite
+cargo test -p equity-catalyst-shared --test math_property_test
 
-# Run TypeScript SDK tests (including Pyth Lazer streaming and PDA verification)
-cd sdk && pnpm test && cd ..
+# Run security and production hardening regression suite
+cargo test -p equity-catalyst-api --test security_hardening_test
+
+# Build Next.js frontend production bundle (18/18 static and dynamic routes)
+pnpm --prefix apps/web build
+
+# Execute mainnet and Pyth oracle verification script
+npx ts-node scripts/verify-mainnet.ts
 ```
 
 ### 5. Run the Deterministic Demo Replay
-Experience the full 7-stage event-to-execution pipeline without requiring a live testnet wallet:
+Experience the full 7-stage event-to-execution pipeline using deterministic local fixtures:
 ```bash
 npx ts-node scripts/replay-demo.ts --fast
 ```
@@ -352,7 +366,7 @@ pnpm install
 pnpm dev
 ```
 
-Visit `http://localhost:3000` to access the dashboard, `/markets` for live Meteora DBC curve pools with Pyth Lazer real-time pricing, and the interactive Portfolio Simulator.
+Visit `http://localhost:3000` to access the dashboard, `/markets` for live Meteora DBC curve pools with Pyth real-time pricing, and the interactive Portfolio Simulator.
 
 ---
 
@@ -362,10 +376,12 @@ Visit `http://localhost:3000` to access the dashboard, `/markets` for live Meteo
 * **Program ID**: `8NhtqxR1mwq7a3HTUtcGABNZ3KWzQi9KM3fXu3rHS8LH`
 * **On-Chain Instructions**:
   1. `initialize_vault`: Initializes Vault PDA and Policy PDA with authority, risk bounds, and mandatory `min_cash_bps`.
-  2. `deposit`: Transfers underlying SPL tokens and mints pro-rata LP shares ($\lfloor \frac{\text{amount} \times S_{\text{total}}}{D_{\text{total}}} \rfloor$). Rejects if vault is paused.
-  3. `withdraw`: Burns LP shares and transfers pro-rata underlying assets ($\lfloor \frac{\text{shares} \times D_{\text{total}}}{S_{\text{total}}} \rfloor$). Rejects if vault is paused.
+  2. `deposit`: Transfers underlying SPL tokens and mints pro-rata LP shares. Rejects if vault is paused.
+  3. `withdraw`: Burns LP shares and transfers pro-rata underlying assets. Rejects if vault is paused.
   4. `update_policy`: Updates concentration limits, stop-loss parameters, and `min_cash_bps` (Authority only).
   5. `emergency_exit`: Authority-triggered circuit breaker toggling `is_paused = true`.
+  6. `set_asset_compliance`: Establishes or updates the on-chain `AssetCompliance` PDA with status, policy version, evidence hash, and validity expiry (Authority only).
+  7. `execute_action`: Revalidates slippage and balance bounds, executing authorized spot trade actions atomically on-chain.
 * **Program Error Codes & Invariants**:
   - `6004 BelowMinCashReserve`: Triggered if vault cash reserves fall below `min_cash_bps`.
   - `6005 ProhibitedLeverageOrShort`: Strictly blocks any instruction attempting leverage, short selling, or debt creation.

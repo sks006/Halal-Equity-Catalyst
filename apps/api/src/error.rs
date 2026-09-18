@@ -23,6 +23,9 @@ pub enum ApiError {
     #[error("Unauthorized: {0}")]
     Unauthorized(String),
 
+    #[error("Too many requests: {0}")]
+    TooManyRequests(String),
+
     #[error("Domain validation error: {0}")]
     ValidationError(#[from] equity_catalyst_shared::ValidationError),
 }
@@ -42,14 +45,32 @@ pub struct ErrorResponse {
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, code, message) = match &self {
-            ApiError::InternalServerError(msg) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "INTERNAL_SERVER_ERROR",
-                msg.clone(),
-            ),
+            ApiError::InternalServerError(msg) => {
+                let lower = msg.to_lowercase();
+                let safe_msg = if lower.contains("postgres://")
+                    || lower.contains("password")
+                    || lower.contains("secret")
+                    || lower.contains("bearer")
+                    || lower.contains("private")
+                {
+                    "An internal server error occurred".to_string()
+                } else {
+                    msg.clone()
+                };
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "INTERNAL_SERVER_ERROR",
+                    safe_msg,
+                )
+            }
             ApiError::BadRequest(msg) => (StatusCode::BAD_REQUEST, "BAD_REQUEST", msg.clone()),
             ApiError::NotFound(msg) => (StatusCode::NOT_FOUND, "NOT_FOUND", msg.clone()),
             ApiError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg.clone()),
+            ApiError::TooManyRequests(msg) => (
+                StatusCode::TOO_MANY_REQUESTS,
+                "TOO_MANY_REQUESTS",
+                msg.clone(),
+            ),
             ApiError::ValidationError(err) => {
                 (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", err.to_string())
             }

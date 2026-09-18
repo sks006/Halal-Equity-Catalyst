@@ -11,11 +11,50 @@
 //! binds quantitative thresholds to a designated [`ScreeningStandard`] and `policy_version`.
 
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
+use super::types::ScreeningStandard;
 use crate::constants::MAX_BPS;
 use crate::types::BasisPoints;
 use crate::validation::ValidationError;
-use super::types::ScreeningStandard;
+
+/// Comparison mode for evaluating quantitative financial screening thresholds.
+///
+/// In Islamic finance governance, supervisory boards and index methodologies differ on boundary conditions:
+/// - Textual definitions in certain standards (e.g. AAOIFI Standard No. 21) prescribe benchmark thresholds
+///   as strictly below the boundary (`ratio < limit`).
+/// - Other boards and commercial screening engines (e.g. DJIM, MSCI Islamic) treat benchmark ratios
+///   inclusively (`ratio <= limit`).
+///
+/// By explicitly parameterizing [`ThresholdComparison`], the governing policy unambiguously specifies
+/// whether boundary equality satisfies or fails screening.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ThresholdComparison {
+    /// Strict upper bound: ratio must be strictly less than the threshold (`ratio < limit`).
+    StrictLessThan,
+    /// Inclusive upper bound: ratio may be up to and including the threshold (`ratio <= limit`).
+    LessThanOrEqual,
+}
+
+impl ThresholdComparison {
+    /// Evaluates whether a candidate ratio in basis points complies with the limit under this comparison rule.
+    #[inline]
+    pub fn is_compliant(&self, ratio_bps: u16, limit_bps: u16) -> bool {
+        match self {
+            Self::StrictLessThan => ratio_bps < limit_bps,
+            Self::LessThanOrEqual => ratio_bps <= limit_bps,
+        }
+    }
+}
+
+impl fmt::Display for ThresholdComparison {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::StrictLessThan => write!(f, "< (StrictLessThan)"),
+            Self::LessThanOrEqual => write!(f, "<= (LessThanOrEqual)"),
+        }
+    }
+}
 
 /// Deterministic policy configuration specifying the qualitative and quantitative
 /// boundaries required for an asset to receive [`ShariahStatus::Approved`](crate::shariah::ShariahStatus).
@@ -34,6 +73,8 @@ pub struct ScreeningPolicy {
     /// Maximum permissible revenue from non-operating or impure incidental sources relative to total revenue.
     /// Standard benchmark is 500 bps = 5.00%.
     pub impure_income_limit_bps: BasisPoints,
+    /// Explicit threshold comparison operator (StrictLessThan '<' vs LessThanOrEqual '<=').
+    pub comparison: ThresholdComparison,
 }
 
 impl ScreeningPolicy {
@@ -44,6 +85,7 @@ impl ScreeningPolicy {
         debt_limit_bps: BasisPoints,
         interest_bearing_cash_limit_bps: BasisPoints,
         impure_income_limit_bps: BasisPoints,
+        comparison: ThresholdComparison,
     ) -> Result<Self, ValidationError> {
         let version = policy_version.into();
         if version.trim().is_empty() {
@@ -72,16 +114,18 @@ impl ScreeningPolicy {
             debt_limit_bps,
             interest_bearing_cash_limit_bps,
             impure_income_limit_bps,
+            comparison,
         })
     }
 
-    /// Convenience constructor taking raw basis point values (u16).
+    /// Convenience constructor taking raw basis point values (u16) and comparison mode.
     pub fn from_raw_bps(
         standard: ScreeningStandard,
         policy_version: impl Into<String>,
         debt_limit_bps: u16,
         interest_bearing_cash_limit_bps: u16,
         impure_income_limit_bps: u16,
+        comparison: ThresholdComparison,
     ) -> Result<Self, ValidationError> {
         Self::new(
             standard,
@@ -89,15 +133,16 @@ impl ScreeningPolicy {
             BasisPoints::new(debt_limit_bps)?,
             BasisPoints::new(interest_bearing_cash_limit_bps)?,
             BasisPoints::new(impure_income_limit_bps)?,
+            comparison,
         )
     }
 
     /// Default baseline policy approved by the initial supervisory board.
     ///
-    /// Benchmark thresholds:
-    /// - Debt Limit: 3,000 bps (30.00%)
-    /// - Cash / Deposits Limit: 3,000 bps (30.00%)
-    /// - Impure Income Limit: 500 bps (5.00%)
+    /// Benchmark thresholds (inclusive upper bounds `<= limit`):
+    /// - Debt Limit: <= 3,000 bps (30.00%)
+    /// - Cash / Deposits Limit: <= 3,000 bps (30.00%)
+    /// - Impure Income Limit: <= 500 bps (5.00%)
     pub fn board_approved_v1() -> Self {
         Self {
             standard: ScreeningStandard::BoardApprovedV1,
@@ -105,12 +150,13 @@ impl ScreeningPolicy {
             debt_limit_bps: BasisPoints(3_000),
             interest_bearing_cash_limit_bps: BasisPoints(3_000),
             impure_income_limit_bps: BasisPoints(500),
+            comparison: ThresholdComparison::LessThanOrEqual,
         }
     }
 
     /// Parameterized preset for AAOIFI Shariah Standard No. 21 with specific policy version.
     ///
-    /// Standard AAOIFI ratios:
+    /// Standard AAOIFI textual ratios (strict upper bounds `< limit`):
     /// - Debt / Market Cap < 30.00% (3,000 bps)
     /// - Cash & Deposits / Market Cap < 30.00% (3,000 bps)
     /// - Impure Revenue / Total Revenue < 5.00% (500 bps)
@@ -121,6 +167,7 @@ impl ScreeningPolicy {
             debt_limit_bps: BasisPoints(3_000),
             interest_bearing_cash_limit_bps: BasisPoints(3_000),
             impure_income_limit_bps: BasisPoints(500),
+            comparison: ThresholdComparison::StrictLessThan,
         }
     }
 
@@ -136,6 +183,7 @@ impl ScreeningPolicy {
         debt_limit_bps: BasisPoints,
         interest_bearing_cash_limit_bps: BasisPoints,
         impure_income_limit_bps: BasisPoints,
+        comparison: ThresholdComparison,
     ) -> Result<Self, ValidationError> {
         let name = standard_name.into();
         if name.trim().is_empty() {
@@ -150,7 +198,14 @@ impl ScreeningPolicy {
             debt_limit_bps,
             interest_bearing_cash_limit_bps,
             impure_income_limit_bps,
+            comparison,
         )
+    }
+
+    /// Builder method to override the threshold comparison operator.
+    pub fn with_comparison(mut self, comparison: ThresholdComparison) -> Self {
+        self.comparison = comparison;
+        self
     }
 
     /// Validates internal consistency of policy limits.

@@ -74,6 +74,46 @@ async fn test_step29_event_listener_ingestion_and_queuing() {
         .await
         .expect("Failed to seed vault for event");
 
+    let policy_repo = PolicyRepository::new(pool.clone());
+    let policy_model = PolicyModel {
+        policy_address: format!("S29Policy_{}", Uuid::new_v4().simple()),
+        vault_address: vault_pda.to_string(),
+        authority: vault_model.authority.clone(),
+        min_cash_bps: 1000,
+        max_position_bps: 3500,
+        stop_loss_bps: 600,
+        take_profit_bps: 2000,
+        rebalance_threshold_bps: 300,
+        is_active: true,
+        bump: 254,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+    policy_repo
+        .upsert(&policy_model)
+        .await
+        .expect("Failed to seed policy");
+
+    let portfolio_repo = PortfolioRepository::new(pool.clone());
+    let pos_model = PortfolioModel {
+        portfolio_id: Uuid::new_v4(),
+        vault_address: vault_pda.to_string(),
+        asset_symbol: "SOL".to_string(),
+        asset_mint: vault_model.deposit_mint.clone(),
+        amount: 50_000,
+        entry_price_usd: 140.0,
+        current_price_usd: 145.0,
+        current_value_usd: 7_250_000.0,
+        target_weight_bps: 10000,
+        current_weight_bps: 10000,
+        last_rebalanced_at: None,
+        updated_at: Utc::now(),
+    };
+    portfolio_repo
+        .upsert_position(&pos_model)
+        .await
+        .expect("Failed to seed portfolio");
+
     let deposit_event = DepositEvent {
         vault: vault_pda,
         user: user_pubkey,
@@ -397,14 +437,28 @@ async fn test_end_to_end_event_queue_to_policy_worker_flow() {
     .with_queue_key(&shared_queue);
 
     // 7. Worker polls queue and processes event end-to-end
-    let maybe_decision = worker
-        .poll_and_process_next()
-        .await
-        .expect("Worker poll and process failed");
+    let mut decision = None;
+    for _ in 0..10 {
+        if let Some(d) = worker
+            .poll_and_process_next()
+            .await
+            .expect("Worker poll and process failed")
+        {
+            if d.vault_address == vault_address {
+                decision = Some(d);
+                break;
+            }
+        } else {
+            break;
+        }
+    }
 
-    assert!(maybe_decision.is_some());
-    let decision = maybe_decision.unwrap();
-    assert_eq!(decision.vault_address, vault_address);
+    assert!(
+        decision.is_some(),
+        "Expected to process event for vault {}",
+        vault_address
+    );
+    let decision = decision.unwrap();
 
     // 8. Verify execution record in Postgres with status 'LOGGED'
     let exec = execution_repo

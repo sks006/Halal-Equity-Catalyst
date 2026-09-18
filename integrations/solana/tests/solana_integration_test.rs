@@ -115,7 +115,8 @@ fn test_asset_compliance_account_deserialization() {
     data.extend_from_slice(&ASSET_COMPLIANCE_ACCOUNT_DISCRIMINATOR);
     compliance.serialize(&mut data).unwrap();
 
-    let parsed = parse_asset_compliance(&data).expect("Failed to parse valid asset compliance account");
+    let parsed =
+        parse_asset_compliance(&data).expect("Failed to parse valid asset compliance account");
     assert_eq!(parsed.asset_mint, asset_mint);
     assert_eq!(parsed.status, 1);
     assert_eq!(parsed.valid_until, 1800000000);
@@ -275,6 +276,7 @@ fn test_instruction_builders_layout() {
     let (comp_ix, comp_pda) = client
         .build_set_asset_compliance_ix(
             &authority,
+            &v_pda,
             &asset_mint,
             1,
             [1u8; 32],
@@ -283,10 +285,11 @@ fn test_instruction_builders_layout() {
         )
         .unwrap();
     assert_eq!(&comp_ix.data[..8], &SET_ASSET_COMPLIANCE_DISCRIMINATOR);
-    assert_eq!(comp_ix.accounts.len(), 4);
+    assert_eq!(comp_ix.accounts.len(), 5);
     assert_eq!(comp_ix.accounts[0].pubkey, authority);
-    assert_eq!(comp_ix.accounts[1].pubkey, asset_mint);
-    assert_eq!(comp_ix.accounts[2].pubkey, comp_pda);
+    assert_eq!(comp_ix.accounts[1].pubkey, v_pda);
+    assert_eq!(comp_ix.accounts[2].pubkey, asset_mint);
+    assert_eq!(comp_ix.accounts[3].pubkey, comp_pda);
 
     // 7. Execute action
     let keeper = Keypair::new().pubkey();
