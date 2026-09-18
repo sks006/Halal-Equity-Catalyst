@@ -393,4 +393,6 @@ async fn test_quote_evaluate_http_endpoint() {
     assert_eq!(verdict.expected_amount_out, 290_000_000);
     assert_eq!(verdict.price_impact_bps, 2);
     assert!(verdict.is_dry_run);
+    assert_eq!(verdict.fee_breakdown.fee_calculation_version, "v1.0-deterministic");
+    assert!(verdict.fee_breakdown.total_fee > 0);
 }

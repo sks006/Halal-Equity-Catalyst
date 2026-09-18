@@ -94,6 +94,8 @@ pub struct LiquidityQuoteResponse {
     pub fee_amount: u64,
     pub current_price_usd: f64,
     pub effective_execution_price_usd: f64,
+    /// Fully transparent and deterministic fee disclosure
+    pub fee_breakdown: crate::fees::FeeBreakdown,
 }
 
 /// On-chain pool reserves and curve state summary.

@@ -456,6 +456,7 @@ impl SolanaService {
         action_type: u8,
         input_mint: &Pubkey,
         output_mint: &Pubkey,
+        compliance_pda: &Pubkey,
         input_amount: u64,
         min_output_amount: u64,
     ) -> Result<(Signature, Pubkey), ApiError> {
@@ -468,6 +469,7 @@ impl SolanaService {
                 action_type,
                 input_mint,
                 output_mint,
+                compliance_pda,
                 input_amount,
                 min_output_amount,
             )
@@ -477,6 +479,34 @@ impl SolanaService {
             .submit_transaction(&[ix], &keeper.pubkey(), &[keeper])
             .await?;
         Ok((sig, execution_pda))
+    }
+
+    /// Sets or updates Shariah compliance state for an asset on Solana
+    pub async fn set_asset_compliance(
+        &self,
+        authority: &Keypair,
+        asset_mint: &Pubkey,
+        status: u8,
+        policy_version: [u8; 32],
+        evidence_hash: [u8; 32],
+        valid_until: i64,
+    ) -> Result<(Signature, Pubkey), ApiError> {
+        let (ix, compliance_pda) = self
+            .anchor_client
+            .build_set_asset_compliance_ix(
+                &authority.pubkey(),
+                asset_mint,
+                status,
+                policy_version,
+                evidence_hash,
+                valid_until,
+            )
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+
+        let sig = self
+            .submit_transaction(&[ix], &authority.pubkey(), &[authority])
+            .await?;
+        Ok((sig, compliance_pda))
     }
 
     pub async fn borrow(

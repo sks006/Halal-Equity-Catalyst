@@ -497,4 +497,287 @@ describe("equity_vault - Milestones 1 & 2", () => {
       expect(user2Shares.shares.toNumber()).to.be.greaterThan(250_000);
     });
   });
+
+  describe("Phase 6: Shariah Compliance & Execution Boundary", () => {
+    let approvedAssetMint: PublicKey;
+    let pendingAssetMint: PublicKey;
+    let rejectedAssetMint: PublicKey;
+    let expiredAssetMint: PublicKey;
+    let mismatchedAssetMint: PublicKey;
+
+    let approvedCompliancePda: PublicKey;
+    let pendingCompliancePda: PublicKey;
+    let rejectedCompliancePda: PublicKey;
+    let expiredCompliancePda: PublicKey;
+    let mismatchedCompliancePda: PublicKey;
+
+    const policyVersion = Array.from(Buffer.alloc(32, 1));
+    const evidenceHash = Array.from(Buffer.alloc(32, 2));
+
+    function findCompliancePda(mint: PublicKey): PublicKey {
+      return PublicKey.findProgramAddressSync(
+        [Buffer.from("compliance"), mint.toBuffer()],
+        program.programId
+      )[0];
+    }
+
+    function findExecutionPda(vault: PublicKey, id: anchor.BN): PublicKey {
+      const buf = Buffer.alloc(8);
+      buf.writeBigUInt64LE(BigInt(id.toString()));
+      return PublicKey.findProgramAddressSync(
+        [Buffer.from("execution"), vault.toBuffer(), buf],
+        program.programId
+      )[0];
+    }
+
+    before(async () => {
+      // Create test equity mints
+      approvedAssetMint = await createMint(
+        provider.connection,
+        authority,
+        authority.publicKey,
+        null,
+        6
+      );
+      pendingAssetMint = await createMint(
+        provider.connection,
+        authority,
+        authority.publicKey,
+        null,
+        6
+      );
+      rejectedAssetMint = await createMint(
+        provider.connection,
+        authority,
+        authority.publicKey,
+        null,
+        6
+      );
+      expiredAssetMint = await createMint(
+        provider.connection,
+        authority,
+        authority.publicKey,
+        null,
+        6
+      );
+      mismatchedAssetMint = await createMint(
+        provider.connection,
+        authority,
+        authority.publicKey,
+        null,
+        6
+      );
+
+      approvedCompliancePda = findCompliancePda(approvedAssetMint);
+      pendingCompliancePda = findCompliancePda(pendingAssetMint);
+      rejectedCompliancePda = findCompliancePda(rejectedAssetMint);
+      expiredCompliancePda = findCompliancePda(expiredAssetMint);
+      mismatchedCompliancePda = findCompliancePda(mismatchedAssetMint);
+
+      const futureTimestamp = new anchor.BN(Math.floor(Date.now() / 1000) + 86400 * 30);
+      const pastTimestamp = new anchor.BN(Math.floor(Date.now() / 1000) - 86400);
+
+      // 1. Initialize Approved compliance
+      await program.methods
+        .setAssetCompliance(1, policyVersion, evidenceHash, futureTimestamp)
+        .accounts({
+          authority: authority.publicKey,
+          assetMint: approvedAssetMint,
+          compliance: approvedCompliancePda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+
+      // 2. Initialize Pending compliance
+      await program.methods
+        .setAssetCompliance(0, policyVersion, evidenceHash, futureTimestamp)
+        .accounts({
+          authority: authority.publicKey,
+          assetMint: pendingAssetMint,
+          compliance: pendingCompliancePda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+
+      // 3. Initialize Rejected compliance
+      await program.methods
+        .setAssetCompliance(2, policyVersion, evidenceHash, futureTimestamp)
+        .accounts({
+          authority: authority.publicKey,
+          assetMint: rejectedAssetMint,
+          compliance: rejectedCompliancePda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+
+      // 4. Initialize Expired compliance
+      await program.methods
+        .setAssetCompliance(1, policyVersion, evidenceHash, pastTimestamp)
+        .accounts({
+          authority: authority.publicKey,
+          assetMint: expiredAssetMint,
+          compliance: expiredCompliancePda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+
+      // 5. Initialize Mismatched compliance
+      await program.methods
+        .setAssetCompliance(1, policyVersion, evidenceHash, futureTimestamp)
+        .accounts({
+          authority: authority.publicKey,
+          assetMint: mismatchedAssetMint,
+          compliance: mismatchedCompliancePda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+    });
+
+    it("verifies compliance account state was initialized correctly", async () => {
+      const comp = await program.account.assetCompliance.fetch(approvedCompliancePda);
+      expect(comp.assetMint.toBase58()).to.equal(approvedAssetMint.toBase58());
+      expect(comp.status).to.equal(1);
+    });
+
+    it("allows execution for an Approved asset with valid review window", async () => {
+      const execId = new anchor.BN(2001);
+      const execPda = findExecutionPda(vaultPda, execId);
+
+      await program.methods
+        .executeAction(execId, 1, new anchor.BN(1_000_000), new anchor.BN(990_000))
+        .accounts({
+          keeper: authority.publicKey,
+          vault: vaultPda,
+          execution: execPda,
+          inputMint: assetMint,
+          outputMint: approvedAssetMint,
+          compliance: approvedCompliancePda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+
+      const execAccount = await program.account.execution.fetch(execPda);
+      expect(execAccount.status).to.equal(1); // Executed
+      expect(execAccount.actionType).to.equal(1); // Spot Swap
+      expect(execAccount.executionId.toString()).to.equal(execId.toString());
+      expect(execAccount.inputMint.toBase58()).to.equal(assetMint.toBase58());
+      expect(execAccount.outputMint.toBase58()).to.equal(approvedAssetMint.toBase58());
+    });
+
+    it("rejects execution when asset status is Pending", async () => {
+      const execId = new anchor.BN(2002);
+      const execPda = findExecutionPda(vaultPda, execId);
+
+      try {
+        await program.methods
+          .executeAction(execId, 1, new anchor.BN(1_000_000), new anchor.BN(990_000))
+          .accounts({
+            keeper: authority.publicKey,
+            vault: vaultPda,
+            execution: execPda,
+            inputMint: assetMint,
+            outputMint: pendingAssetMint,
+            compliance: pendingCompliancePda,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .rpc();
+        expect.fail("Expected failure on Pending asset");
+      } catch (err: any) {
+        expect(err.toString()).to.include("AssetNotApproved");
+      }
+    });
+
+    it("rejects execution when asset status is Rejected", async () => {
+      const execId = new anchor.BN(2003);
+      const execPda = findExecutionPda(vaultPda, execId);
+
+      try {
+        await program.methods
+          .executeAction(execId, 1, new anchor.BN(1_000_000), new anchor.BN(990_000))
+          .accounts({
+            keeper: authority.publicKey,
+            vault: vaultPda,
+            execution: execPda,
+            inputMint: assetMint,
+            outputMint: rejectedAssetMint,
+            compliance: rejectedCompliancePda,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .rpc();
+        expect.fail("Expected failure on Rejected asset");
+      } catch (err: any) {
+        expect(err.toString()).to.include("AssetNotApproved");
+      }
+    });
+
+    it("rejects execution when Shariah review timestamp has expired", async () => {
+      const execId = new anchor.BN(2004);
+      const execPda = findExecutionPda(vaultPda, execId);
+
+      try {
+        await program.methods
+          .executeAction(execId, 1, new anchor.BN(1_000_000), new anchor.BN(990_000))
+          .accounts({
+            keeper: authority.publicKey,
+            vault: vaultPda,
+            execution: execPda,
+            inputMint: assetMint,
+            outputMint: expiredAssetMint,
+            compliance: expiredCompliancePda,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .rpc();
+        expect.fail("Expected failure on expired review");
+      } catch (err: any) {
+        expect(err.toString()).to.include("ComplianceExpired");
+      }
+    });
+
+    it("rejects execution when compliance PDA does not match either input or output mint", async () => {
+      const execId = new anchor.BN(2005);
+      const execPda = findExecutionPda(vaultPda, execId);
+
+      try {
+        await program.methods
+          .executeAction(execId, 1, new anchor.BN(1_000_000), new anchor.BN(990_000))
+          .accounts({
+            keeper: authority.publicKey,
+            vault: vaultPda,
+            execution: execPda,
+            inputMint: assetMint,
+            outputMint: mismatchedAssetMint,
+            // Supply approvedCompliancePda (which points to approvedAssetMint, not mismatchedAssetMint)
+            compliance: approvedCompliancePda,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .rpc();
+        expect.fail("Expected failure on compliance mint mismatch");
+      } catch (err: any) {
+        expect(err.toString()).to.include("ComplianceMintMismatch");
+      }
+    });
+
+    it("rejects non-spot action types (e.g. leverage/borrowing opcode 2)", async () => {
+      const execId = new anchor.BN(2006);
+      const execPda = findExecutionPda(vaultPda, execId);
+
+      try {
+        await program.methods
+          .executeAction(execId, 2, new anchor.BN(1_000_000), new anchor.BN(990_000))
+          .accounts({
+            keeper: authority.publicKey,
+            vault: vaultPda,
+            execution: execPda,
+            inputMint: assetMint,
+            outputMint: approvedAssetMint,
+            compliance: approvedCompliancePda,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .rpc();
+        expect.fail("Expected failure on prohibited action type");
+      } catch (err: any) {
+        expect(err.toString()).to.include("ProhibitedLeverage");
+      }
+    });
+  });
 });

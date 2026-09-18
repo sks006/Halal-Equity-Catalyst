@@ -51,6 +51,18 @@ fn test_anchor_discriminators_match_idl() {
         EMERGENCY_EXIT_DISCRIMINATOR,
         compute_instruction_discriminator("emergency_exit")
     );
+    assert_eq!(
+        ASSET_COMPLIANCE_ACCOUNT_DISCRIMINATOR,
+        compute_account_discriminator("AssetCompliance")
+    );
+    assert_eq!(
+        SET_ASSET_COMPLIANCE_DISCRIMINATOR,
+        compute_instruction_discriminator("set_asset_compliance")
+    );
+    assert_eq!(
+        EXECUTE_ACTION_DISCRIMINATOR,
+        compute_instruction_discriminator("execute_action")
+    );
 }
 
 #[test]
@@ -81,6 +93,32 @@ fn test_pda_derivations() {
 
     let (exec_pda, _) = find_execution_pda(&vault_pda, 42, &program);
     assert_ne!(exec_pda, Pubkey::default());
+
+    let (compliance_pda, c_bump) = find_compliance_pda(&mint, &program);
+    assert_ne!(compliance_pda, Pubkey::default());
+    let _ = c_bump;
+}
+
+#[test]
+fn test_asset_compliance_account_deserialization() {
+    let asset_mint = Keypair::new().pubkey();
+    let compliance = AssetComplianceAccount {
+        asset_mint,
+        status: 1, // Approved
+        policy_version: [1u8; 32],
+        evidence_hash: [2u8; 32],
+        valid_until: 1800000000,
+        bump: 255,
+    };
+
+    let mut data = Vec::new();
+    data.extend_from_slice(&ASSET_COMPLIANCE_ACCOUNT_DISCRIMINATOR);
+    compliance.serialize(&mut data).unwrap();
+
+    let parsed = parse_asset_compliance(&data).expect("Failed to parse valid asset compliance account");
+    assert_eq!(parsed.asset_mint, asset_mint);
+    assert_eq!(parsed.status, 1);
+    assert_eq!(parsed.valid_until, 1800000000);
 }
 
 #[test]
@@ -232,6 +270,47 @@ fn test_instruction_builders_layout() {
         .unwrap();
     assert_eq!(&emg_ix.data[..8], &EMERGENCY_EXIT_DISCRIMINATOR);
     assert_eq!(emg_ix.accounts.len(), 2);
+
+    // 6. Set asset compliance
+    let (comp_ix, comp_pda) = client
+        .build_set_asset_compliance_ix(
+            &authority,
+            &asset_mint,
+            1,
+            [1u8; 32],
+            [2u8; 32],
+            1800000000,
+        )
+        .unwrap();
+    assert_eq!(&comp_ix.data[..8], &SET_ASSET_COMPLIANCE_DISCRIMINATOR);
+    assert_eq!(comp_ix.accounts.len(), 4);
+    assert_eq!(comp_ix.accounts[0].pubkey, authority);
+    assert_eq!(comp_ix.accounts[1].pubkey, asset_mint);
+    assert_eq!(comp_ix.accounts[2].pubkey, comp_pda);
+
+    // 7. Execute action
+    let keeper = Keypair::new().pubkey();
+    let (exec_ix, exec_pda) = client
+        .build_execute_action_ix(
+            &keeper,
+            &v_pda,
+            101,
+            1, // Spot Swap
+            &asset_mint,
+            &asset_mint,
+            &comp_pda,
+            1_000_000,
+            990_000,
+        )
+        .unwrap();
+    assert_eq!(&exec_ix.data[..8], &EXECUTE_ACTION_DISCRIMINATOR);
+    assert_eq!(exec_ix.accounts.len(), 7);
+    assert_eq!(exec_ix.accounts[0].pubkey, keeper);
+    assert_eq!(exec_ix.accounts[1].pubkey, v_pda);
+    assert_eq!(exec_ix.accounts[2].pubkey, exec_pda);
+    assert_eq!(exec_ix.accounts[3].pubkey, asset_mint);
+    assert_eq!(exec_ix.accounts[4].pubkey, asset_mint);
+    assert_eq!(exec_ix.accounts[5].pubkey, comp_pda);
 }
 
 #[tokio::test]

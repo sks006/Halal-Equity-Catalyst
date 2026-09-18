@@ -44,6 +44,8 @@ pub struct QuoteExecutionVerdict {
     pub evaluated_exposure_bps: Option<u16>,
     pub is_dry_run: bool,
     pub evaluated_at: DateTime<Utc>,
+    /// Transparent deterministic fee disclosure
+    pub fee_breakdown: equity_catalyst_shared::fees::FeeBreakdown,
 }
 
 /// Service implementing Step 33 quote-only execution.
@@ -241,6 +243,9 @@ impl QuoteExecutionService {
             );
         }
 
+        let fee_schedule = equity_catalyst_shared::fees::FeeSchedule::standard_v1();
+        let fee_breakdown = fee_schedule.calculate_fees(request.amount_in, 6, None);
+
         Ok(QuoteExecutionVerdict {
             execution_id,
             vault_address: request.vault_address.clone(),
@@ -256,6 +261,7 @@ impl QuoteExecutionService {
             evaluated_exposure_bps,
             is_dry_run: true,
             evaluated_at: Utc::now(),
+            fee_breakdown,
         })
     }
 }

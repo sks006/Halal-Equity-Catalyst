@@ -16,6 +16,8 @@ pub const DEPOSIT_DISCRIMINATOR: [u8; 8] = [242, 35, 198, 137, 82, 225, 242, 182
 pub const WITHDRAW_DISCRIMINATOR: [u8; 8] = [183, 18, 70, 156, 148, 109, 161, 34];
 pub const UPDATE_POLICY_DISCRIMINATOR: [u8; 8] = [212, 245, 246, 7, 163, 151, 18, 57];
 pub const EMERGENCY_EXIT_DISCRIMINATOR: [u8; 8] = [164, 174, 48, 163, 191, 65, 91, 245];
+pub const SET_ASSET_COMPLIANCE_DISCRIMINATOR: [u8; 8] = [41, 131, 99, 238, 155, 69, 159, 226];
+pub const EXECUTE_ACTION_DISCRIMINATOR: [u8; 8] = [246, 137, 105, 113, 247, 6, 223, 174];
 
 pub struct AnchorClient {
     rpc: Arc<SolanaRpcClient>,
@@ -127,6 +129,19 @@ impl AnchorClient {
             .await?
             .ok_or_else(|| SolanaError::AccountNotFound(token_account.to_string()))?;
         parse_spl_token(&info.data)
+    }
+
+    #[instrument(skip(self), fields(compliance_pda = %compliance_pda))]
+    pub async fn fetch_asset_compliance(
+        &self,
+        compliance_pda: &Pubkey,
+    ) -> Result<AssetComplianceAccount, SolanaError> {
+        let info = self
+            .rpc
+            .get_account_info(compliance_pda)
+            .await?
+            .ok_or_else(|| SolanaError::AccountNotFound(compliance_pda.to_string()))?;
+        parse_asset_compliance(&info.data)
     }
 
     // ==========================================
@@ -332,7 +347,50 @@ impl AnchorClient {
         })
     }
 
-    /// 6. Execute Action (rebalance, swap, keeper execution)
+    /// 6. Set Asset Shariah Compliance (on-chain gate configuration)
+    pub fn build_set_asset_compliance_ix(
+        &self,
+        authority: &Pubkey,
+        asset_mint: &Pubkey,
+        status: u8,
+        policy_version: [u8; 32],
+        evidence_hash: [u8; 32],
+        valid_until: i64,
+    ) -> Result<(Instruction, Pubkey), SolanaError> {
+        let (compliance_pda, _) = find_compliance_pda(asset_mint, &self.program_id);
+
+        let mut data = Vec::with_capacity(8 + 1 + 32 + 32 + 8);
+        data.extend_from_slice(&SET_ASSET_COMPLIANCE_DISCRIMINATOR);
+        status
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        policy_version
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        evidence_hash
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        valid_until
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+
+        let accounts = vec![
+            AccountMeta::new(*authority, true),
+            AccountMeta::new_readonly(*asset_mint, false),
+            AccountMeta::new(compliance_pda, false),
+            AccountMeta::new_readonly(system_program::id(), false),
+        ];
+
+        let ix = Instruction {
+            program_id: self.program_id,
+            accounts,
+            data,
+        };
+
+        Ok((ix, compliance_pda))
+    }
+
+    /// 7. Execute Action (rebalance, swap, keeper execution guarded by on-chain Shariah compliance)
     #[allow(clippy::too_many_arguments)]
     pub fn build_execute_action_ix(
         &self,
@@ -342,14 +400,17 @@ impl AnchorClient {
         action_type: u8,
         input_mint: &Pubkey,
         output_mint: &Pubkey,
+        compliance_pda: &Pubkey,
         input_amount: u64,
         min_output_amount: u64,
     ) -> Result<(Instruction, Pubkey), SolanaError> {
         let (execution_pda, _) = find_execution_pda(vault_pda, execution_id, &self.program_id);
-        let disc = compute_instruction_discriminator("execute_action");
 
-        let mut data = Vec::with_capacity(32);
-        data.extend_from_slice(&disc);
+        let mut data = Vec::with_capacity(41);
+        data.extend_from_slice(&EXECUTE_ACTION_DISCRIMINATOR);
+        execution_id
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
         action_type
             .serialize(&mut data)
             .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
@@ -361,11 +422,12 @@ impl AnchorClient {
             .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
 
         let accounts = vec![
-            AccountMeta::new_readonly(*keeper, true),
+            AccountMeta::new(*keeper, true),
             AccountMeta::new(*vault_pda, false),
             AccountMeta::new(execution_pda, false),
             AccountMeta::new_readonly(*input_mint, false),
             AccountMeta::new_readonly(*output_mint, false),
+            AccountMeta::new_readonly(*compliance_pda, false),
             AccountMeta::new_readonly(system_program::id(), false),
         ];
 

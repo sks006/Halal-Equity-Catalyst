@@ -34,4 +34,10 @@ pub enum VaultError {
     NameTooLong,
     #[msg("Vault symbol exceeds maximum allowed length")]
     SymbolTooLong,
+    #[msg("Asset Shariah compliance status is not Approved")]
+    AssetNotApproved,
+    #[msg("Asset Shariah review has expired")]
+    ComplianceExpired,
+    #[msg("Compliance PDA does not match the traded asset mint")]
+    ComplianceMintMismatch,
 }

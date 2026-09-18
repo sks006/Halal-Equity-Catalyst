@@ -224,8 +224,8 @@ fn test_risk_engine_approve_case() {
     let total_portfolio = 4_850_000;
     let available_cash = 1_208_760;
 
-    // Normal trade: Buy $242,500 NVDA (post trade = $1,038,580 = 21.41% <= 25.00% max position)
-    let trades = vec![RebalanceTrade {
+    // Normal BUY trade: Buy $242,500 NVDA (post trade = $1,038,580 = 21.41% <= 25.00% max position)
+    let buy_trades = vec![RebalanceTrade {
         symbol: "NVDA".to_string(),
         is_buy: true,
         current_value: 796_080,
@@ -234,15 +234,35 @@ fn test_risk_engine_approve_case() {
         drift_bps: BasisPoints(500),
     }];
 
-    let assessment = risk_engine.evaluate_proposed_trades(
-        &trades,
+    let assessment_buy = risk_engine.evaluate_proposed_trades(
+        &buy_trades,
         &positions,
         &policy,
         total_portfolio,
         available_cash,
     );
 
-    assert_eq!(assessment, RiskAssessment::Approved);
+    assert_eq!(assessment_buy, RiskAssessment::Approved);
+
+    // Normal SELL trade: Sell $200,000 NVDA out of $796,080 owned balance
+    let sell_trades = vec![RebalanceTrade {
+        symbol: "NVDA".to_string(),
+        is_buy: false,
+        current_value: 796_080,
+        target_value: 596_080,
+        trade_value: 200_000,
+        drift_bps: BasisPoints(412),
+    }];
+
+    let assessment_sell = risk_engine.evaluate_proposed_trades(
+        &sell_trades,
+        &positions,
+        &policy,
+        total_portfolio,
+        available_cash,
+    );
+
+    assert_eq!(assessment_sell, RiskAssessment::Approved);
 }
 
 #[test]
@@ -304,7 +324,7 @@ fn test_risk_engine_reject_cases() {
         _ => panic!("Expected rejection on trade limit"),
     }
 
-    // Case C: Cash Reserve Inadequacy Rejection (cash $100k < $242.5k trade + $485k min cash)
+    // Case C: Cash Reserve Inadequacy Rejection (cash $300k covers $242.5k trade but violates $485k min cash reserve)
     let normal_trades = vec![RebalanceTrade {
         symbol: "NVDA".to_string(),
         is_buy: true,
@@ -318,7 +338,7 @@ fn test_risk_engine_reject_cases() {
         &positions,
         &policy,
         total_portfolio,
-        100_000, // Insufficient cash
+        300_000, // Covers trade outlay ($242.5k) but leaves $57.5k which breaches $485k min reserve
     );
     match res_cash_with_trades {
         RiskAssessment::Rejected { reason } => {
@@ -359,6 +379,107 @@ fn test_risk_engine_reject_cases() {
             );
         }
         _ => panic!("Expected rejection on stop loss"),
+    }
+
+    // Case E: Spot Funding Rejection (settled cash $100k < $242.5k trade outlay)
+    let res_funding = risk_engine.evaluate_proposed_trades(
+        &normal_trades,
+        &positions,
+        &policy,
+        total_portfolio,
+        100_000,
+    );
+    match res_funding {
+        RiskAssessment::Rejected { reason } => {
+            assert!(
+                reason.contains("Spot funding check failed") && reason.contains("Insufficient settled cash"),
+                "Reason: {}",
+                reason
+            );
+        }
+        _ => panic!("Expected rejection on spot funding"),
+    }
+
+    // Case F: Spot Ownership Rejection: Zero-balance naked short sale of unheld asset (e.g. AAPL)
+    let naked_sell_trade = vec![RebalanceTrade {
+        symbol: "AAPL".to_string(),
+        is_buy: false,
+        current_value: 0,
+        target_value: 0,
+        trade_value: 50_000,
+        drift_bps: BasisPoints(100),
+    }];
+    let res_naked_sell = risk_engine.evaluate_proposed_trades(
+        &naked_sell_trade,
+        &positions,
+        &policy,
+        total_portfolio,
+        available_cash,
+    );
+    match res_naked_sell {
+        RiskAssessment::Rejected { reason } => {
+            assert!(
+                reason.contains("Spot ownership check failed for 'AAPL'"),
+                "Reason: {}",
+                reason
+            );
+        }
+        _ => panic!("Expected rejection on zero-balance naked sell"),
+    }
+
+    // Case G: Spot Ownership Rejection: Oversell exceeding available balance
+    // Vault holds $796,080 NVDA, trade attempts to sell $900,000
+    let oversell_trade = vec![RebalanceTrade {
+        symbol: "NVDA".to_string(),
+        is_buy: false,
+        current_value: 796_080,
+        target_value: 0,
+        trade_value: 900_000,
+        drift_bps: BasisPoints(1855),
+    }];
+    let res_oversell = risk_engine.evaluate_proposed_trades(
+        &oversell_trade,
+        &positions,
+        &policy,
+        total_portfolio,
+        available_cash,
+    );
+    match res_oversell {
+        RiskAssessment::Rejected { reason } => {
+            assert!(
+                reason.contains("Spot ownership check failed for 'NVDA'"),
+                "Reason: {}",
+                reason
+            );
+        }
+        _ => panic!("Expected rejection on oversell"),
+    }
+
+    // Case H: Spot Ownership Rejection: Zero quantity sell
+    let zero_qty_sell = vec![RebalanceTrade {
+        symbol: "NVDA".to_string(),
+        is_buy: false,
+        current_value: 796_080,
+        target_value: 796_080,
+        trade_value: 0,
+        drift_bps: BasisPoints(0),
+    }];
+    let res_zero_qty = risk_engine.evaluate_proposed_trades(
+        &zero_qty_sell,
+        &positions,
+        &policy,
+        total_portfolio,
+        available_cash,
+    );
+    match res_zero_qty {
+        RiskAssessment::Rejected { reason } => {
+            assert!(
+                reason.contains("Spot ownership check failed for 'NVDA'") && reason.contains("must be positive"),
+                "Reason: {}",
+                reason
+            );
+        }
+        _ => panic!("Expected rejection on zero quantity sell"),
     }
 }
 
@@ -433,6 +554,71 @@ fn test_decision_engine_reject_cases() {
         1_208_760,
     );
     assert!(matches!(inactive_err, Err(ApiError::BadRequest(msg)) if msg.contains("inactive")));
+
+    // Case 3: Spot funding rejection (zero settled cash available for buy)
+    let zero_cash_request = decision_engine
+        .process_event(&event, &active_vault, &policy, &positions, 4_850_000, 0)
+        .expect("Decision pipeline should return ExecutionRequest");
+    assert!(!zero_cash_request.approved);
+    assert!(
+        zero_cash_request.rationale.contains("Rejected by Risk Engine")
+            && zero_cash_request.rationale.contains("Spot funding check failed"),
+        "Rationale: {}",
+        zero_cash_request.rationale
+    );
+
+    // Case 4: Spot ownership rejection (ghost position with zero token amount)
+    let ghost_positions = vec![
+        PortfolioModel {
+            portfolio_id: Uuid::new_v4(),
+            vault_address: policy.vault_address.clone(),
+            asset_symbol: "NVDA".to_string(),
+            asset_mint: "Xnvda111111111111111111111111111111111111111".to_string(),
+            amount: 0, // Zero vault balance owned!
+            entry_price_usd: 118.5,
+            current_price_usd: 128.4,
+            current_value_usd: 796_080.0,
+            target_weight_bps: 1600,
+            current_weight_bps: 1641,
+            last_rebalanced_at: None,
+            updated_at: Utc::now(),
+        },
+        PortfolioModel {
+            portfolio_id: Uuid::new_v4(),
+            vault_address: policy.vault_address.clone(),
+            asset_symbol: "USDC".to_string(),
+            asset_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
+            amount: 4_053_920,
+            entry_price_usd: 1.0,
+            current_price_usd: 1.0,
+            current_value_usd: 4_053_920.0,
+            target_weight_bps: 8400,
+            current_weight_bps: 8359,
+            last_rebalanced_at: None,
+            updated_at: Utc::now(),
+        },
+    ];
+    let exit_event = EventModel {
+        event_id: Uuid::new_v4(),
+        vault_address: Some(policy.vault_address.clone()),
+        event_type: "REGULATORY_HALT".to_string(),
+        source: "sec_alert".to_string(),
+        sentiment_score: Some(-1.0),
+        payload: json!({ "scope": "all" }),
+        status: "PENDING".to_string(),
+        detected_at: Utc::now(),
+        processed_at: None,
+    };
+    let unowned_sell_request = decision_engine
+        .process_event(&exit_event, &active_vault, &policy, &ghost_positions, 4_850_000, 1_208_760)
+        .expect("Decision pipeline should return ExecutionRequest");
+    assert!(!unowned_sell_request.approved);
+    assert!(
+        unowned_sell_request.rationale.contains("Rejected by Risk Engine")
+            && unowned_sell_request.rationale.contains("Spot ownership check failed"),
+        "Rationale: {}",
+        unowned_sell_request.rationale
+    );
 }
 
 // =========================================================================
@@ -467,3 +653,63 @@ fn test_execution_quote_evaluation_approve_and_reject() {
         "Inactive policy should trigger rejection"
     );
 }
+
+// =========================================================================
+// 5. Decision Engine: ShariahGate Security Guardrails
+// =========================================================================
+
+#[test]
+fn test_decision_engine_shariah_gate_approval_and_rejections() {
+    let signer = ExecutionSigner::load_or_generate("~/.config/solana/id.json");
+    let mut decision_engine = DecisionEngine::new(signer);
+    let policy = create_sample_policy(true);
+    let positions = create_sample_positions();
+
+    let event = EventModel {
+        event_id: Uuid::new_v4(),
+        vault_address: Some(policy.vault_address.clone()),
+        event_type: "EARNINGS_BEAT".to_string(),
+        source: "bloomberg".to_string(),
+        sentiment_score: Some(0.85),
+        payload: json!({ "symbol": "NVDA" }),
+        status: "PENDING".to_string(),
+        detected_at: Utc::now(),
+        processed_at: None,
+    };
+    let vault = create_sample_vault(false);
+
+    // 1. Clean approved asset passes ShariahGate and Risk Engine
+    let req_approved = decision_engine
+        .process_event(&event, &vault, &policy, &positions, 4_850_000, 1_208_760)
+        .expect("Decision should process");
+    assert!(req_approved.approved);
+    assert!(req_approved.rationale.contains("Approved by Risk Engine"));
+
+    // 2. Revoked asset blocked by ShariahGate (AI reasoning cannot override)
+    decision_engine
+        .registry_mut()
+        .revoke_asset("backed:NVDAx")
+        .expect("Revoke succeeds");
+
+    let req_revoked = decision_engine
+        .process_event(&event, &vault, &policy, &positions, 4_850_000, 1_208_760)
+        .expect("Decision should process but be rejected");
+    assert!(!req_revoked.approved);
+    assert!(req_revoked.rationale.contains("Rejected by ShariahGate"));
+    assert!(req_revoked.rationale.contains("Revoked"));
+
+    // 3. Expired asset blocked by ShariahGate
+    let mut engine_expired = DecisionEngine::new(ExecutionSigner::load_or_generate("~/.config/solana/id.json"));
+    engine_expired
+        .registry_mut()
+        .expire_asset("backed:NVDAx")
+        .expect("Expire succeeds");
+
+    let req_expired = engine_expired
+        .process_event(&event, &vault, &policy, &positions, 4_850_000, 1_208_760)
+        .expect("Decision should process but be rejected");
+    assert!(!req_expired.approved);
+    assert!(req_expired.rationale.contains("Rejected by ShariahGate"));
+    assert!(req_expired.rationale.contains("Expired"));
+}
+

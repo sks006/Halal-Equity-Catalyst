@@ -6,6 +6,7 @@ use crate::asset::{
     verified_mainnet_assets, AssetProvider, AssetStatus, BACKED_AAPL_MINT, BACKED_NVDA_MINT,
     BACKED_SPYX_MINT, METEORA_AAPL_USDC_POOL, METEORA_NVDA_USDC_POOL, METEORA_SPYX_USDC_POOL,
 };
+use crate::shariah::ShariahStatus;
 
 /// External provider reference linking an asset to a specific platform or protocol.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -15,6 +16,22 @@ pub struct ProviderReference {
     pub underlying_symbol: String,
     pub description: String,
     pub status: AssetStatus,
+}
+
+/// Nature and authoritative status of an asset reference resolution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ResolutionKind {
+    /// Direct, exact match against a verified canonical asset in the primary registry.
+    Exact,
+    /// Authorized secondary reference explicitly registered on a verified canonical asset.
+    SecondaryReference,
+    /// Unofficial fallback mapping to underlying identity for lookup/pricing convenience only.
+    ///
+    /// # Safety Invariant
+    /// Fallback resolution NEVER grants provider authorization, ownership verification,
+    /// active listing approval, or Shariah eligibility. It always carries
+    /// `shariah_status = Pending`, `ownership_verified = false`, and `is_executable = false`.
+    FallbackIdentity,
 }
 
 /// Normalized asset representation resolved from one or more provider integrations.
@@ -28,7 +45,28 @@ pub struct ResolvedProviderAsset {
     pub source_id: String,
     pub price_feed_id: String,
     pub meteora_pool: Option<String>,
+    pub resolution_kind: ResolutionKind,
     pub is_fallback: bool,
+    pub shariah_status: ShariahStatus,
+    pub ownership_verified: bool,
+    pub is_executable: bool,
+}
+
+impl ResolvedProviderAsset {
+    /// Returns true if this resolved asset is fully verified and authorized for trade execution.
+    #[inline]
+    pub fn can_execute(&self) -> bool {
+        self.is_executable
+            && self.ownership_verified
+            && self.shariah_status.is_approved()
+            && self.resolution_kind != ResolutionKind::FallbackIdentity
+    }
+
+    /// Returns true if this resolution represents an authorized canonical or registered secondary provider reference.
+    #[inline]
+    pub fn is_authorized(&self) -> bool {
+        self.resolution_kind != ResolutionKind::FallbackIdentity
+    }
 }
 
 /// Provider resolver providing unified resolution and graceful on-chain fallback across external protocols.
@@ -49,10 +87,12 @@ impl ProviderResolver {
 
     /// Resolves any provider reference, ticker symbol, or token mint to its normalized domain asset.
     ///
-    /// Fallback Rule:
-    /// If an external provider reference (e.g. "prestocks:NVDA", "tessera:AAPL", "clawpump:SPYX")
-    /// is queried, this method maps it to the statutory tokenized equity mint on Solana,
-    /// backed by statutory certificates, canonical Pyth Hermes oracle price feeds, and verified Meteora DBC pools.
+    /// # Fallback Hardening Rules:
+    /// 1. Direct matches against verified mainnet assets are marked `ResolutionKind::Exact` with verified ownership.
+    /// 2. Registered secondary references are marked `ResolutionKind::SecondaryReference` with verified ownership.
+    /// 3. External provider prefixes without direct protocol authorization (e.g. "prestocks:NVDA", "clawpump:SPYX")
+    ///    resolve identity only (`ResolutionKind::FallbackIdentity`). They carry `shariah_status = Pending`,
+    ///    `ownership_verified = false`, and `is_executable = false`, barring them from execution.
     pub fn resolve(query: &str) -> Option<ResolvedProviderAsset> {
         let q = query.trim();
         if q.is_empty() {
@@ -75,7 +115,11 @@ impl ProviderResolver {
                     source_id: asset.id().to_string(),
                     price_feed_id: asset.price_feed_id().to_string(),
                     meteora_pool: asset.provider.meteora_pool.clone(),
+                    resolution_kind: ResolutionKind::Exact,
                     is_fallback: false,
+                    shariah_status: ShariahStatus::Approved,
+                    ownership_verified: true,
+                    is_executable: true,
                 });
             }
 
@@ -91,7 +135,11 @@ impl ProviderResolver {
                         source_id: sec.clone(),
                         price_feed_id: asset.price_feed_id().to_string(),
                         meteora_pool: asset.provider.meteora_pool.clone(),
+                        resolution_kind: ResolutionKind::SecondaryReference,
                         is_fallback: false,
+                        shariah_status: ShariahStatus::Approved,
+                        ownership_verified: true,
+                        is_executable: true,
                     });
                 }
             }
@@ -112,12 +160,28 @@ impl ProviderResolver {
             "backed" => Self::resolve_backed_reference(&symbol, target_symbol),
             _ => {
                 // Fallback attempt with normalized symbol
-                Self::resolve_fallback_canonical(target_symbol)
+                let canonical = Self::resolve_fallback_canonical(target_symbol)?;
+                Some(ResolvedProviderAsset {
+                    symbol: canonical.symbol,
+                    name: canonical.name,
+                    mint: canonical.mint,
+                    decimals: canonical.decimals,
+                    provider: canonical.provider,
+                    source_id: canonical.source_id,
+                    price_feed_id: canonical.price_feed_id,
+                    meteora_pool: canonical.meteora_pool,
+                    resolution_kind: ResolutionKind::FallbackIdentity,
+                    is_fallback: true,
+                    shariah_status: ShariahStatus::Pending,
+                    ownership_verified: false,
+                    is_executable: false,
+                })
             }
         }
     }
 
-    /// Resolves PreStocks pre-IPO equity references with on-chain statutory fallback.
+    /// Resolves PreStocks pre-IPO equity references with on-chain identity fallback.
+    /// Does NOT grant provider authorization, ownership verification, or execution approval.
     fn resolve_prestocks_reference(
         source_symbol: &str,
         base_symbol: &str,
@@ -132,11 +196,16 @@ impl ProviderResolver {
             source_id: format!("prestocks:{}", source_symbol),
             price_feed_id: canonical.price_feed_id,
             meteora_pool: canonical.meteora_pool,
+            resolution_kind: ResolutionKind::FallbackIdentity,
             is_fallback: true,
+            shariah_status: ShariahStatus::Pending,
+            ownership_verified: false,
+            is_executable: false,
         })
     }
 
-    /// Resolves Tessera fractionalized vault share references with on-chain statutory fallback.
+    /// Resolves Tessera fractionalized vault share references.
+    /// Unregistered secondary references fall back to identity only.
     fn resolve_tessera_reference(
         source_symbol: &str,
         base_symbol: &str,
@@ -151,11 +220,16 @@ impl ProviderResolver {
             source_id: format!("tessera:{}", source_symbol),
             price_feed_id: canonical.price_feed_id,
             meteora_pool: canonical.meteora_pool,
+            resolution_kind: ResolutionKind::FallbackIdentity,
             is_fallback: true,
+            shariah_status: ShariahStatus::Pending,
+            ownership_verified: false,
+            is_executable: false,
         })
     }
 
-    /// Resolves Clawpump bonding curve references with fair-value Pyth oracle anchoring.
+    /// Resolves Clawpump bonding curve references to underlying identity.
+    /// Does NOT grant provider authorization or execution approval.
     fn resolve_clawpump_reference(
         source_symbol: &str,
         base_symbol: &str,
@@ -170,7 +244,11 @@ impl ProviderResolver {
             source_id: format!("clawpump:{}", source_symbol),
             price_feed_id: canonical.price_feed_id,
             meteora_pool: canonical.meteora_pool,
+            resolution_kind: ResolutionKind::FallbackIdentity,
             is_fallback: true,
+            shariah_status: ShariahStatus::Pending,
+            ownership_verified: false,
+            is_executable: false,
         })
     }
 
@@ -189,7 +267,11 @@ impl ProviderResolver {
             source_id: format!("backed:{}", source_symbol),
             price_feed_id: canonical.price_feed_id,
             meteora_pool: canonical.meteora_pool,
+            resolution_kind: ResolutionKind::Exact,
             is_fallback: false,
+            shariah_status: ShariahStatus::Approved,
+            ownership_verified: true,
+            is_executable: true,
         })
     }
 
@@ -206,7 +288,11 @@ impl ProviderResolver {
                 price_feed_id: "3155e714652285e6834d8ef0b3558163f4585c5b9679f222956cf57fb3645391"
                     .to_string(),
                 meteora_pool: Some(METEORA_NVDA_USDC_POOL.to_string()),
+                resolution_kind: ResolutionKind::Exact,
                 is_fallback: false,
+                shariah_status: ShariahStatus::Approved,
+                ownership_verified: true,
+                is_executable: true,
             }),
             "AAPL" => Some(ResolvedProviderAsset {
                 symbol: "AAPL".to_string(),
@@ -218,7 +304,11 @@ impl ProviderResolver {
                 price_feed_id: "49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175ec697df854ab"
                     .to_string(),
                 meteora_pool: Some(METEORA_AAPL_USDC_POOL.to_string()),
+                resolution_kind: ResolutionKind::Exact,
                 is_fallback: false,
+                shariah_status: ShariahStatus::Approved,
+                ownership_verified: true,
+                is_executable: true,
             }),
             "SPY" | "SPYX" => Some(ResolvedProviderAsset {
                 symbol: "SPYx".to_string(),
@@ -230,7 +320,11 @@ impl ProviderResolver {
                 price_feed_id: "2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b"
                     .to_string(),
                 meteora_pool: Some(METEORA_SPYX_USDC_POOL.to_string()),
+                resolution_kind: ResolutionKind::Exact,
                 is_fallback: false,
+                shariah_status: ShariahStatus::Approved,
+                ownership_verified: true,
+                is_executable: true,
             }),
             _ => None,
         }
@@ -300,21 +394,39 @@ mod tests {
 
     #[test]
     fn test_resolve_prestocks_and_tessera_references() {
-        // PreStocks resolution
+        // PreStocks resolution - identity fallback only
         let prestocks_nvda =
             ProviderResolver::resolve("prestocks:NVDA").expect("Resolves PreStocks NVDA");
         assert_eq!(prestocks_nvda.symbol, "NVDA");
         assert_eq!(prestocks_nvda.mint, BACKED_NVDA_MINT);
         assert_eq!(prestocks_nvda.provider, AssetProvider::PreStocks);
         assert!(prestocks_nvda.is_fallback);
+        assert_eq!(
+            prestocks_nvda.resolution_kind,
+            ResolutionKind::FallbackIdentity
+        );
+        assert_eq!(prestocks_nvda.shariah_status, ShariahStatus::Pending);
+        assert!(!prestocks_nvda.ownership_verified);
+        assert!(!prestocks_nvda.is_executable);
+        assert!(!prestocks_nvda.can_execute());
+        assert!(!prestocks_nvda.is_authorized());
 
-        // Tessera registered secondary reference
+        // Tessera registered secondary reference - authorized on verified asset
         let tessera_aapl =
             ProviderResolver::resolve("tessera:AAPL").expect("Resolves Tessera AAPL");
         assert_eq!(tessera_aapl.symbol, "AAPL");
         assert_eq!(tessera_aapl.mint, BACKED_AAPL_MINT);
         assert_eq!(tessera_aapl.provider, AssetProvider::Tessera);
         assert!(!tessera_aapl.is_fallback); // Explicitly registered in canonical asset registry
+        assert_eq!(
+            tessera_aapl.resolution_kind,
+            ResolutionKind::SecondaryReference
+        );
+        assert_eq!(tessera_aapl.shariah_status, ShariahStatus::Approved);
+        assert!(tessera_aapl.ownership_verified);
+        assert!(tessera_aapl.is_executable);
+        assert!(tessera_aapl.can_execute());
+        assert!(tessera_aapl.is_authorized());
 
         // Tessera unmapped secondary reference fallback
         let tessera_spy = ProviderResolver::resolve("tessera:SPY").expect("Resolves Tessera SPY");
@@ -322,6 +434,10 @@ mod tests {
         assert_eq!(tessera_spy.mint, BACKED_SPYX_MINT);
         assert_eq!(tessera_spy.provider, AssetProvider::Tessera);
         assert!(tessera_spy.is_fallback);
+        assert_eq!(tessera_spy.resolution_kind, ResolutionKind::FallbackIdentity);
+        assert_eq!(tessera_spy.shariah_status, ShariahStatus::Pending);
+        assert!(!tessera_spy.ownership_verified);
+        assert!(!tessera_spy.can_execute());
 
         // Clawpump resolution
         let clawpump_spy =
@@ -330,6 +446,23 @@ mod tests {
         assert_eq!(clawpump_spy.mint, BACKED_SPYX_MINT);
         assert_eq!(clawpump_spy.provider, AssetProvider::Clawpump);
         assert!(clawpump_spy.is_fallback);
+        assert_eq!(clawpump_spy.resolution_kind, ResolutionKind::FallbackIdentity);
+        assert_eq!(clawpump_spy.shariah_status, ShariahStatus::Pending);
+        assert!(!clawpump_spy.ownership_verified);
+        assert!(!clawpump_spy.can_execute());
+    }
+
+    #[test]
+    fn test_fallback_cannot_execute_or_claim_shariah_eligibility() {
+        let fallback_asset =
+            ProviderResolver::resolve("prestocks:NVDA").expect("Resolves fallback");
+        assert_eq!(
+            fallback_asset.resolution_kind,
+            ResolutionKind::FallbackIdentity
+        );
+        assert_eq!(fallback_asset.shariah_status, ShariahStatus::Pending);
+        assert!(!fallback_asset.ownership_verified);
+        assert!(!fallback_asset.can_execute());
     }
 
     #[test]
@@ -339,11 +472,19 @@ mod tests {
         assert_eq!(direct_nvda.symbol, "NVDA");
         assert_eq!(direct_nvda.mint, BACKED_NVDA_MINT);
         assert_eq!(direct_nvda.decimals, 8);
+        assert_eq!(direct_nvda.resolution_kind, ResolutionKind::Exact);
+        assert_eq!(direct_nvda.shariah_status, ShariahStatus::Approved);
+        assert!(direct_nvda.ownership_verified);
+        assert!(direct_nvda.can_execute());
 
         // Direct mint lookup
         let mint_lookup = ProviderResolver::resolve(BACKED_AAPL_MINT).expect("Mint AAPL");
         assert_eq!(mint_lookup.symbol, "AAPL");
         assert_eq!(mint_lookup.mint, BACKED_AAPL_MINT);
+        assert_eq!(mint_lookup.resolution_kind, ResolutionKind::Exact);
+        assert_eq!(mint_lookup.shariah_status, ShariahStatus::Approved);
+        assert!(mint_lookup.ownership_verified);
+        assert!(mint_lookup.can_execute());
     }
 
     #[test]
