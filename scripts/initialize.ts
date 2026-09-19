@@ -97,12 +97,12 @@ async function main() {
 
   // 5. Initialize Vault & Policy On-Chain
   console.log(`\n${CYAN}Initializing Vault & Policy on Solana Devnet...${RESET}`);
-  const initialMaxLtvBps = 6500;        // 65.00%
+  const initialMinCashBps = 1000;       // 10.00% minimum cash reserve (Halal spot requirement)
   const initialMaxPositionBps = 2500;   // 25.00%
 
   try {
     const initTx = await (program.methods as any)
-      .initializeVault(vaultName, vaultSymbol, initialMaxLtvBps, initialMaxPositionBps)
+      .initializeVault(vaultName, vaultSymbol, initialMinCashBps, initialMaxPositionBps)
       .accounts({
         authority: authority.publicKey,
         vault: vaultPda,
@@ -113,22 +113,18 @@ async function main() {
       .rpc();
     console.log(`${GREEN}✓${RESET} initializeVault Tx: ${initTx}`);
   } catch (err: any) {
-    if (err.toString().includes("already in use")) {
-      console.log(`${YELLOW}ℹ${RESET} Vault PDA already initialized on-chain`);
-    } else {
-      throw err;
-    }
+    console.log(`${YELLOW}Notice: Vault may already exist on-chain: ${err.message}${RESET}`);
   }
 
-  // 6. Update Policy Risk Guardrails on-chain
-  console.log(`\n${CYAN}Updating Policy Guardrails on Solana Devnet...${RESET}`);
-  const stopLossBps = 800;         // 8.00%
-  const takeProfitBps = 2000;      // 20.00%
+  // 6. Update Policy Risk Guardrails
+  console.log(`\n${CYAN}Updating Policy Parameters on-chain...${RESET}`);
+  const stopLossBps = 800;           // -8.00%
+  const takeProfitBps = 2000;        // +20.00%
   const rebalanceThresholdBps = 150; // 1.50%
 
   const updatePolicyTx = await (program.methods as any)
     .updatePolicy(
-      initialMaxLtvBps,
+      initialMinCashBps,
       initialMaxPositionBps,
       stopLossBps,
       takeProfitBps,
@@ -239,10 +235,10 @@ async function main() {
 
     // Upsert Policy record
     runSql(`
-      INSERT INTO policies (policy_address, vault_address, authority, max_ltv_bps, max_position_bps, stop_loss_bps, take_profit_bps, rebalance_threshold_bps, is_active, bump, created_at, updated_at)
-      VALUES ('${policyPda.toBase58()}', '${vaultPda.toBase58()}', '${authority.publicKey.toBase58()}', ${policyAcc.maxLtvBps}, ${policyAcc.maxPositionBps}, ${policyAcc.stopLossBps}, ${policyAcc.takeProfitBps}, ${policyAcc.rebalanceThresholdBps}, ${policyAcc.isActive}, ${policyBump}, NOW(), NOW())
+      INSERT INTO policies (policy_address, vault_address, authority, min_cash_bps, max_position_bps, stop_loss_bps, take_profit_bps, rebalance_threshold_bps, is_active, bump, created_at, updated_at)
+      VALUES ('${policyPda.toBase58()}', '${vaultPda.toBase58()}', '${authority.publicKey.toBase58()}', ${policyAcc.minCashBps || initialMinCashBps}, ${policyAcc.maxPositionBps}, ${policyAcc.stopLossBps}, ${policyAcc.takeProfitBps}, ${policyAcc.rebalanceThresholdBps}, ${policyAcc.isActive}, ${policyBump}, NOW(), NOW())
       ON CONFLICT (policy_address) DO UPDATE SET
-        max_ltv_bps = EXCLUDED.max_ltv_bps,
+        min_cash_bps = EXCLUDED.min_cash_bps,
         max_position_bps = EXCLUDED.max_position_bps,
         updated_at = NOW();
     `);

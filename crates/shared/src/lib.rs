@@ -10,6 +10,7 @@ pub mod math;
 pub mod policy;
 pub mod portfolio;
 pub mod provider;
+pub mod redaction;
 pub mod risk;
 pub mod shariah;
 pub mod types;
@@ -25,6 +26,7 @@ pub use math::*;
 pub use policy::*;
 pub use portfolio::*;
 pub use provider::*;
+pub use redaction::*;
 pub use risk::*;
 pub use shariah::*;
 pub use types::*;
@@ -439,7 +441,10 @@ mod tests {
     fn test_risk_comprehensive() {
         // calculate_cash_reserve
         assert_eq!(calculate_cash_reserve(0, 100_000).unwrap(), BasisPoints(0));
-        assert_eq!(calculate_cash_reserve(15_000, 100_000).unwrap(), BasisPoints(1_500));
+        assert_eq!(
+            calculate_cash_reserve(15_000, 100_000).unwrap(),
+            BasisPoints(1_500)
+        );
         assert_eq!(calculate_cash_reserve(100, 0).unwrap(), BasisPoints(0)); // Zero portfolio
 
         // check_cash_reserve

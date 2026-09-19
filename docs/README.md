@@ -53,6 +53,32 @@ Detailed Shariah compliance documentation is located in [`docs/shariah-review/`]
 
 ---
 
+## Technical Research & Audit Reports
+
+Research reports and empirical verification studies located in [`docs/research/`](./research/):
+
+| Document | Title | Description | Status |
+|---|---|---|---|
+| [independent-audit-findings.md](./research/independent-audit-findings.md) | Independent Code Audit Findings | Static & architectural audit of 12 subsystems, 0 critical / 0 high vulnerabilities | Complete |
+| [benchmark-report.md](./research/benchmark-report.md) | Technical Benchmark & Performance Report | Empirical microsecond latency distributions across 11 stages ($N \ge 1,000$), ~864 µs median validation | Complete |
+| [security-validation.md](./research/security-validation.md) | Security Validation & Adversarial Matrix | 18-vector adversarial testing suite, deterministic rejection, zero signing invocations | Complete |
+| [system-limitations.md](./research/system-limitations.md) | System Limitations & Boundaries | Honest assessment of Solana slot latency, account write lock contention, and oracle confidence | Complete |
+| [equity-discovery-curve.md](./research/equity-discovery-curve.md) | Equity Discovery Curve (EDC) Design | 3-regime piecewise bonding curve formulation for tokenized equities on Meteora DBC | Complete |
+
+---
+
+## Capabilities & Submission Verification
+
+Submission verification and audit evidence located in [`docs/submission/`](./submission/):
+
+| Document | Title | Description | Status |
+|---|---|---|---|
+| [verification-matrix.md](./submission/verification-matrix.md) | Capabilities & Verification Matrix | Truthful capabilities matrix cross-referencing code, tests, Devnet, and Mainnet-beta state | Complete |
+| [security-summary.md](./submission/security-summary.md) | Security Summary & Invariants | Security invariants, signer quarantine, authentication guards, and defense-in-depth | Complete |
+| [database-audit.md](./submission/database-audit.md) | Database Schema & Migration Audit | PostgreSQL schema audit, migration integrity (001–009), foreign keys, indexes, and DLQ | Complete |
+
+---
+
 ## Implementation Status Legend
 
 Throughout this documentation, system elements and architectural modules are strictly annotated using the following taxonomy:

@@ -315,13 +315,17 @@ impl ExecutionEngineService {
                     .map(|p| p.amount)
                     .unwrap_or(0);
 
-                validate_spot_ownership(symbol, request.amount_in, available)
-                    .map_err(|e| format!("Spot ownership revalidation failed for '{}': {}", symbol, e))?;
+                validate_spot_ownership(symbol, request.amount_in, available).map_err(|e| {
+                    format!("Spot ownership revalidation failed for '{}': {}", symbol, e)
+                })?;
             } else {
                 // 7, 8. BUY amount is fully funded (100% equity funded, no margin, no debt)
                 let available_cash = positions
                     .iter()
-                    .find(|p| p.asset_symbol.eq_ignore_ascii_case("USDC") || p.asset_symbol.eq_ignore_ascii_case("CASH"))
+                    .find(|p| {
+                        p.asset_symbol.eq_ignore_ascii_case("USDC")
+                            || p.asset_symbol.eq_ignore_ascii_case("CASH")
+                    })
                     .map(|p| p.amount)
                     .unwrap_or(0);
 
@@ -368,7 +372,12 @@ impl ExecutionEngineService {
         // ==========================================
         if let Some(repo) = &self.execution_repo {
             if let Some(existing) = repo.find_by_id(execution_id).await? {
-                if existing.status == "confirmed" || existing.status == "submitted" {
+                if existing.status == "confirmed"
+                    || existing.status == "submitted"
+                    || existing.status == "requested"
+                    || existing.status == "simulated"
+                    || existing.status == "validated"
+                {
                     warn!(
                         execution_id = %execution_id,
                         status = %existing.status,
@@ -378,20 +387,44 @@ impl ExecutionEngineService {
                         execution_id,
                         vault_address: request.vault_address.clone(),
                         tx_signature: existing.tx_signature,
-                        status: existing.status,
+                        status: existing.status.clone(),
                         amount_out_actual: existing.amount_out_actual,
                         slippage_drift_bps: None,
                         simulation_success: true,
                         error_message: None,
-                        confirmed: true,
+                        confirmed: existing.status == "confirmed",
                     });
                 }
             }
         }
 
-        // Record initial status: "requested"
-        self.record_state(request, "requested", None, None, None)
-            .await?;
+        // Record initial status: "requested" (handles concurrent race where second request collides)
+        if let Err(e) = self
+            .record_state(request, "requested", None, None, None)
+            .await
+        {
+            if let Some(repo) = &self.execution_repo {
+                if let Ok(Some(existing)) = repo.find_by_id(execution_id).await {
+                    warn!(
+                        execution_id = %execution_id,
+                        status = %existing.status,
+                        "Concurrent duplicate execution request caught by database unique constraint"
+                    );
+                    return Ok(ExecutionOutcome {
+                        execution_id,
+                        vault_address: request.vault_address.clone(),
+                        tx_signature: existing.tx_signature,
+                        status: existing.status.clone(),
+                        amount_out_actual: existing.amount_out_actual,
+                        slippage_drift_bps: None,
+                        simulation_success: true,
+                        error_message: None,
+                        confirmed: existing.status == "confirmed",
+                    });
+                }
+            }
+            return Err(e);
+        }
 
         // ==========================================
         // 2. IMMEDIATE PRE-EXECUTION REVALIDATION
@@ -532,6 +565,33 @@ impl ExecutionEngineService {
         // ==========================================
         // 5. SIGNING & BROADCAST BOUNDARY
         // ==========================================
+        // Emergency Pause Recheck immediately before signing
+        if let Some(v_repo) = &self.vault_repo {
+            if let Some(vault) = v_repo.find_by_address(&request.vault_address).await? {
+                if vault.is_paused {
+                    let msg =
+                        "Pre-signing emergency validation failed: Vault was paused".to_string();
+                    warn!(execution_id = %execution_id, "Emergency stop: Vault paused before signing — aborting");
+                    self.record_state(request, "failed", None, None, Some(&msg))
+                        .await?;
+                    return Err(ApiError::BadRequest(msg));
+                }
+            }
+        }
+
+        if let Some(p_repo) = &self.policy_repo {
+            if let Some(policy) = p_repo.find_by_vault(&request.vault_address).await? {
+                if !policy.is_active {
+                    let msg = "Pre-signing emergency validation failed: Policy was deactivated"
+                        .to_string();
+                    warn!(execution_id = %execution_id, "Emergency stop: Policy deactivated before signing — aborting");
+                    self.record_state(request, "failed", None, None, Some(&msg))
+                        .await?;
+                    return Err(ApiError::BadRequest(msg));
+                }
+            }
+        }
+
         let (tx_sig, _) = self
             .solana_service
             .execute_action(
@@ -748,16 +808,12 @@ mod tests {
             None,
         ));
         let pyth_client = Arc::new(equity_catalyst_pyth::PythClient::new_mock());
-        pyth_client.set_mock_price(
-            "NVDA",
-            "12000000000",
-            "5000000",
-            -8,
-            Utc::now().timestamp(),
-        );
+        pyth_client.set_mock_price("NVDA", "12000000000", "5000000", -8, Utc::now().timestamp());
         let oracle_service = Arc::new(OracleService::new(pyth_client, None));
         let risk_engine = Arc::new(RiskEngine::new());
-        let signer = Arc::new(ExecutionSigner::load_or_generate("/tmp/test_exec_signer.json"));
+        let signer = Arc::new(ExecutionSigner::load_or_generate(
+            "/tmp/test_exec_signer.json",
+        ));
 
         ExecutionEngineService::new(
             solana_service,
@@ -782,7 +838,7 @@ mod tests {
             action_name: "REBALANCE_BUY_NVDA".to_string(),
             input_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
             output_mint: "Xnvda111111111111111111111111111111111111111".to_string(),
-            amount_in,        // 5 USDC
+            amount_in,                   // 5 USDC
             amount_out_expected: 40_000, // 0.04 NVDA
             min_amount_out: 39_600,
             slippage_bps: 100,
@@ -803,8 +859,8 @@ mod tests {
             action_name: "REBALANCE_SELL_NVDA".to_string(),
             input_mint: "Xnvda111111111111111111111111111111111111111".to_string(),
             output_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
-            amount_in,               // 500 NVDA tokens
-            amount_out_expected: 60_000,  // 60k USDC
+            amount_in,                   // 500 NVDA tokens
+            amount_out_expected: 60_000, // 60k USDC
             min_amount_out: 59_400,
             slippage_bps: 100,
             target_symbol: "NVDA".to_string(),
@@ -822,7 +878,10 @@ mod tests {
         assert!(service.revalidate_shariah_and_spot(&req, now).await.is_ok());
 
         // Revoke NVDA status right before execution
-        service.registry_mut().revoke_asset("NVDA").expect("Asset exists");
+        service
+            .registry_mut()
+            .revoke_asset("NVDA")
+            .expect("Asset exists");
 
         let result = service.revalidate_shariah_and_spot(&req, now).await;
         assert!(result.is_err());
@@ -844,7 +903,12 @@ mod tests {
         assert!(service.revalidate_shariah_and_spot(&req, now).await.is_ok());
 
         // Fast-forward past expiry or expire the asset review
-        service.registry_mut().get_asset_mut("NVDA").unwrap().eligibility.expires_at = now - 10;
+        service
+            .registry_mut()
+            .get_asset_mut("NVDA")
+            .unwrap()
+            .eligibility
+            .expires_at = now - 10;
 
         let result = service.revalidate_shariah_and_spot(&req, now).await;
         assert!(result.is_err());
@@ -866,7 +930,12 @@ mod tests {
         assert!(service.revalidate_shariah_and_spot(&req, now).await.is_ok());
 
         // Revoke custodial ownership verification right before execution
-        service.registry_mut().get_asset_mut("NVDA").unwrap().eligibility.ownership_verified = false;
+        service
+            .registry_mut()
+            .get_asset_mut("NVDA")
+            .unwrap()
+            .eligibility
+            .ownership_verified = false;
 
         let result = service.revalidate_shariah_and_spot(&req, now).await;
         assert!(result.is_err());
@@ -884,74 +953,79 @@ mod tests {
         let now = 1_750_000_000;
 
         // 1. Unowned sell (zero balance): Vault owns 0 NVDA
-        let empty_positions = vec![
-            PortfolioModel {
-                portfolio_id: Uuid::new_v4(),
-                vault_address: req_sell.vault_address.clone(),
-                asset_symbol: "USDC".to_string(),
-                asset_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
-                amount: 1_000_000,
-                entry_price_usd: 1.0,
-                current_price_usd: 1.0,
-                current_value_usd: 1_000_000.0,
-                target_weight_bps: 10_000,
-                current_weight_bps: 10_000,
-                last_rebalanced_at: None,
-                updated_at: Utc::now(),
-            }
-        ];
+        let empty_positions = vec![PortfolioModel {
+            portfolio_id: Uuid::new_v4(),
+            vault_address: req_sell.vault_address.clone(),
+            asset_symbol: "USDC".to_string(),
+            asset_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
+            amount: 1_000_000,
+            entry_price_usd: 1.0,
+            current_price_usd: 1.0,
+            current_value_usd: 1_000_000.0,
+            target_weight_bps: 10_000,
+            current_weight_bps: 10_000,
+            last_rebalanced_at: None,
+            updated_at: Utc::now(),
+        }];
         let service_empty = create_test_execution_service().with_positions(empty_positions);
-        let res_naked = service_empty.revalidate_shariah_and_spot(&req_sell, now).await;
+        let res_naked = service_empty
+            .revalidate_shariah_and_spot(&req_sell, now)
+            .await;
         assert!(res_naked.is_err());
         assert!(
-            res_naked.unwrap_err().contains("Spot ownership revalidation failed"),
+            res_naked
+                .unwrap_err()
+                .contains("Spot ownership revalidation failed"),
             "Expected naked short sell rejection"
         );
 
         // 2. Oversell: Vault owns 200 NVDA, but request sells 500 NVDA
-        let partial_positions = vec![
-            PortfolioModel {
-                portfolio_id: Uuid::new_v4(),
-                vault_address: req_sell.vault_address.clone(),
-                asset_symbol: "NVDA".to_string(),
-                asset_mint: req_sell.input_mint.clone(),
-                amount: 200, // holds 200 < 500 requested
-                entry_price_usd: 100.0,
-                current_price_usd: 120.0,
-                current_value_usd: 24_000.0,
-                target_weight_bps: 5000,
-                current_weight_bps: 5000,
-                last_rebalanced_at: None,
-                updated_at: Utc::now(),
-            }
-        ];
+        let partial_positions = vec![PortfolioModel {
+            portfolio_id: Uuid::new_v4(),
+            vault_address: req_sell.vault_address.clone(),
+            asset_symbol: "NVDA".to_string(),
+            asset_mint: req_sell.input_mint.clone(),
+            amount: 200, // holds 200 < 500 requested
+            entry_price_usd: 100.0,
+            current_price_usd: 120.0,
+            current_value_usd: 24_000.0,
+            target_weight_bps: 5000,
+            current_weight_bps: 5000,
+            last_rebalanced_at: None,
+            updated_at: Utc::now(),
+        }];
         let service_partial = create_test_execution_service().with_positions(partial_positions);
-        let res_oversell = service_partial.revalidate_shariah_and_spot(&req_sell, now).await;
+        let res_oversell = service_partial
+            .revalidate_shariah_and_spot(&req_sell, now)
+            .await;
         assert!(res_oversell.is_err());
         assert!(
-            res_oversell.unwrap_err().contains("Spot ownership revalidation failed"),
+            res_oversell
+                .unwrap_err()
+                .contains("Spot ownership revalidation failed"),
             "Expected oversell rejection"
         );
 
         // 3. Valid owned sell: Vault owns 1,000 NVDA, request sells 500 NVDA
-        let full_positions = vec![
-            PortfolioModel {
-                portfolio_id: Uuid::new_v4(),
-                vault_address: req_sell.vault_address.clone(),
-                asset_symbol: "NVDA".to_string(),
-                asset_mint: req_sell.input_mint.clone(),
-                amount: 1_000, // holds 1000 >= 500 requested
-                entry_price_usd: 100.0,
-                current_price_usd: 120.0,
-                current_value_usd: 120_000.0,
-                target_weight_bps: 5000,
-                current_weight_bps: 5000,
-                last_rebalanced_at: None,
-                updated_at: Utc::now(),
-            }
-        ];
+        let full_positions = vec![PortfolioModel {
+            portfolio_id: Uuid::new_v4(),
+            vault_address: req_sell.vault_address.clone(),
+            asset_symbol: "NVDA".to_string(),
+            asset_mint: req_sell.input_mint.clone(),
+            amount: 1_000, // holds 1000 >= 500 requested
+            entry_price_usd: 100.0,
+            current_price_usd: 120.0,
+            current_value_usd: 120_000.0,
+            target_weight_bps: 5000,
+            current_weight_bps: 5000,
+            last_rebalanced_at: None,
+            updated_at: Utc::now(),
+        }];
         let service_full = create_test_execution_service().with_positions(full_positions);
-        assert!(service_full.revalidate_shariah_and_spot(&req_sell, now).await.is_ok());
+        assert!(service_full
+            .revalidate_shariah_and_spot(&req_sell, now)
+            .await
+            .is_ok());
     }
 
     #[tokio::test]
@@ -960,49 +1034,52 @@ mod tests {
         let now = 1_750_000_000;
 
         // Insufficient cash: Vault only has 2_000_000 raw USDC
-        let broke_positions = vec![
-            PortfolioModel {
-                portfolio_id: Uuid::new_v4(),
-                vault_address: req_buy.vault_address.clone(),
-                asset_symbol: "USDC".to_string(),
-                asset_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
-                amount: 2_000_000, // only 2 USDC
-                entry_price_usd: 1.0,
-                current_price_usd: 1.0,
-                current_value_usd: 2.0,
-                target_weight_bps: 10_000,
-                current_weight_bps: 10_000,
-                last_rebalanced_at: None,
-                updated_at: Utc::now(),
-            }
-        ];
+        let broke_positions = vec![PortfolioModel {
+            portfolio_id: Uuid::new_v4(),
+            vault_address: req_buy.vault_address.clone(),
+            asset_symbol: "USDC".to_string(),
+            asset_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
+            amount: 2_000_000, // only 2 USDC
+            entry_price_usd: 1.0,
+            current_price_usd: 1.0,
+            current_value_usd: 2.0,
+            target_weight_bps: 10_000,
+            current_weight_bps: 10_000,
+            last_rebalanced_at: None,
+            updated_at: Utc::now(),
+        }];
         let service_broke = create_test_execution_service().with_positions(broke_positions);
-        let res_unfunded = service_broke.revalidate_shariah_and_spot(&req_buy, now).await;
+        let res_unfunded = service_broke
+            .revalidate_shariah_and_spot(&req_buy, now)
+            .await;
         assert!(res_unfunded.is_err());
         assert!(
-            res_unfunded.unwrap_err().contains("Spot funding revalidation failed"),
+            res_unfunded
+                .unwrap_err()
+                .contains("Spot funding revalidation failed"),
             "Expected unfunded buy rejection"
         );
 
         // Fully funded: Vault has 10_000_000 raw USDC
-        let funded_positions = vec![
-            PortfolioModel {
-                portfolio_id: Uuid::new_v4(),
-                vault_address: req_buy.vault_address.clone(),
-                asset_symbol: "USDC".to_string(),
-                asset_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
-                amount: 10_000_000, // 10 USDC >= 5 USDC
-                entry_price_usd: 1.0,
-                current_price_usd: 1.0,
-                current_value_usd: 10.0,
-                target_weight_bps: 10_000,
-                current_weight_bps: 10_000,
-                last_rebalanced_at: None,
-                updated_at: Utc::now(),
-            }
-        ];
+        let funded_positions = vec![PortfolioModel {
+            portfolio_id: Uuid::new_v4(),
+            vault_address: req_buy.vault_address.clone(),
+            asset_symbol: "USDC".to_string(),
+            asset_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
+            amount: 10_000_000, // 10 USDC >= 5 USDC
+            entry_price_usd: 1.0,
+            current_price_usd: 1.0,
+            current_value_usd: 10.0,
+            target_weight_bps: 10_000,
+            current_weight_bps: 10_000,
+            last_rebalanced_at: None,
+            updated_at: Utc::now(),
+        }];
         let service_funded = create_test_execution_service().with_positions(funded_positions);
-        assert!(service_funded.revalidate_shariah_and_spot(&req_buy, now).await.is_ok());
+        assert!(service_funded
+            .revalidate_shariah_and_spot(&req_buy, now)
+            .await
+            .is_ok());
     }
 
     #[tokio::test]
@@ -1027,9 +1104,13 @@ mod tests {
         // Prohibited action opcode (e.g. 5)
         let mut bad_opcode_req = sample_nvda_buy_request();
         bad_opcode_req.action_type = 5;
-        let res_opcode = service.revalidate_shariah_and_spot(&bad_opcode_req, now).await;
+        let res_opcode = service
+            .revalidate_shariah_and_spot(&bad_opcode_req, now)
+            .await;
         assert!(res_opcode.is_err());
-        assert!(res_opcode.unwrap_err().contains("Invalid non-spot action opcode"));
+        assert!(res_opcode
+            .unwrap_err()
+            .contains("Invalid non-spot action opcode"));
     }
 
     #[tokio::test]
@@ -1039,7 +1120,10 @@ mod tests {
         let keeper_keypair = Keypair::new();
 
         // Asset was Approved, but revoked right before execution
-        service.registry_mut().revoke_asset("NVDA").expect("Asset exists");
+        service
+            .registry_mut()
+            .revoke_asset("NVDA")
+            .expect("Asset exists");
 
         let result = service.execute_transaction(&req, &keeper_keypair).await;
         assert!(result.is_err());
@@ -1064,7 +1148,12 @@ mod tests {
         let keeper_keypair = Keypair::new();
 
         // Expire the asset review right before execution
-        service.registry_mut().get_asset_mut("NVDA").unwrap().eligibility.expires_at = 1_000_000;
+        service
+            .registry_mut()
+            .get_asset_mut("NVDA")
+            .unwrap()
+            .eligibility
+            .expires_at = 1_000_000;
 
         let result = service.execute_transaction(&req, &keeper_keypair).await;
         assert!(result.is_err());
@@ -1088,7 +1177,12 @@ mod tests {
         let keeper_keypair = Keypair::new();
 
         // Revoke custodial ownership verification right before execution
-        service.registry_mut().get_asset_mut("NVDA").unwrap().eligibility.ownership_verified = false;
+        service
+            .registry_mut()
+            .get_asset_mut("NVDA")
+            .unwrap()
+            .eligibility
+            .ownership_verified = false;
 
         let result = service.execute_transaction(&req, &keeper_keypair).await;
         assert!(result.is_err());

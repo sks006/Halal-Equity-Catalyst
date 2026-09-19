@@ -153,7 +153,11 @@ pub fn validate_spot_funding(
     leverage_multiple: f64,
     borrowed_amount_usd: u64,
 ) -> Result<(), ValidationError> {
-    if leverage_multiple.is_nan() || leverage_multiple > 1.0 || leverage_multiple < 0.0 || borrowed_amount_usd > 0 {
+    if leverage_multiple.is_nan()
+        || leverage_multiple > 1.0
+        || leverage_multiple < 0.0
+        || borrowed_amount_usd > 0
+    {
         return Err(ValidationError::ProhibitedLeverageOrShort);
     }
 
@@ -181,15 +185,24 @@ mod tests {
 
         // Reject zero-balance sell (naked short sale)
         let zero_bal_err = validate_spot_ownership("NVDA", 10, 0);
-        assert_eq!(zero_bal_err, Err(ValidationError::ProhibitedLeverageOrShort));
+        assert_eq!(
+            zero_bal_err,
+            Err(ValidationError::ProhibitedLeverageOrShort)
+        );
 
         // Reject partial sell exceeding available balance (oversell)
         let oversell_err = validate_spot_ownership("NVDA", 150, 100);
-        assert_eq!(oversell_err, Err(ValidationError::ProhibitedLeverageOrShort));
+        assert_eq!(
+            oversell_err,
+            Err(ValidationError::ProhibitedLeverageOrShort)
+        );
 
         // Reject zero quantity
         let zero_qty_err = validate_spot_ownership("NVDA", 0, 100);
-        assert!(matches!(zero_qty_err, Err(ValidationError::InvalidParam(_))));
+        assert!(matches!(
+            zero_qty_err,
+            Err(ValidationError::InvalidParam(_))
+        ));
 
         // Reject empty symbol
         let empty_sym_err = validate_spot_ownership("", 50, 100);
@@ -204,7 +217,10 @@ mod tests {
 
         // Reject leverage > 1.0 (margin loan)
         let leverage_err = validate_spot_funding(5_000, 10_000, 1.5, 0);
-        assert_eq!(leverage_err, Err(ValidationError::ProhibitedLeverageOrShort));
+        assert_eq!(
+            leverage_err,
+            Err(ValidationError::ProhibitedLeverageOrShort)
+        );
 
         // Reject negative leverage or NaN
         assert_eq!(
@@ -218,11 +234,13 @@ mod tests {
 
         // Reject borrowed funds > 0 (debt-financed buy)
         let borrowed_err = validate_spot_funding(5_000, 10_000, 1.0, 1_000);
-        assert_eq!(borrowed_err, Err(ValidationError::ProhibitedLeverageOrShort));
+        assert_eq!(
+            borrowed_err,
+            Err(ValidationError::ProhibitedLeverageOrShort)
+        );
 
         // Reject insufficient settled cash
         let cash_err = validate_spot_funding(15_000, 10_000, 1.0, 0);
         assert!(matches!(cash_err, Err(ValidationError::InvalidParam(_))));
     }
 }
-

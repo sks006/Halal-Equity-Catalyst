@@ -335,7 +335,14 @@ fn test_decision_engine_end_to_end_pipeline() {
     let total_value = 500_000;
     let available_cash = 380_000;
     let request = decision_engine
-        .process_event(&event, &vault, &policy, &positions, total_value, available_cash)
+        .process_event(
+            &event,
+            &vault,
+            &policy,
+            &positions,
+            total_value,
+            available_cash,
+        )
         .expect("Decision pipeline failed");
 
     assert!(request.approved);

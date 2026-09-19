@@ -260,6 +260,9 @@
           "signer": true
         },
         {
+          "name": "vault"
+        },
+        {
           "name": "asset_mint"
         },
         {

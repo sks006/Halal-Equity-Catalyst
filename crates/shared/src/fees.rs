@@ -119,8 +119,7 @@ impl FeeSchedule {
         decimals: u8,
         sol_price_usd: Option<f64>,
     ) -> FeeBreakdown {
-        let pool_fee =
-            ((amount_in as u128 * self.pool_fee_bps as u128 + 5_000) / 10_000) as u64;
+        let pool_fee = ((amount_in as u128 * self.pool_fee_bps as u128 + 5_000) / 10_000) as u64;
         let platform_fee =
             ((amount_in as u128 * self.platform_fee_bps as u128 + 5_000) / 10_000) as u64;
         let total_fee = pool_fee.saturating_add(platform_fee);
@@ -129,8 +128,8 @@ impl FeeSchedule {
         let scale = 10f64.powi(decimals as i32);
         let pool_fee_usd = (pool_fee as f64) / scale;
         let platform_fee_usd = (platform_fee as f64) / scale;
-        let network_fee_usd = sol_price_usd
-            .map(|price| (network_fee as f64 / 1_000_000_000.0) * price);
+        let network_fee_usd =
+            sol_price_usd.map(|price| (network_fee as f64 / 1_000_000_000.0) * price);
         let total_fee_usd = pool_fee_usd + platform_fee_usd + network_fee_usd.unwrap_or(0.0);
 
         FeeBreakdown {
@@ -194,9 +193,10 @@ impl FeeSchedule {
         }
 
         // Bounded network fee drift check
-        let max_drift = max_network_fee_drift_lamports
-            .unwrap_or(DEFAULT_MAX_NETWORK_FEE_DRIFT_LAMPORTS);
-        let drift = (quoted.network_fee as i64 - self.estimated_network_fee_lamports as i64).abs() as u64;
+        let max_drift =
+            max_network_fee_drift_lamports.unwrap_or(DEFAULT_MAX_NETWORK_FEE_DRIFT_LAMPORTS);
+        let drift =
+            (quoted.network_fee as i64 - self.estimated_network_fee_lamports as i64).unsigned_abs();
         if drift > max_drift {
             return Err(FeeValidationError::ExcessiveNetworkFeeDrift {
                 quoted: quoted.network_fee,

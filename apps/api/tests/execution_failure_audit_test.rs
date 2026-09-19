@@ -162,6 +162,7 @@ async fn test_duplicate_request_idempotency_gate() {
         amount_out_expected: 950_000,
         slippage_bps: 100,
         target_symbol: "NVDA".to_string(),
+        fee_breakdown: None,
     };
 
     let keeper_keypair = Keypair::new();

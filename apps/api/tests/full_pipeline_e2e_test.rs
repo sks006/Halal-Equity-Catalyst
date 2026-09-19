@@ -113,6 +113,7 @@ async fn test_full_pipeline_end_to_end_flow() {
             Request::builder()
                 .method("POST")
                 .uri("/vaults")
+                .header("x-admin-key", "catalyst-admin-secret-dev")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(frontend_vault_payload.to_string()))
                 .unwrap(),
@@ -153,6 +154,7 @@ async fn test_full_pipeline_end_to_end_flow() {
             Request::builder()
                 .method("POST")
                 .uri("/policies")
+                .header("x-admin-key", "catalyst-admin-secret-dev")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(frontend_policy_payload.to_string()))
                 .unwrap(),

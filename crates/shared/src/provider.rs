@@ -434,7 +434,10 @@ mod tests {
         assert_eq!(tessera_spy.mint, BACKED_SPYX_MINT);
         assert_eq!(tessera_spy.provider, AssetProvider::Tessera);
         assert!(tessera_spy.is_fallback);
-        assert_eq!(tessera_spy.resolution_kind, ResolutionKind::FallbackIdentity);
+        assert_eq!(
+            tessera_spy.resolution_kind,
+            ResolutionKind::FallbackIdentity
+        );
         assert_eq!(tessera_spy.shariah_status, ShariahStatus::Pending);
         assert!(!tessera_spy.ownership_verified);
         assert!(!tessera_spy.can_execute());
@@ -446,7 +449,10 @@ mod tests {
         assert_eq!(clawpump_spy.mint, BACKED_SPYX_MINT);
         assert_eq!(clawpump_spy.provider, AssetProvider::Clawpump);
         assert!(clawpump_spy.is_fallback);
-        assert_eq!(clawpump_spy.resolution_kind, ResolutionKind::FallbackIdentity);
+        assert_eq!(
+            clawpump_spy.resolution_kind,
+            ResolutionKind::FallbackIdentity
+        );
         assert_eq!(clawpump_spy.shariah_status, ShariahStatus::Pending);
         assert!(!clawpump_spy.ownership_verified);
         assert!(!clawpump_spy.can_execute());

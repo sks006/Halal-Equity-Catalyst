@@ -186,16 +186,33 @@ impl SolanaRpcClient {
                 let status = resp.status();
                 if !status.is_success() {
                     let err_msg = format!("HTTP error: {}", status);
-                    warn!(
-                        endpoint = %endpoint,
-                        status = %status,
-                        "Solana RPC HTTP non-success status, attempting next endpoint"
-                    );
-                    last_error = Some(crate::SolanaError::RpcError {
-                        code: status.as_u16() as i64,
-                        message: format!("[{}] {}", endpoint, err_msg),
-                    });
-                    continue;
+                    let is_transient_http = status == reqwest::StatusCode::TOO_MANY_REQUESTS
+                        || status == reqwest::StatusCode::SERVICE_UNAVAILABLE
+                        || status == reqwest::StatusCode::BAD_GATEWAY
+                        || status == reqwest::StatusCode::GATEWAY_TIMEOUT
+                        || status == reqwest::StatusCode::INTERNAL_SERVER_ERROR;
+
+                    if is_transient_http {
+                        warn!(
+                            endpoint = %endpoint,
+                            status = %status,
+                            "Transient Solana RPC HTTP status (429/5xx), attempting retry"
+                        );
+                        last_error = Some(crate::SolanaError::RpcError {
+                            code: status.as_u16() as i64,
+                            message: format!("[{}] {}", endpoint, err_msg),
+                        });
+                        continue;
+                    } else {
+                        // Non-transient client error (400, 401, 403, 404): fail immediately
+                        return Err(crate::SolanaError::RpcError {
+                            code: status.as_u16() as i64,
+                            message: format!(
+                                "[{}] Permanent HTTP client error: {}",
+                                endpoint, err_msg
+                            ),
+                        });
+                    }
                 }
 
                 let json_resp: Value = match resp.json().await {

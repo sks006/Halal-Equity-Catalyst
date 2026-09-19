@@ -150,10 +150,13 @@ async function runDemoReplay() {
   const projectedNvdaExposureBps = Math.round(
     (postTradeNvdaValue / totalVaultValueUsd) * 10000
   );
+  const remainingCashBps = Math.round(
+    ((currentUsdc.current_value_usd - tradeBudgetUsd) / totalVaultValueUsd) * 10000
+  );
 
   const exposurePassed = projectedNvdaExposureBps <= samplePolicy.max_position_bps;
   const limitPassed = weightDeltaBps <= 1000;
-  const ltvPassed = 0 <= samplePolicy.max_ltv_bps;
+  const minCashPassed = remainingCashBps >= (samplePolicy.min_cash_bps || 1000);
   const stopsPassed = true;
 
   console.log(`   ${BOLD}Checking Defense Guardrails:${RESET}`);
@@ -164,7 +167,7 @@ async function runDemoReplay() {
     `     2. ${BOLD}Trade Drift Limit:${RESET}         ${weightDeltaBps / 100}% <= 10.00% max  ${GREEN}[PASSED ✓]${RESET}`
   );
   console.log(
-    `     3. ${BOLD}Vault LTV / Debt Limit:${RESET}    0.00% <= ${samplePolicy.max_ltv_bps / 100}% max   ${GREEN}[PASSED ✓]${RESET}`
+    `     3. ${BOLD}Minimum Cash Reserve:${RESET}    ${(remainingCashBps / 100).toFixed(2)}% >= ${((samplePolicy.min_cash_bps || 1000) / 100).toFixed(2)}% min   ${GREEN}[PASSED ✓]${RESET}`
   );
   console.log(
     `     4. ${BOLD}Stop-Loss & Drawdown:${RESET}      Unrealized +8.35% > -${samplePolicy.stop_loss_bps / 100}% stop  ${GREEN}[PASSED ✓]${RESET}`
@@ -217,8 +220,8 @@ async function runDemoReplay() {
 
   console.log(`   ${BOLD}Anchor Instruction:${RESET}           ${MAGENTA}execute_action${RESET} (action_type: 1)`);
   console.log(`   ${BOLD}Execution PDA Derived:${RESET}        ${execStage.pda_execution}`);
-  console.log(`   ${BOLD}Solana Cluster:${RESET}               ${CYAN}${execStage.solana_cluster.toUpperCase()}${RESET}`);
-  console.log(`   ${BOLD}Transaction Signature:${RESET}        ${GREEN}${execStage.tx_signature}${RESET}`);
+  console.log(`   ${BOLD}Solana Cluster:${RESET}               ${CYAN}${execStage.solana_cluster.toUpperCase()} (Simulated Demo Fixture)${RESET}`);
+  console.log(`   ${BOLD}Transaction Signature:${RESET}        ${GREEN}${execStage.tx_signature}${RESET} ${DIM}[Simulated Fixture]${RESET}`);
   console.log(`   ${BOLD}Confirmation Latency:${RESET}         ${BOLD}${execStage.block_time_ms} ms${RESET} (Finalized)`);
   console.log(`   ${BOLD}Post-Execution State:${RESET}`);
   console.log(`     • New NVDA Position:        ${(currentNvda.amount + jupStage.expected_tokens_out).toFixed(2)} shares`);

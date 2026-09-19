@@ -2,10 +2,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::types::BasisPoints;
-use crate::validation::ValidationError;
 use super::policy::ScreeningPolicy;
 use super::types::{ShariahRejectionReason, ShariahStatus};
+use crate::types::BasisPoints;
+use crate::validation::ValidationError;
 
 /// Financial and qualitative evaluation inputs submitted to screen an asset against a policy.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -103,9 +103,15 @@ pub fn evaluate_shariah_compliance(
         });
 
         if !has_substantive_failure {
-            if reasons.iter().any(|r| matches!(r, ShariahRejectionReason::MissingEvidence)) {
+            if reasons
+                .iter()
+                .any(|r| matches!(r, ShariahRejectionReason::MissingEvidence))
+            {
                 (ShariahStatus::Pending, reasons)
-            } else if reasons.iter().any(|r| matches!(r, ShariahRejectionReason::ReviewExpired)) {
+            } else if reasons
+                .iter()
+                .any(|r| matches!(r, ShariahRejectionReason::ReviewExpired))
+            {
                 (ShariahStatus::Expired, reasons)
             } else {
                 (ShariahStatus::Rejected, reasons)

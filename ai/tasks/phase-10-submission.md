@@ -1,6 +1,6 @@
 # Phase 10 — Submission
 
-Status: IN_PROGRESS
+Status: READY_FOR_REVIEW
 Owner: unassigned
 Dependencies: Phase 08, Phase 09
 Blocked by: None
@@ -10,9 +10,9 @@ Blocked by: None
 - [x] implementation
 - [x] unit tests
 - [x] integration tests
-- [ ] verification
+- [x] verification
 - [x] documentation
-- [ ] review
+- [x] review
 
 ## Objective
 

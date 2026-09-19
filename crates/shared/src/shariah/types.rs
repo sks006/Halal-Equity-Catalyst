@@ -138,11 +138,25 @@ impl fmt::Display for ShariahRejectionReason {
         match self {
             Self::ProhibitedBusiness => write!(f, "Prohibited core business activity"),
             Self::ExcessDebt => write!(f, "Interest-bearing debt exceeds policy threshold"),
-            Self::ExcessInterestBearingCash => write!(f, "Interest-bearing cash and deposits exceed policy threshold"),
-            Self::ExcessImpureIncome => write!(f, "Impermissible impure income exceeds policy threshold"),
-            Self::OwnershipUnverified => write!(f, "Underlying beneficial ownership or custodial isolation unverified"),
-            Self::SyntheticExposure => write!(f, "Synthetic or derivative exposure without underlying spot backing"),
-            Self::MissingEvidence => write!(f, "Missing evidence or insufficient audited financial disclosures"),
+            Self::ExcessInterestBearingCash => write!(
+                f,
+                "Interest-bearing cash and deposits exceed policy threshold"
+            ),
+            Self::ExcessImpureIncome => {
+                write!(f, "Impermissible impure income exceeds policy threshold")
+            }
+            Self::OwnershipUnverified => write!(
+                f,
+                "Underlying beneficial ownership or custodial isolation unverified"
+            ),
+            Self::SyntheticExposure => write!(
+                f,
+                "Synthetic or derivative exposure without underlying spot backing"
+            ),
+            Self::MissingEvidence => write!(
+                f,
+                "Missing evidence or insufficient audited financial disclosures"
+            ),
             Self::ReviewExpired => write!(f, "Periodic screening review has expired"),
             Self::Other(msg) => write!(f, "Other rejection reason: {}", msg),
         }

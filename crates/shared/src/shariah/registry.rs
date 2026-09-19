@@ -17,7 +17,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
 
-use crate::asset::{Asset, AssetStatus};
 use super::eligibility::ShariahEligibility;
 use super::ownership::{validate_ownership, OwnershipRecord};
 use super::policy::ScreeningPolicy;
@@ -25,6 +24,7 @@ use super::screening::{
     screen_business_activity, screen_financial_metrics, BusinessCategory, ShariahFinancialMetrics,
 };
 use super::types::{ShariahRejectionReason, ShariahStatus};
+use crate::asset::{Asset, AssetStatus};
 
 /// Registry errors returned during asset admission or trade authorization.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -129,13 +129,19 @@ pub fn register_asset_at(
 
     // 1. Asset identity validation
     if symbol.trim().is_empty() {
-        return Err(RegistryError::InvalidAsset("asset symbol cannot be empty".to_string()));
+        return Err(RegistryError::InvalidAsset(
+            "asset symbol cannot be empty".to_string(),
+        ));
     }
     if asset.id().trim().is_empty() {
-        return Err(RegistryError::InvalidAsset("asset_id cannot be empty".to_string()));
+        return Err(RegistryError::InvalidAsset(
+            "asset_id cannot be empty".to_string(),
+        ));
     }
     if asset.mint().trim().is_empty() {
-        return Err(RegistryError::InvalidAsset("token mint cannot be empty".to_string()));
+        return Err(RegistryError::InvalidAsset(
+            "token mint cannot be empty".to_string(),
+        ));
     }
 
     // 2. Ownership record structural validation
@@ -162,18 +168,12 @@ pub fn register_asset_at(
 
     // 5. Qualitative business sector filter
     if let Err(reason) = screen_business_activity(&business) {
-        return Err(RegistryError::ShariahRejected {
-            symbol,
-            reason,
-        });
+        return Err(RegistryError::ShariahRejected { symbol, reason });
     }
 
     // 6. Quantitative financial screening benchmarks
     if let Err(reason) = screen_financial_metrics(&financials, policy) {
-        return Err(RegistryError::ShariahRejected {
-            symbol,
-            reason,
-        });
+        return Err(RegistryError::ShariahRejected { symbol, reason });
     }
 
     // Construct confirmed ShariahEligibility record

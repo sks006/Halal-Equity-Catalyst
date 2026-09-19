@@ -482,9 +482,11 @@ impl SolanaService {
     }
 
     /// Sets or updates Shariah compliance state for an asset on Solana
+    #[allow(clippy::too_many_arguments)]
     pub async fn set_asset_compliance(
         &self,
         authority: &Keypair,
+        vault_pda: &Pubkey,
         asset_mint: &Pubkey,
         status: u8,
         policy_version: [u8; 32],
@@ -495,6 +497,7 @@ impl SolanaService {
             .anchor_client
             .build_set_asset_compliance_ix(
                 &authority.pubkey(),
+                vault_pda,
                 asset_mint,
                 status,
                 policy_version,

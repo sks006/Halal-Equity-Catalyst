@@ -75,6 +75,7 @@ async fn test_api_post_and_get_vaults() {
             Request::builder()
                 .method("POST")
                 .uri("/vaults")
+                .header("x-admin-key", "catalyst-admin-secret-dev")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(vault_payload.to_string()))
                 .unwrap(),
@@ -136,6 +137,7 @@ async fn test_api_post_and_get_policies() {
             Request::builder()
                 .method("POST")
                 .uri("/vaults")
+                .header("x-admin-key", "catalyst-admin-secret-dev")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(
                     json!({
@@ -182,6 +184,7 @@ async fn test_api_post_and_get_policies() {
             Request::builder()
                 .method("POST")
                 .uri("/policies")
+                .header("x-admin-key", "catalyst-admin-secret-dev")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(policy_payload.to_string()))
                 .unwrap(),
@@ -238,6 +241,7 @@ async fn test_api_post_and_get_events() {
             Request::builder()
                 .method("POST")
                 .uri("/vaults")
+                .header("x-admin-key", "catalyst-admin-secret-dev")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(
                     json!({
@@ -250,6 +254,36 @@ async fn test_api_post_and_get_events() {
                         "total_shares": 100000,
                         "total_deposits": 100000,
                         "is_paused": false,
+                        "bump": 255,
+                        "created_at": Utc::now().to_rfc3339(),
+                        "updated_at": Utc::now().to_rfc3339(),
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let policy_address = format!("pol_{}", Uuid::new_v4().simple());
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/policies")
+                .header("x-admin-key", "catalyst-admin-secret-dev")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    json!({
+                        "policy_address": policy_address,
+                        "vault_address": vault_address,
+                        "authority": Keypair::new().pubkey().to_string(),
+                        "min_cash_bps": 1000,
+                        "max_position_bps": 2500,
+                        "stop_loss_bps": 800,
+                        "take_profit_bps": 2000,
+                        "rebalance_threshold_bps": 150,
+                        "is_active": true,
                         "bump": 255,
                         "created_at": Utc::now().to_rfc3339(),
                         "updated_at": Utc::now().to_rfc3339(),
@@ -281,6 +315,7 @@ async fn test_api_post_and_get_events() {
             Request::builder()
                 .method("POST")
                 .uri("/events")
+                .header("x-admin-key", "catalyst-admin-secret-dev")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(event_payload.to_string()))
                 .unwrap(),
@@ -340,6 +375,7 @@ async fn test_api_get_executions() {
             Request::builder()
                 .method("POST")
                 .uri("/vaults")
+                .header("x-admin-key", "catalyst-admin-secret-dev")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(
                     json!({
@@ -443,6 +479,7 @@ async fn test_api_post_dbc_configure() {
             Request::builder()
                 .method("POST")
                 .uri("/dbc/configure")
+                .header("x-admin-key", "catalyst-admin-secret-dev")
                 .header(header::CONTENT_TYPE, "application/json")
                 .body(Body::from(serde_json::to_vec(&request_payload).unwrap()))
                 .unwrap(),

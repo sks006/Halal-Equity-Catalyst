@@ -12,9 +12,9 @@ use crate::{
     error::ApiError,
     models::{EventModel, ExecutionModel},
     repositories::{
-        event_repository::EventRepository, execution_repository::ExecutionRepository,
-        policy_repository::PolicyRepository, portfolio_repository::PortfolioRepository,
-        vault_repository::VaultRepository,
+        dead_letter_repository::DeadLetterRepository, event_repository::EventRepository,
+        execution_repository::ExecutionRepository, policy_repository::PolicyRepository,
+        portfolio_repository::PortfolioRepository, vault_repository::VaultRepository,
     },
     workers::event_listener::DEFAULT_EVENTS_QUEUE,
 };
@@ -27,6 +27,7 @@ pub struct PolicyWorker {
     portfolio_repo: PortfolioRepository,
     event_repo: EventRepository,
     execution_repo: ExecutionRepository,
+    dead_letter_repo: Option<DeadLetterRepository>,
     redis_client: Option<redis::Client>,
     queue_key: String,
 }
@@ -48,9 +49,15 @@ impl PolicyWorker {
             portfolio_repo,
             event_repo,
             execution_repo,
+            dead_letter_repo: None,
             redis_client,
             queue_key: DEFAULT_EVENTS_QUEUE.to_string(),
         }
+    }
+
+    pub fn with_dead_letter_repo(mut self, repo: DeadLetterRepository) -> Self {
+        self.dead_letter_repo = Some(repo);
+        self
     }
 
     pub fn with_queue_key(mut self, key: &str) -> Self {
@@ -204,10 +211,34 @@ impl PolicyWorker {
 
         // 2. Fallback: Query pending events from PostgreSQL
         let pending = self.event_repo.find_pending().await?;
-        if let Some(event) = pending.first() {
+        for event in &pending {
             debug!(event_id = %event.event_id, "Fetched pending event from PostgreSQL queue");
-            let decision = self.process_single_event(event).await?;
-            return Ok(Some(decision));
+            match self.process_single_event(event).await {
+                Ok(decision) => return Ok(Some(decision)),
+                Err(err) => {
+                    warn!(
+                        event_id = %event.event_id,
+                        error = %err,
+                        "Failed to process pending event — marking as REJECTED to prevent queue stall"
+                    );
+                    let _ = self
+                        .event_repo
+                        .update_status(event.event_id, "REJECTED", Some(Utc::now()))
+                        .await;
+
+                    if let Some(ref dl_repo) = self.dead_letter_repo {
+                        let _ = dl_repo
+                            .record_failure(
+                                Some(event.event_id),
+                                &err.to_string(),
+                                &event.payload,
+                                1,
+                            )
+                            .await;
+                    }
+                    continue;
+                }
+            }
         }
 
         Ok(None)

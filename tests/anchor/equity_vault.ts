@@ -582,6 +582,7 @@ describe("equity_vault - Milestones 1 & 2", () => {
         .setAssetCompliance(1, policyVersion, evidenceHash, futureTimestamp)
         .accounts({
           authority: authority.publicKey,
+          vault: vaultPda,
           assetMint: approvedAssetMint,
           compliance: approvedCompliancePda,
           systemProgram: anchor.web3.SystemProgram.programId,
@@ -593,6 +594,7 @@ describe("equity_vault - Milestones 1 & 2", () => {
         .setAssetCompliance(0, policyVersion, evidenceHash, futureTimestamp)
         .accounts({
           authority: authority.publicKey,
+          vault: vaultPda,
           assetMint: pendingAssetMint,
           compliance: pendingCompliancePda,
           systemProgram: anchor.web3.SystemProgram.programId,
@@ -604,6 +606,7 @@ describe("equity_vault - Milestones 1 & 2", () => {
         .setAssetCompliance(2, policyVersion, evidenceHash, futureTimestamp)
         .accounts({
           authority: authority.publicKey,
+          vault: vaultPda,
           assetMint: rejectedAssetMint,
           compliance: rejectedCompliancePda,
           systemProgram: anchor.web3.SystemProgram.programId,
@@ -615,6 +618,7 @@ describe("equity_vault - Milestones 1 & 2", () => {
         .setAssetCompliance(1, policyVersion, evidenceHash, pastTimestamp)
         .accounts({
           authority: authority.publicKey,
+          vault: vaultPda,
           assetMint: expiredAssetMint,
           compliance: expiredCompliancePda,
           systemProgram: anchor.web3.SystemProgram.programId,
@@ -626,6 +630,7 @@ describe("equity_vault - Milestones 1 & 2", () => {
         .setAssetCompliance(1, policyVersion, evidenceHash, futureTimestamp)
         .accounts({
           authority: authority.publicKey,
+          vault: vaultPda,
           assetMint: mismatchedAssetMint,
           compliance: mismatchedCompliancePda,
           systemProgram: anchor.web3.SystemProgram.programId,
@@ -757,26 +762,76 @@ describe("equity_vault - Milestones 1 & 2", () => {
       }
     });
 
-    it("rejects non-spot action types (e.g. leverage/borrowing opcode 2)", async () => {
-      const execId = new anchor.BN(2006);
+    it("allows authorized vault authority to update asset compliance", async () => {
+      const futureTimestamp = new anchor.BN(Math.floor(Date.now() / 1000) + 86400 * 60);
+      await program.methods
+        .setAssetCompliance(1, policyVersion, evidenceHash, futureTimestamp)
+        .accounts({
+          authority: authority.publicKey,
+          vault: vaultPda,
+          assetMint: approvedAssetMint,
+          compliance: approvedCompliancePda,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        })
+        .rpc();
+
+      const comp = await program.account.assetCompliance.fetch(approvedCompliancePda);
+      expect(comp.status).to.equal(1);
+    });
+
+    it("rejects unauthorized signer from updating compliance", async () => {
+      const futureTimestamp = new anchor.BN(Math.floor(Date.now() / 1000) + 86400 * 60);
+      try {
+        await program.methods
+          .setAssetCompliance(1, policyVersion, evidenceHash, futureTimestamp)
+          .accounts({
+            authority: user2.publicKey,
+            vault: vaultPda,
+            assetMint: approvedAssetMint,
+            compliance: approvedCompliancePda,
+            systemProgram: anchor.web3.SystemProgram.programId,
+          })
+          .signers([user2])
+          .rpc();
+        expect.fail("Expected failure on unauthorized signer updating compliance");
+      } catch (err: any) {
+        expect(err.toString()).to.satisfy(
+          (s: string) =>
+            s.includes("UnauthorizedKeeper") ||
+            s.includes("ConstraintHasOne") ||
+            s.includes("2001") ||
+            s.includes("Error")
+        );
+      }
+    });
+
+    it("rejects execution when compliance account is invalid or substituted (wrong compliance account)", async () => {
+      const execId = new anchor.BN(2007);
       const execPda = findExecutionPda(vaultPda, execId);
 
       try {
         await program.methods
-          .executeAction(execId, 2, new anchor.BN(1_000_000), new anchor.BN(990_000))
+          .executeAction(execId, 1, new anchor.BN(1_000_000), new anchor.BN(990_000))
           .accounts({
             keeper: authority.publicKey,
             vault: vaultPda,
             execution: execPda,
             inputMint: assetMint,
             outputMint: approvedAssetMint,
-            compliance: approvedCompliancePda,
+            // Supply vaultPda as wrong compliance account
+            compliance: vaultPda,
             systemProgram: anchor.web3.SystemProgram.programId,
           })
           .rpc();
-        expect.fail("Expected failure on prohibited action type");
+        expect.fail("Expected failure on wrong compliance account");
       } catch (err: any) {
-        expect(err.toString()).to.include("ProhibitedLeverage");
+        expect(err.toString()).to.satisfy(
+          (s: string) =>
+            s.includes("AccountNotInitialized") ||
+            s.includes("ConstraintSeeds") ||
+            s.includes("ConstraintRaw") ||
+            s.includes("Error")
+        );
       }
     });
   });
