@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  transpilePackages: ["@equity-catalyst/sdk"],
+  transpilePackages: ["@equity-catalyst/sdk", "sdk"],
   webpack: (config) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,

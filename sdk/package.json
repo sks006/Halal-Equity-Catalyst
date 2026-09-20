@@ -12,9 +12,9 @@
     "@coral-xyz/anchor": "^0.30.1",
     "@meteora-ag/dynamic-bonding-curve-sdk": "^1.5.12",
     "@pythnetwork/pyth-lazer-sdk": "^7.0.0",
-    "@solana/spl-token": "^0.4.8",
-    "@solana/web3.js": "^1.95.3",
-    "bn.js": "^5.2.1"
+    "@solana/spl-token": "^0.4.15",
+    "@solana/web3.js": "^1.99.0",
+    "bn.js": "^5.2.5"
   },
   "devDependencies": {
     "@types/bn.js": "^5.1.5",
