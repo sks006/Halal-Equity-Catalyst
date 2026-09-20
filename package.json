@@ -3,7 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "license": "Apache-2.0",
+  "workspaces": [
+    "apps/*",
+    "sdk"
+  ],
   "scripts": {
+    "build": "npm run build --workspace=apps/web",
+    "build:sdk": "npm run build --workspace=sdk",
+    "build:web": "npm run build --workspace=apps/web",
     "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
     "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
   },
