@@ -5,7 +5,7 @@ pub mod signer;
 pub mod validation;
 
 pub use decision::{ExecutionRequest, TradeOrder};
-pub use signer::ExecutionSigner;
+pub use signer::{CanonicalExecutionPayload, ExecutionSigner};
 pub use validation::validate_decision_preflight;
 
 use chrono::Utc;
