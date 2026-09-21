@@ -1,23 +1,71 @@
 //! Isolated execution signer managing on-chain dispatch credentials securely.
 
-use solana_sdk::signature::SeedDerivable;
-use std::{fs, path::Path};
+use serde::{Deserialize, Serialize};
+use solana_sdk::{
+    hash::hash,
+    pubkey::Pubkey,
+    signature::{Keypair, SeedDerivable, Signature},
+    signer::Signer,
+};
+use std::{fs, path::Path, sync::Arc};
 use tracing::{info, warn};
 use uuid::Uuid;
+
+/// Canonical execution payload representing strictly the deterministic parameters of a financial trade.
+/// AI proposals (sentiment, natural language reasoning, prompt instructions) are quarantined
+/// and excluded from this payload.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct CanonicalExecutionPayload {
+    pub execution_id: Uuid,
+    pub vault_address: String,
+    pub action_type: u8,
+    pub input_mint: String,
+    pub output_mint: String,
+    pub amount_in: u64,
+    pub min_amount_out: u64,
+    pub execution_seq: u64,
+    pub timestamp: i64,
+}
+
+impl CanonicalExecutionPayload {
+    /// Domain separation prefix to prevent cross-protocol signature replay attacks.
+    pub const DOMAIN_SEPARATOR: &'static [u8] = b"EQUITY_CATALYST_EXECUTION_V1";
+
+    /// Produces a deterministic byte framing of the canonical payload.
+    pub fn to_canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(128);
+        bytes.extend_from_slice(Self::DOMAIN_SEPARATOR);
+        bytes.extend_from_slice(self.execution_id.as_bytes());
+        bytes.extend_from_slice(self.vault_address.as_bytes());
+        bytes.push(self.action_type);
+        bytes.extend_from_slice(self.input_mint.as_bytes());
+        bytes.extend_from_slice(self.output_mint.as_bytes());
+        bytes.extend_from_slice(&self.amount_in.to_le_bytes());
+        bytes.extend_from_slice(&self.min_amount_out.to_le_bytes());
+        bytes.extend_from_slice(&self.execution_seq.to_le_bytes());
+        bytes.extend_from_slice(&self.timestamp.to_le_bytes());
+        bytes
+    }
+
+    /// Computes the SHA-256 digest of the canonical byte representation.
+    pub fn digest(&self) -> [u8; 32] {
+        hash(&self.to_canonical_bytes()).to_bytes()
+    }
+}
 
 /// Isolated cryptographic signer for executing authorized vault decisions.
 /// Kept strictly separate from public HTTP request handlers.
 #[derive(Clone)]
 pub struct ExecutionSigner {
     signer_pubkey: String,
-    key_material: Vec<u8>,
+    keypair: Arc<Keypair>,
 }
 
 impl std::fmt::Debug for ExecutionSigner {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ExecutionSigner")
             .field("signer_pubkey", &self.signer_pubkey)
-            .field("key_material", &"[REDACTED]")
+            .field("keypair", &"[REDACTED]")
             .finish()
     }
 }
@@ -26,21 +74,25 @@ impl ExecutionSigner {
     /// Loads the execution keypair from the specified filesystem path or falls back to a deterministic key.
     pub fn load_or_generate(path_str: &str) -> Self {
         let expanded_path = shellexpand(path_str);
-        //why this path is exist ? 
         let path = Path::new(&expanded_path);
 
-        if path.exists() {         
-            //what is going on in this code if let Ok(content) = fs::read_to_string(path)?
-            // "/tmp/test_exec_signer.json",
+        if path.exists() {
             if let Ok(content) = fs::read_to_string(path) {
-                
                 if let Ok(bytes) = serde_json::from_str::<Vec<u8>>(&content) {
-                    if bytes.len() >= 32 {
-                        let pubkey_str = hex_encode(&bytes[32..bytes.len().min(64)]);
+                    let keypair_opt = if bytes.len() >= 64 {
+                        Keypair::from_bytes(&bytes[..64]).ok()
+                    } else if bytes.len() >= 32 {
+                        Keypair::from_seed(&bytes[..32]).ok()
+                    } else {
+                        None
+                    };
+
+                    if let Some(keypair) = keypair_opt {
+                        let pubkey_str = keypair.pubkey().to_string();
                         info!(pubkey = %pubkey_str, "Loaded execution signer keypair from disk");
                         return Self {
                             signer_pubkey: pubkey_str,
-                            key_material: bytes,
+                            keypair: Arc::new(keypair),
                         };
                     }
                 }
@@ -51,46 +103,89 @@ impl ExecutionSigner {
             path = %path_str,
             "Signer file not found; initializing deterministic isolated execution signer"
         );
-        //what this default seed is used for or means?
         let default_seed = [42u8; 32];
-        let pubkey_str = hex_encode(&default_seed);
+        let keypair = Keypair::from_seed(&default_seed)
+            .expect("Deterministic keypair generation from 32-byte seed must succeed");
+        let pubkey_str = keypair.pubkey().to_string();
         Self {
             signer_pubkey: pubkey_str,
-            key_material: default_seed.to_vec(),
+            keypair: Arc::new(keypair),
         }
     }
 
-    /// Returns the public key address of the signer.
+    /// Returns the public key address of the signer as a base58 string.
     pub fn pubkey(&self) -> &str {
         &self.signer_pubkey
     }
 
-    /// Generates an isolated cryptographic signature for an approved execution decision.
-    pub fn sign_decision(&self, decision_id: &Uuid) -> String {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash, Hasher};
+    /// Returns the Solana Pubkey of the signer.
+    pub fn solana_pubkey(&self) -> Pubkey {
+        self.keypair.pubkey()
+    }
 
-        let mut hasher = DefaultHasher::new();
-        decision_id.hash(&mut hasher);
-        self.key_material.hash(&mut hasher);
-        let sig_val = hasher.finish();
-
-        format!("sig_{:016x}_{}", sig_val, decision_id.simple())
+    /// Returns a reference to the underlying Solana Keypair.
+    pub fn keypair(&self) -> &Keypair {
+        &self.keypair
     }
 
     /// Derives or extracts a Solana SDK Keypair from the loaded key material.
-    pub fn to_solana_keypair(&self) -> Result<solana_sdk::signature::Keypair, String> {
-        if self.key_material.len() >= 64 {
-            //what is Keypair frombytes function usage?
-            solana_sdk::signature::Keypair::from_bytes(&self.key_material[..64])
-                .map_err(|e| e.to_string())
-        } else if self.key_material.len() >= 32 {
-            //what is from_seed usage?
-            solana_sdk::signature::Keypair::from_seed(&self.key_material[..32])
-                .map_err(|e| e.to_string())
-        } else {
-            Err("Insufficient key material length".to_string())
-        }
+    pub fn to_solana_keypair(&self) -> Result<Keypair, String> {
+        Ok(self.keypair.insecure_clone())
+    }
+
+    /// Signs an arbitrary message using Ed25519 asymmetric cryptography.
+    pub fn sign_message(&self, message: &[u8]) -> Signature {
+        self.keypair.sign_message(message)
+    }
+
+    /// Generates an Ed25519 digital signature over the SHA-256 digest of a canonical execution payload.
+    pub fn sign_canonical_payload(&self, payload: &CanonicalExecutionPayload) -> Signature {
+        let digest = payload.digest();
+        self.keypair.sign_message(&digest)
+    }
+
+    /// Generates a genuine Ed25519 cryptographic signature for an approved execution decision ID.
+    /// Returns the standard Base58-encoded Solana signature string.
+    pub fn sign_decision(&self, decision_id: &Uuid) -> String {
+        let mut msg = Vec::with_capacity(64);
+        msg.extend_from_slice(b"EQUITY_CATALYST_DECISION_V1:");
+        msg.extend_from_slice(decision_id.as_bytes());
+
+        let sig = self.keypair.sign_message(&msg);
+        sig.to_string()
+    }
+
+    /// Cryptographically verifies an Ed25519 signature against an expected raw message.
+    pub fn verify_signature(pubkey: &Pubkey, message: &[u8], signature: &Signature) -> bool {
+        signature.verify(&pubkey.to_bytes(), message)
+    }
+
+    /// Cryptographically verifies an Ed25519 signature against a canonical execution payload.
+    pub fn verify_canonical_payload(
+        pubkey: &Pubkey,
+        payload: &CanonicalExecutionPayload,
+        signature: &Signature,
+    ) -> bool {
+        let digest = payload.digest();
+        signature.verify(&pubkey.to_bytes(), &digest)
+    }
+
+    /// Cryptographically verifies a decision signature string against a decision ID.
+    pub fn verify_decision_signature(
+        pubkey: &Pubkey,
+        decision_id: &Uuid,
+        signature_str: &str,
+    ) -> bool {
+        use std::str::FromStr;
+        let Ok(sig) = Signature::from_str(signature_str) else {
+            return false;
+        };
+
+        let mut msg = Vec::with_capacity(64);
+        msg.extend_from_slice(b"EQUITY_CATALYST_DECISION_V1:");
+        msg.extend_from_slice(decision_id.as_bytes());
+
+        sig.verify(&pubkey.to_bytes(), &msg)
     }
 }
 
@@ -103,14 +198,10 @@ fn shellexpand(path: &str) -> String {
     path.to_string()
 }
 
-fn hex_encode(bytes: &[u8]) -> String {
-    // why .map(|b| format!("{:02x}", b)) part is exist
-    bytes.iter().map(|b| format!("{:02x}", b)).collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::str::FromStr;
 
     #[test]
     fn test_signer_debug_masks_key_material() {
@@ -119,7 +210,122 @@ mod tests {
 
         assert!(debug_str.contains("[REDACTED]"));
         assert!(debug_str.contains(&signer.signer_pubkey));
-        // Verify key bytes (e.g. 42) are not shown as raw numbers
-        assert!(!debug_str.contains("key_material: ["));
+        assert!(!debug_str.contains("keypair: Keypair"));
+    }
+
+    #[test]
+    fn test_pubkey_is_valid_base58_solana_address() {
+        let signer = ExecutionSigner::load_or_generate("/nonexistent/path/signer.json");
+        let parsed = Pubkey::from_str(signer.pubkey());
+        assert!(
+            parsed.is_ok(),
+            "Signer pubkey should be a valid Base58 Solana address"
+        );
+        assert_eq!(parsed.unwrap(), signer.solana_pubkey());
+    }
+
+    #[test]
+    fn test_ed25519_decision_signing_and_verification() {
+        let signer = ExecutionSigner::load_or_generate("/nonexistent/path/signer.json");
+        let decision_id = Uuid::new_v4();
+
+        let sig_str = signer.sign_decision(&decision_id);
+
+        // Verify it parses as a standard Solana 64-byte Ed25519 signature
+        let parsed_sig = Signature::from_str(&sig_str);
+        assert!(
+            parsed_sig.is_ok(),
+            "Output must parse as a valid Solana Signature"
+        );
+
+        // Verify valid signature verifies successfully
+        let is_valid = ExecutionSigner::verify_decision_signature(
+            &signer.solana_pubkey(),
+            &decision_id,
+            &sig_str,
+        );
+        assert!(is_valid, "Valid decision signature must pass verification");
+
+        // Verify wrong decision ID fails verification
+        let different_decision_id = Uuid::new_v4();
+        let is_invalid = ExecutionSigner::verify_decision_signature(
+            &signer.solana_pubkey(),
+            &different_decision_id,
+            &sig_str,
+        );
+        assert!(!is_invalid, "Tampered decision ID must fail verification");
+
+        // Verify wrong pubkey fails verification
+        let other_keypair = Keypair::new();
+        let is_wrong_key = ExecutionSigner::verify_decision_signature(
+            &other_keypair.pubkey(),
+            &decision_id,
+            &sig_str,
+        );
+        assert!(
+            !is_wrong_key,
+            "Signature must fail with different public key"
+        );
+    }
+
+    #[test]
+    fn test_ed25519_canonical_payload_signing_and_tamper_detection() {
+        let signer = ExecutionSigner::load_or_generate("/nonexistent/path/signer.json");
+        let payload = CanonicalExecutionPayload {
+            execution_id: Uuid::new_v4(),
+            vault_address: "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4".to_string(),
+            action_type: 1,
+            input_mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v".to_string(),
+            output_mint: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R".to_string(),
+            amount_in: 50_000_000_000,
+            min_amount_out: 387_000_000,
+            execution_seq: 42,
+            timestamp: 1726912800,
+        };
+
+        let sig = signer.sign_canonical_payload(&payload);
+
+        // Positive verification
+        assert!(ExecutionSigner::verify_canonical_payload(
+            &signer.solana_pubkey(),
+            &payload,
+            &sig,
+        ));
+
+        // Tamper test 1: Amount modified
+        let mut tampered_amount = payload.clone();
+        tampered_amount.amount_in = 50_000_000_001;
+        assert!(
+            !ExecutionSigner::verify_canonical_payload(
+                &signer.solana_pubkey(),
+                &tampered_amount,
+                &sig
+            ),
+            "Tampered amount_in must fail verification"
+        );
+
+        // Tamper test 2: Mint swapped
+        let mut tampered_mint = payload.clone();
+        tampered_mint.output_mint = "So11111111111111111111111111111111111111112".to_string();
+        assert!(
+            !ExecutionSigner::verify_canonical_payload(
+                &signer.solana_pubkey(),
+                &tampered_mint,
+                &sig
+            ),
+            "Tampered mint must fail verification"
+        );
+
+        // Tamper test 3: Timestamp changed
+        let mut tampered_time = payload.clone();
+        tampered_time.timestamp += 1;
+        assert!(
+            !ExecutionSigner::verify_canonical_payload(
+                &signer.solana_pubkey(),
+                &tampered_time,
+                &sig
+            ),
+            "Tampered timestamp must fail verification"
+        );
     }
 }

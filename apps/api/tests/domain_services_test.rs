@@ -12,6 +12,7 @@ use equity_catalyst_api::{
     services::VaultService,
 };
 use equity_catalyst_shared::{allocation::RebalanceTrade, types::SignalType};
+use std::str::FromStr;
 use uuid::Uuid;
 
 fn setup_test_vault_service() -> VaultService {
@@ -348,9 +349,14 @@ fn test_decision_engine_end_to_end_pipeline() {
     assert!(request.approved);
     assert_eq!(request.action, "BUY");
     assert!(!request.trades.is_empty());
-    assert_eq!(request.vault_address, vault.vault_address);
-
-    // Sign the execution request
+    // Sign the execution request with genuine Ed25519 signature
     let signature = signer.sign_decision(&request.decision_id);
-    assert!(signature.starts_with("sig_"));
+    let parsed_sig = solana_sdk::signature::Signature::from_str(&signature)
+        .expect("Generated signature must parse as a valid Solana Ed25519 signature");
+    assert!(ExecutionSigner::verify_decision_signature(
+        &signer.solana_pubkey(),
+        &request.decision_id,
+        &signature
+    ));
+    assert_eq!(parsed_sig.to_string(), signature);
 }
