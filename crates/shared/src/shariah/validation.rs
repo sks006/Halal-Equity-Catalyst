@@ -93,6 +93,10 @@ pub fn evaluate_shariah_compliance(
             matches!(
                 r,
                 ShariahRejectionReason::ProhibitedBusiness
+                    | ShariahRejectionReason::BusinessClassificationUnknown
+                    | ShariahRejectionReason::BusinessClassificationRequiresReview
+                    | ShariahRejectionReason::ExcessReceivablesAndCash
+                    | ShariahRejectionReason::DenominatorMethodMismatch
                     | ShariahRejectionReason::SyntheticExposure
                     | ShariahRejectionReason::OwnershipUnverified
                     | ShariahRejectionReason::ExcessDebt

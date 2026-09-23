@@ -6,6 +6,36 @@ use std::fmt;
 use crate::constants::MAX_BPS;
 use crate::validation::{self, ValidationError};
 
+/// Explicit newtype wrapper around a Unix timestamp in seconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct UnixSeconds(pub i64);
+
+impl UnixSeconds {
+    pub const ZERO: Self = Self(0);
+
+    pub fn as_i64(self) -> i64 {
+        self.0
+    }
+}
+
+impl From<i64> for UnixSeconds {
+    fn from(s: i64) -> Self {
+        Self(s)
+    }
+}
+
+impl From<UnixSeconds> for i64 {
+    fn from(u: UnixSeconds) -> Self {
+        u.0
+    }
+}
+
+impl fmt::Display for UnixSeconds {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// Represents a fractional value in basis points (1 bp = 0.01% = 0.0001).
 /// 10,000 bps represents 100.00%.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]

@@ -37,7 +37,8 @@ use equity_catalyst_shared::{
     allocation::RebalanceTrade,
     fees::FeeSchedule,
     shariah::{
-        screen_asset, BusinessCategory, OwnershipRecord, ScreeningPolicy, ShariahFinancialMetrics,
+        screen_asset, BusinessActivityAssessment, BusinessCategory, OwnershipRecord,
+        ScreeningPolicy, ShariahFinancialMetrics,
     },
     types::BasisPoints,
 };
@@ -172,18 +173,18 @@ async fn test_run_empirical_pipeline_benchmarks() {
         verified_at: Utc::now().timestamp() - 3600,
         expires_at: Utc::now().timestamp() + 86400 * 30,
     };
-    let metrics = ShariahFinancialMetrics {
-        debt_ratio_bps: 1200,
-        interest_bearing_cash_ratio_bps: 800,
-        impure_income_ratio_bps: 50,
-    };
-    let category = BusinessCategory::Technology;
+    let metrics = ShariahFinancialMetrics::from_market_cap_ratios(1200, 800, 50);
+    let business = BusinessActivityAssessment::reviewed_permissible(
+        BusinessCategory::Technology,
+        "Enterprise enterprise cloud hardware",
+        "SEC Form 10-K",
+    );
     let now = Utc::now().timestamp();
 
     let mut shariah_latencies = Vec::with_capacity(iters);
     for _ in 0..iters {
         let t0 = Instant::now();
-        let res = screen_asset(&category, &metrics, &ownership, &policy, now);
+        let res = screen_asset(&business, &metrics, &ownership, &policy, now);
         assert!(res.is_approved());
         shariah_latencies.push(t0.elapsed().as_nanos() as f64 / 1_000.0);
     }

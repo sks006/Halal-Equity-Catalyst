@@ -13,7 +13,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-use super::types::ScreeningStandard;
+use super::types::{DenominatorMethod, ScreeningStandard};
 use crate::constants::MAX_BPS;
 use crate::types::BasisPoints;
 use crate::validation::ValidationError;
@@ -39,11 +39,17 @@ pub enum ThresholdComparison {
 impl ThresholdComparison {
     /// Evaluates whether a candidate ratio in basis points complies with the limit under this comparison rule.
     #[inline]
-    pub fn is_compliant(&self, ratio_bps: u16, limit_bps: u16) -> bool {
+    pub fn is_compliant(&self, ratio_bps: u32, limit_bps: u32) -> bool {
         match self {
             Self::StrictLessThan => ratio_bps < limit_bps,
             Self::LessThanOrEqual => ratio_bps <= limit_bps,
         }
+    }
+
+    /// Evaluates compliance for u16 ratios (backwards compatibility helper).
+    #[inline]
+    pub fn is_compliant_u16(&self, ratio_bps: u16, limit_bps: u16) -> bool {
+        self.is_compliant(ratio_bps as u32, limit_bps as u32)
     }
 }
 
@@ -64,12 +70,17 @@ pub struct ScreeningPolicy {
     pub standard: ScreeningStandard,
     /// Policy version or governance identifier (e.g. "v1.0", "aaoifi-21-2024").
     pub policy_version: String,
-    /// Maximum permissible interest-bearing debt relative to market capitalization, in basis points.
+    /// Denominator calculation methodology mandated by this screening standard.
+    pub denominator: DenominatorMethod,
+    /// Maximum permissible interest-bearing debt relative to the denominator, in basis points.
     /// E.g., 3,000 bps = 30.00%, 3,300 bps = 33.00%.
     pub debt_limit_bps: BasisPoints,
-    /// Maximum permissible cash and interest-bearing deposits relative to market capitalization, in basis points.
+    /// Maximum permissible cash and interest-bearing deposits relative to the denominator, in basis points.
     /// E.g., 3,000 bps = 30.00%, 3,300 bps = 33.00%.
     pub interest_bearing_cash_limit_bps: BasisPoints,
+    /// Optional benchmark limit for Accounts Receivable + Cash relative to the denominator.
+    /// Explicitly required by MSCI Islamic (<= 33.33%) and S&P Shariah (< 49.00%).
+    pub receivables_cash_limit_bps: Option<BasisPoints>,
     /// Maximum permissible revenue from non-operating or impure incidental sources relative to total revenue.
     /// Standard benchmark is 500 bps = 5.00%.
     pub impure_income_limit_bps: BasisPoints,
@@ -82,8 +93,10 @@ impl ScreeningPolicy {
     pub fn new(
         standard: ScreeningStandard,
         policy_version: impl Into<String>,
+        denominator: DenominatorMethod,
         debt_limit_bps: BasisPoints,
         interest_bearing_cash_limit_bps: BasisPoints,
+        receivables_cash_limit_bps: Option<BasisPoints>,
         impure_income_limit_bps: BasisPoints,
         comparison: ThresholdComparison,
     ) -> Result<Self, ValidationError> {
@@ -102,6 +115,11 @@ impl ScreeningPolicy {
                 interest_bearing_cash_limit_bps.0,
             ));
         }
+        if let Some(r) = receivables_cash_limit_bps {
+            if r.0 > MAX_BPS {
+                return Err(ValidationError::InvalidBasisPoints(r.0));
+            }
+        }
         if impure_income_limit_bps.0 > MAX_BPS {
             return Err(ValidationError::InvalidBasisPoints(
                 impure_income_limit_bps.0,
@@ -111,8 +129,10 @@ impl ScreeningPolicy {
         Ok(Self {
             standard,
             policy_version: version,
+            denominator,
             debt_limit_bps,
             interest_bearing_cash_limit_bps,
+            receivables_cash_limit_bps,
             impure_income_limit_bps,
             comparison,
         })
@@ -130,8 +150,10 @@ impl ScreeningPolicy {
         Self::new(
             standard,
             policy_version,
+            DenominatorMethod::AverageMarketCapMonths(12),
             BasisPoints::new(debt_limit_bps)?,
             BasisPoints::new(interest_bearing_cash_limit_bps)?,
+            None,
             BasisPoints::new(impure_income_limit_bps)?,
             comparison,
         )
@@ -140,15 +162,19 @@ impl ScreeningPolicy {
     /// Default baseline policy approved by the initial supervisory board.
     ///
     /// Benchmark thresholds (inclusive upper bounds `<= limit`):
+    /// - Denominator: 12-month trailing average market cap
     /// - Debt Limit: <= 3,000 bps (30.00%)
     /// - Cash / Deposits Limit: <= 3,000 bps (30.00%)
+    /// - Receivables & Cash: None
     /// - Impure Income Limit: <= 500 bps (5.00%)
     pub fn board_approved_v1() -> Self {
         Self {
             standard: ScreeningStandard::BoardApprovedV1,
             policy_version: "v1.0".to_string(),
+            denominator: DenominatorMethod::AverageMarketCapMonths(12),
             debt_limit_bps: BasisPoints(3_000),
             interest_bearing_cash_limit_bps: BasisPoints(3_000),
+            receivables_cash_limit_bps: None,
             impure_income_limit_bps: BasisPoints(500),
             comparison: ThresholdComparison::LessThanOrEqual,
         }
@@ -157,15 +183,19 @@ impl ScreeningPolicy {
     /// Parameterized preset for AAOIFI Shariah Standard No. 21 with specific policy version.
     ///
     /// Standard AAOIFI textual ratios (strict upper bounds `< limit`):
+    /// - Denominator: 12-month trailing average market capitalization
     /// - Debt / Market Cap < 30.00% (3,000 bps)
     /// - Cash & Deposits / Market Cap < 30.00% (3,000 bps)
+    /// - Receivables & Cash: None
     /// - Impure Revenue / Total Revenue < 5.00% (500 bps)
     pub fn aaoifi_21(policy_version: impl Into<String>) -> Self {
         Self {
             standard: ScreeningStandard::Aaoifi21,
             policy_version: policy_version.into(),
+            denominator: DenominatorMethod::AverageMarketCapMonths(12),
             debt_limit_bps: BasisPoints(3_000),
             interest_bearing_cash_limit_bps: BasisPoints(3_000),
+            receivables_cash_limit_bps: None,
             impure_income_limit_bps: BasisPoints(500),
             comparison: ThresholdComparison::StrictLessThan,
         }
@@ -176,7 +206,70 @@ impl ScreeningPolicy {
         Self::aaoifi_21("aaoifi-21-2024")
     }
 
-    /// Constructs a policy for a custom board standard (e.g. DJIM 33% debt threshold).
+    /// Preset for MSCI Islamic Index screening methodology.
+    ///
+    /// Benchmarks against total assets or market cap with explicit receivables screen:
+    /// - Denominator: Total Assets
+    /// - Debt / Total Assets < 33.33% (3,333 bps)
+    /// - Cash & Interest-bearing Securities / Total Assets < 33.33% (3,333 bps)
+    /// - Accounts Receivable + Cash / Total Assets < 33.33% (3,333 bps)
+    /// - Impure Revenue / Total Revenue < 5.00% (500 bps)
+    pub fn msci_islamic(policy_version: impl Into<String>) -> Self {
+        Self {
+            standard: ScreeningStandard::Custom("MSCI-Islamic".to_string()),
+            policy_version: policy_version.into(),
+            denominator: DenominatorMethod::TotalAssets,
+            debt_limit_bps: BasisPoints(3_333),
+            interest_bearing_cash_limit_bps: BasisPoints(3_333),
+            receivables_cash_limit_bps: Some(BasisPoints(3_333)),
+            impure_income_limit_bps: BasisPoints(500),
+            comparison: ThresholdComparison::StrictLessThan,
+        }
+    }
+
+    /// Preset for S&P Shariah Index screening methodology.
+    ///
+    /// Benchmarks against 36-month average market capitalization:
+    /// - Denominator: 36-month average market cap
+    /// - Debt / 36-mo Market Cap < 33.00% (3,300 bps)
+    /// - Cash & Interest-bearing Securities / 36-mo Market Cap < 33.00% (3,300 bps)
+    /// - Accounts Receivable / 36-mo Market Cap < 49.00% (4,900 bps)
+    /// - Impure Revenue / Total Revenue < 5.00% (500 bps)
+    pub fn sp_shariah(policy_version: impl Into<String>) -> Self {
+        Self {
+            standard: ScreeningStandard::Custom("SP-Shariah".to_string()),
+            policy_version: policy_version.into(),
+            denominator: DenominatorMethod::AverageMarketCapMonths(36),
+            debt_limit_bps: BasisPoints(3_300),
+            interest_bearing_cash_limit_bps: BasisPoints(3_300),
+            receivables_cash_limit_bps: Some(BasisPoints(4_900)),
+            impure_income_limit_bps: BasisPoints(500),
+            comparison: ThresholdComparison::StrictLessThan,
+        }
+    }
+
+    /// Preset for FTSE IdealRatings Shariah Index screening methodology.
+    ///
+    /// Benchmarks against 24-month average daily market capitalization:
+    /// - Denominator: 24-month average market cap
+    /// - Debt / 24-mo Market Cap < 33.33% (3,333 bps)
+    /// - Cash & Interest-bearing Securities / 24-mo Market Cap < 33.33% (3,333 bps)
+    /// - Accounts Receivable & Cash / 24-mo Market Cap < 50.00% (5,000 bps)
+    /// - Impure Revenue / Total Revenue < 5.00% (500 bps)
+    pub fn ftse_idealratings(policy_version: impl Into<String>) -> Self {
+        Self {
+            standard: ScreeningStandard::Custom("FTSE-IdealRatings".to_string()),
+            policy_version: policy_version.into(),
+            denominator: DenominatorMethod::AverageMarketCapMonths(24),
+            debt_limit_bps: BasisPoints(3_333),
+            interest_bearing_cash_limit_bps: BasisPoints(3_333),
+            receivables_cash_limit_bps: Some(BasisPoints(5_000)),
+            impure_income_limit_bps: BasisPoints(500),
+            comparison: ThresholdComparison::StrictLessThan,
+        }
+    }
+
+    /// Constructs a policy for a custom board standard.
     pub fn custom(
         standard_name: impl Into<String>,
         policy_version: impl Into<String>,
@@ -195,11 +288,25 @@ impl ScreeningPolicy {
         Self::new(
             ScreeningStandard::Custom(name),
             policy_version,
+            DenominatorMethod::AverageMarketCapMonths(12),
             debt_limit_bps,
             interest_bearing_cash_limit_bps,
+            None,
             impure_income_limit_bps,
             comparison,
         )
+    }
+
+    /// Builder method to set the denominator calculation method.
+    pub fn with_denominator(mut self, denominator: DenominatorMethod) -> Self {
+        self.denominator = denominator;
+        self
+    }
+
+    /// Builder method to configure or remove the Accounts Receivable + Cash limit.
+    pub fn with_receivables_limit(mut self, limit: Option<BasisPoints>) -> Self {
+        self.receivables_cash_limit_bps = limit;
+        self
     }
 
     /// Builder method to override the threshold comparison operator.
@@ -222,6 +329,11 @@ impl ScreeningPolicy {
             return Err(ValidationError::InvalidBasisPoints(
                 self.interest_bearing_cash_limit_bps.0,
             ));
+        }
+        if let Some(r) = self.receivables_cash_limit_bps {
+            if r.0 > MAX_BPS {
+                return Err(ValidationError::InvalidBasisPoints(r.0));
+            }
         }
         if self.impure_income_limit_bps.0 > MAX_BPS {
             return Err(ValidationError::InvalidBasisPoints(
