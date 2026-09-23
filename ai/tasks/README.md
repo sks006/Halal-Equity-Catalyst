@@ -19,30 +19,46 @@ Assign exactly **one** phase task per agent at any given time:
 - **Do not allow multiple agents to modify the same core module or directory simultaneously**.
 - Respect the `Allowed Files` and `Forbidden Files` demarcated in each phase task file.
 
-### 3. Sequential Implementation Order
+### 3. Canonical Sequential Implementation Order
 
 ```
-PHASE 00: Foundation
-    ↓
-PHASE 01: Pyth Pro
-    ↓
-PHASE 02: PreStocks + Tessera
-    ↓
-PHASE 03: Meteora DBC
-    ↓
-PHASE 04: Equity Market Engine
-    ↓
-PHASE 05: Liquidity Agent
-    ↓
-PHASE 06: Execution
-    ↓
-PHASE 07: Frontend
-    ↓
-PHASE 08: Mainnet
-    ↓
-PHASE 09: Security / Reliability
-    ↓
-PHASE 10: Submission
+PHASE 0 — Baseline & Safety
+        ↓
+PHASE 1 — Canonical Asset Registry
+        ↓
+PHASE 2 — Asset ↔ Pyth Feed Mapping
+        ↓
+PHASE 3 — Dynamic Subscription Model
+        ↓
+PHASE 4 — Pyth Real-Time SSE Client
+        ↓
+PHASE 5 — Dynamic Stream Manager
+        ↓
+PHASE 6 — Market Data Store
+        ↓
+PHASE 7 — Oracle Validation
+        ↓
+PHASE 8 — REST + WebSocket API
+        ↓
+PHASE 9 — DEX Quote Layer
+        ↓
+PHASE 10 — Deterministic Risk/Policy Engine
+        ↓
+PHASE 11 — Execution Planner
+        ↓
+PHASE 12 — Real Cryptographic Signer
+        ↓
+PHASE 13 — Anchor DEX CPI Execution
+        ↓
+PHASE 14 — Actual Execution Measurement
+        ↓
+PHASE 15 — Purification
+        ↓
+PHASE 16 — Failure/Recovery/Safety
+        ↓
+PHASE 17 — Integration Tests
+        ↓
+PHASE 18 — Production Hardening
 ```
 
 ### 4. Parallelization Topology
