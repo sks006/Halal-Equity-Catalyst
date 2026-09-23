@@ -17,7 +17,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::policy::ScreeningPolicy;
-use super::types::{ScreeningStandard, ShariahRejectionReason, ShariahStatus};
+use super::types::{DenominatorMethod, ScreeningStandard, ShariahRejectionReason, ShariahStatus};
 
 /// Comprehensive Shariah compliance qualification record for an individual asset.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -26,14 +26,18 @@ pub struct ShariahEligibility {
     pub status: ShariahStatus,
     /// Shariah screening framework standard applied.
     pub standard: ScreeningStandard,
-    /// Qualitative certification that primary business activity does not involve impermissible sectors.
+    /// Qualitative certification that primary and subsidiary business activities are vetted and permissible.
     pub business_activity_approved: bool,
     /// Trailing interest-bearing debt ratio in basis points (e.g., 2,850 = 28.50%).
-    pub debt_ratio_bps: u16,
+    pub debt_ratio_bps: u32,
     /// Trailing cash and interest-bearing deposits ratio in basis points.
-    pub interest_bearing_cash_bps: u16,
+    pub interest_bearing_cash_bps: u32,
+    /// Accounts receivable and cash ratio in basis points (optional depending on screening methodology).
+    pub receivables_cash_bps: Option<u32>,
     /// Revenue derived from incidental/impure non-operating sources in basis points.
-    pub impure_income_bps: u16,
+    pub impure_income_bps: u32,
+    /// Denominator calculation methodology utilized during screening.
+    pub denominator_method: DenominatorMethod,
     /// Verification that underlying 1:1 shares are held in bankruptcy-remote custody or SPV.
     pub ownership_verified: bool,
     /// Cryptographic digest of the reviewed audit and filing dossier proving tamper-evidence.
@@ -145,14 +149,33 @@ impl ShariahEligibility {
             reasons.push(ShariahRejectionReason::ProhibitedBusiness);
         }
 
-        // 6. Quantitative financial screening values vs policy limits
-        if self.debt_ratio_bps > policy.debt_limit_bps.as_bps() {
+        // 6. Quantitative financial screening values vs policy limits using comparison semantics
+        if !policy
+            .comparison
+            .is_compliant(self.debt_ratio_bps, policy.debt_limit_bps.as_bps() as u32)
+        {
             reasons.push(ShariahRejectionReason::ExcessDebt);
         }
-        if self.interest_bearing_cash_bps > policy.interest_bearing_cash_limit_bps.as_bps() {
+        if !policy.comparison.is_compliant(
+            self.interest_bearing_cash_bps,
+            policy.interest_bearing_cash_limit_bps.as_bps() as u32,
+        ) {
             reasons.push(ShariahRejectionReason::ExcessInterestBearingCash);
         }
-        if self.impure_income_bps > policy.impure_income_limit_bps.as_bps() {
+        if let Some(limit) = policy.receivables_cash_limit_bps {
+            match self.receivables_cash_bps {
+                Some(ratio) => {
+                    if !policy.comparison.is_compliant(ratio, limit.as_bps() as u32) {
+                        reasons.push(ShariahRejectionReason::ExcessReceivablesAndCash);
+                    }
+                }
+                None => reasons.push(ShariahRejectionReason::MissingEvidence),
+            }
+        }
+        if !policy.comparison.is_compliant(
+            self.impure_income_bps,
+            policy.impure_income_limit_bps.as_bps() as u32,
+        ) {
             reasons.push(ShariahRejectionReason::ExcessImpureIncome);
         }
 

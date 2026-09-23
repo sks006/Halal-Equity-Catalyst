@@ -21,7 +21,8 @@ use super::eligibility::ShariahEligibility;
 use super::ownership::{validate_ownership, OwnershipRecord};
 use super::policy::ScreeningPolicy;
 use super::screening::{
-    screen_business_activity, screen_financial_metrics, BusinessCategory, ShariahFinancialMetrics,
+    screen_business_activity, screen_financial_metrics, BusinessActivityAssessment,
+    ShariahFinancialMetrics,
 };
 use super::types::{ShariahRejectionReason, ShariahStatus};
 use crate::asset::{Asset, AssetStatus};
@@ -109,7 +110,7 @@ pub fn register_asset(
     asset: Asset,
     ownership: OwnershipRecord,
     financials: ShariahFinancialMetrics,
-    business: BusinessCategory,
+    business: BusinessActivityAssessment,
     policy: &ScreeningPolicy,
 ) -> Result<RegisteredAsset, RegistryError> {
     let now = ownership.verified_at;
@@ -121,7 +122,7 @@ pub fn register_asset_at(
     asset: Asset,
     ownership: OwnershipRecord,
     financials: ShariahFinancialMetrics,
-    business: BusinessCategory,
+    business: BusinessActivityAssessment,
     policy: &ScreeningPolicy,
     now: i64,
 ) -> Result<RegisteredAsset, RegistryError> {
@@ -183,7 +184,9 @@ pub fn register_asset_at(
         business_activity_approved: true,
         debt_ratio_bps: financials.debt_ratio_bps,
         interest_bearing_cash_bps: financials.interest_bearing_cash_ratio_bps,
+        receivables_cash_bps: financials.receivables_cash_ratio_bps,
         impure_income_bps: financials.impure_income_ratio_bps,
+        denominator_method: financials.denominator_method,
         ownership_verified: true,
         evidence_hash: ownership.evidence_hash,
         reviewed_at: ownership.verified_at,
@@ -214,7 +217,7 @@ impl ShariahAssetRegistry {
         asset: Asset,
         ownership: OwnershipRecord,
         financials: ShariahFinancialMetrics,
-        business: BusinessCategory,
+        business: BusinessActivityAssessment,
         policy: &ScreeningPolicy,
         now: i64,
     ) -> Result<RegisteredAsset, RegistryError> {

@@ -109,16 +109,45 @@ impl fmt::Display for ScreeningStandard {
     }
 }
 
+/// Denominator methodology utilized for evaluating leverage, cash, and liquidity screening ratios.
+///
+/// Distinct index and supervisory bodies mandate specific denominator standards:
+/// - S&P Shariah uses a 36-month average market value.
+/// - FTSE IdealRatings specifies a 24-month average daily market cap (with a total-assets fallback).
+/// - AAOIFI Standard 21 utilizes 12-month average market cap or total assets depending on asset class.
+/// - MSCI Islamic utilizes total assets or average market capitalization depending on index series.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum DenominatorMethod {
+    /// Spot market capitalization as of the balance sheet or screening date.
+    CurrentMarketCap,
+    /// Trailing average daily market capitalization over N months (e.g. 12, 24, or 36).
+    AverageMarketCapMonths(u8),
+    /// Total assets reported on the audited balance sheet.
+    TotalAssets,
+}
+
+impl fmt::Display for DenominatorMethod {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::CurrentMarketCap => write!(f, "CurrentMarketCap"),
+            Self::AverageMarketCapMonths(m) => write!(f, "AverageMarketCap({} months)", m),
+            Self::TotalAssets => write!(f, "TotalAssets"),
+        }
+    }
+}
+
 /// Specific qualitative, quantitative, or structural reason for Shariah screening rejection.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ShariahRejectionReason {
     /// Core business activity violates Islamic principles (conventional banking, alcohol, gambling,
     /// tobacco, adult entertainment, weapons, etc.).
     ProhibitedBusiness,
-    /// Total interest-bearing debt exceeds the policy limit relative to market capitalization.
+    /// Total interest-bearing debt exceeds the policy limit relative to denominator.
     ExcessDebt,
-    /// Total cash and interest-bearing deposits exceed the policy limit relative to market capitalization.
+    /// Total cash and interest-bearing deposits exceed the policy limit relative to denominator.
     ExcessInterestBearingCash,
+    /// Accounts receivable and cash exceed the policy limit relative to denominator (e.g. MSCI Islamic test).
+    ExcessReceivablesAndCash,
     /// Impermissible/non-operating income exceeds the policy threshold relative to total revenue.
     ExcessImpureIncome,
     /// Direct beneficial ownership, bankruptcy-remote SPV custody, or statutory shares cannot be verified.
@@ -129,6 +158,12 @@ pub enum ShariahRejectionReason {
     MissingEvidence,
     /// Compliance validity period elapsed without periodic recertification.
     ReviewExpired,
+    /// Core business activity classification is unknown, unclassified, or unverified (fail-closed).
+    BusinessClassificationUnknown,
+    /// Business activities require further qualitative investigation or supervisory board audit.
+    BusinessClassificationRequiresReview,
+    /// Denominator calculation method does not match governing screening policy requirements.
+    DenominatorMethodMismatch,
     /// Other specific scholar- or board-mandated rejection criteria.
     Other(String),
 }
@@ -141,6 +176,10 @@ impl fmt::Display for ShariahRejectionReason {
             Self::ExcessInterestBearingCash => write!(
                 f,
                 "Interest-bearing cash and deposits exceed policy threshold"
+            ),
+            Self::ExcessReceivablesAndCash => write!(
+                f,
+                "Accounts receivable and cash exceed policy threshold"
             ),
             Self::ExcessImpureIncome => {
                 write!(f, "Impermissible impure income exceeds policy threshold")
@@ -158,6 +197,15 @@ impl fmt::Display for ShariahRejectionReason {
                 "Missing evidence or insufficient audited financial disclosures"
             ),
             Self::ReviewExpired => write!(f, "Periodic screening review has expired"),
+            Self::BusinessClassificationUnknown => {
+                write!(f, "Business activity classification is unknown or unverified")
+            }
+            Self::BusinessClassificationRequiresReview => {
+                write!(f, "Business activity requires qualitative investigation or audit")
+            }
+            Self::DenominatorMethodMismatch => {
+                write!(f, "Financial metrics denominator method does not match policy requirements")
+            }
             Self::Other(msg) => write!(f, "Other rejection reason: {}", msg),
         }
     }

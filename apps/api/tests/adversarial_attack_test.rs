@@ -58,7 +58,8 @@ use equity_catalyst_shared::{
     provider::ProviderResolver,
     risk::{validate_spot_funding, validate_spot_ownership},
     shariah::{
-        screen_asset, BusinessCategory, OwnershipRecord, ScreeningPolicy, ShariahFinancialMetrics,
+        screen_asset, BusinessActivityAssessment, BusinessCategory, OwnershipRecord,
+        ScreeningPolicy, ShariahFinancialMetrics,
     },
 };
 use serde_json::json;
@@ -316,14 +317,15 @@ async fn test_attack_06_fake_evidence_hash_rejected_no_signing() {
         verified_at: Utc::now().timestamp() - 3600,
         expires_at: Utc::now().timestamp() + 86400 * 30,
     };
-    let metrics = ShariahFinancialMetrics {
-        debt_ratio_bps: 1200,
-        interest_bearing_cash_ratio_bps: 800,
-        impure_income_ratio_bps: 50,
-    };
+    let metrics = ShariahFinancialMetrics::from_market_cap_ratios(1200, 800, 50);
+    let business = BusinessActivityAssessment::reviewed_permissible(
+        BusinessCategory::Technology,
+        "Enterprise technology hardware",
+        "SEC Form 10-K",
+    );
 
     let res = screen_asset(
-        &BusinessCategory::Technology,
+        &business,
         &metrics,
         &ownership,
         &policy,

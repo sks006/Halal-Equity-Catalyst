@@ -138,20 +138,20 @@ fn test_property_shariah_threshold_monotonicity() {
     .unwrap();
 
     // 1. Below threshold: Both must pass
-    let below = ShariahFinancialMetrics {
-        debt_ratio_bps: threshold_bps - 1,
-        interest_bearing_cash_ratio_bps: 100,
-        impure_income_ratio_bps: 50,
-    };
+    let below = ShariahFinancialMetrics::from_market_cap_ratios(
+        (threshold_bps - 1) as u32,
+        100,
+        50,
+    );
     assert!(screen_financial_metrics(&below, &strict_policy).is_ok());
     assert!(screen_financial_metrics(&below, &inclusive_policy).is_ok());
 
     // 2. Exact threshold boundary: Strict MUST REJECT, Inclusive MUST PASS
-    let exact = ShariahFinancialMetrics {
-        debt_ratio_bps: threshold_bps,
-        interest_bearing_cash_ratio_bps: 100,
-        impure_income_ratio_bps: 50,
-    };
+    let exact = ShariahFinancialMetrics::from_market_cap_ratios(
+        threshold_bps as u32,
+        100,
+        50,
+    );
     assert_eq!(
         screen_financial_metrics(&exact, &strict_policy),
         Err(ShariahRejectionReason::ExcessDebt),
@@ -163,11 +163,11 @@ fn test_property_shariah_threshold_monotonicity() {
     );
 
     // 3. Above threshold: Both must reject
-    let above = ShariahFinancialMetrics {
-        debt_ratio_bps: threshold_bps + 1,
-        interest_bearing_cash_ratio_bps: 100,
-        impure_income_ratio_bps: 50,
-    };
+    let above = ShariahFinancialMetrics::from_market_cap_ratios(
+        (threshold_bps + 1) as u32,
+        100,
+        50,
+    );
     assert_eq!(
         screen_financial_metrics(&above, &strict_policy),
         Err(ShariahRejectionReason::ExcessDebt)

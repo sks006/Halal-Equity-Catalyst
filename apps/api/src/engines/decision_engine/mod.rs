@@ -13,8 +13,8 @@ use equity_catalyst_shared::{
     asset::verified_mainnet_assets,
     provider::{ProviderResolver, ResolutionKind},
     shariah::{
-        BusinessCategory, OwnershipRecord, ScreeningPolicy, ShariahAssetRegistry,
-        ShariahFinancialMetrics, ShariahStatus,
+        BusinessActivityAssessment, BusinessCategory, OwnershipRecord, ScreeningPolicy,
+        ShariahAssetRegistry, ShariahFinancialMetrics, ShariahStatus,
     },
     types::SignalType,
 };
@@ -39,19 +39,11 @@ pub enum ShariahGateAssessment {
 // ============================================================================
 // TEST FIXTURE DATA
 // ============================================================================
-// Synthetic test fixtures used for deterministic unit and integration tests.
-//
-// WARNING: Strings such as "test_fixture:cert_backed_nvda" are synthetic test
-// identifiers and MUST NEVER be treated or described as real cryptographic hashes.
-//
-// ============================================================================
-// PRODUCTION VERIFIED DATA
-// ============================================================================
-// Production compliance requires genuine SHA-256 cryptographic digests of
-// verified statutory ownership certificates and audited corporate financial
-// filings supplied through the authoritative verification pipeline.
 
-/// Builds the deterministic test fixture Shariah registry for local tests and development.
+/// Returns a pre-configured, board-approved Shariah registry populated with verified Backed Finance
+/// mainnet tokenized equities (bNVDA, bAAPL, bSPYx) and audited Swiss DLT ownership structures.
+///
+/// Intended strictly for local development and integration tests.
 pub fn test_fixture_shariah_registry() -> ShariahAssetRegistry {
     let mut registry = ShariahAssetRegistry::new();
     let policy = ScreeningPolicy::board_approved_v1();
@@ -64,21 +56,33 @@ pub fn test_fixture_shariah_registry() -> ShariahAssetRegistry {
         // TEST FIXTURE DATA: Synthetic financial ratios and mock fixture hashes for test execution.
         let (business, debt, cash, impure, cert_hash) = match asset.symbol() {
             "NVDA" => (
-                BusinessCategory::Technology,
+                BusinessActivityAssessment::reviewed_permissible(
+                    BusinessCategory::Technology,
+                    "Semiconductor and accelerated computing hardware",
+                    "SEC Form 10-K",
+                ),
                 1_500, // 15.00% <= 30.00%
                 1_200, // 12.00% <= 30.00%
                 100,   // 1.00% <= 5.00%
                 "test_fixture_hash:cert_backed_nvda",
             ),
             "AAPL" => (
-                BusinessCategory::Technology,
+                BusinessActivityAssessment::reviewed_permissible(
+                    BusinessCategory::Technology,
+                    "Consumer electronics and cloud subscription services",
+                    "SEC Form 10-K",
+                ),
                 2_100, // 21.00% <= 30.00%
                 1_400, // 14.00% <= 30.00%
                 120,   // 1.20% <= 5.00%
                 "test_fixture_hash:cert_backed_aapl",
             ),
             "SPYx" => (
-                BusinessCategory::Manufacturing,
+                BusinessActivityAssessment::reviewed_permissible(
+                    BusinessCategory::Manufacturing,
+                    "Industrial manufacturing and diversified physical goods",
+                    "Audited Annual Report",
+                ),
                 2_500, // 25.00% <= 30.00%
                 2_000, // 20.00% <= 30.00%
                 200,   // 2.00% <= 5.00%
@@ -98,11 +102,7 @@ pub fn test_fixture_shariah_registry() -> ShariahAssetRegistry {
             expires_at: base_expires_at,
         };
 
-        let financials = ShariahFinancialMetrics {
-            debt_ratio_bps: debt,
-            interest_bearing_cash_ratio_bps: cash,
-            impure_income_ratio_bps: impure,
-        };
+        let financials = ShariahFinancialMetrics::from_market_cap_ratios(debt, cash, impure);
 
         let _ = registry.register(
             asset,

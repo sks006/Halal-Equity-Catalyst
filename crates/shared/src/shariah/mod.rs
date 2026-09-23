@@ -122,10 +122,26 @@ mod tests {
                 "\"SyntheticExposure\"",
             ),
             (
+                ShariahRejectionReason::ExcessReceivablesAndCash,
+                "\"ExcessReceivablesAndCash\"",
+            ),
+            (
+                ShariahRejectionReason::BusinessClassificationRequiresReview,
+                "\"BusinessClassificationRequiresReview\"",
+            ),
+            (
+                ShariahRejectionReason::DenominatorMethodMismatch,
+                "\"DenominatorMethodMismatch\"",
+            ),
+            (
                 ShariahRejectionReason::MissingEvidence,
                 "\"MissingEvidence\"",
             ),
             (ShariahRejectionReason::ReviewExpired, "\"ReviewExpired\""),
+            (
+                ShariahRejectionReason::BusinessClassificationUnknown,
+                "\"BusinessClassificationUnknown\"",
+            ),
             (
                 ShariahRejectionReason::Other("Non-compliant asset rehypothecation".to_string()),
                 "{\"Other\":\"Non-compliant asset rehypothecation\"}",
@@ -207,8 +223,10 @@ mod tests {
         let invalid_debt = ScreeningPolicy::new(
             ScreeningStandard::BoardApprovedV1,
             "v1",
+            DenominatorMethod::AverageMarketCapMonths(12),
             BasisPoints(10_001),
             BasisPoints(3_000),
+            None,
             BasisPoints(500),
             ThresholdComparison::LessThanOrEqual,
         );
@@ -221,8 +239,10 @@ mod tests {
         let invalid_version = ScreeningPolicy::new(
             ScreeningStandard::BoardApprovedV1,
             "   ",
+            DenominatorMethod::AverageMarketCapMonths(12),
             BasisPoints(3_000),
             BasisPoints(3_000),
+            None,
             BasisPoints(500),
             ThresholdComparison::LessThanOrEqual,
         );
@@ -406,7 +426,9 @@ mod tests {
             business_activity_approved: true,
             debt_ratio_bps: 1_500,            // 15% < 30%
             interest_bearing_cash_bps: 1_200, // 12% < 30%
+            receivables_cash_bps: None,
             impure_income_bps: 200,           // 2% < 5%
+            denominator_method: DenominatorMethod::AverageMarketCapMonths(12),
             ownership_verified: true,
             evidence_hash:
                 "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -429,7 +451,9 @@ mod tests {
             business_activity_approved: true,
             debt_ratio_bps: 1_500,
             interest_bearing_cash_bps: 1_200,
+            receivables_cash_bps: None,
             impure_income_bps: 200,
+            denominator_method: DenominatorMethod::AverageMarketCapMonths(12),
             ownership_verified: true,
             evidence_hash: "sha256:test".to_string(),
             reviewed_at: 1_700_000_000,
@@ -455,7 +479,9 @@ mod tests {
             business_activity_approved: true,
             debt_ratio_bps: 1_500,
             interest_bearing_cash_bps: 1_200,
+            receivables_cash_bps: None,
             impure_income_bps: 200,
+            denominator_method: DenominatorMethod::AverageMarketCapMonths(12),
             ownership_verified: true,
             evidence_hash: "sha256:test".to_string(),
             reviewed_at: 1_700_000_000,
@@ -482,7 +508,9 @@ mod tests {
             business_activity_approved: true,
             debt_ratio_bps: 1_500,
             interest_bearing_cash_bps: 1_200,
+            receivables_cash_bps: None,
             impure_income_bps: 200,
+            denominator_method: DenominatorMethod::AverageMarketCapMonths(12),
             ownership_verified: false, // Inability to verify SPV / custody
             evidence_hash: "sha256:test".to_string(),
             reviewed_at: 1_700_000_000,
@@ -504,7 +532,9 @@ mod tests {
             business_activity_approved: false, // Prohibited core business
             debt_ratio_bps: 1_000,
             interest_bearing_cash_bps: 1_000,
+            receivables_cash_bps: None,
             impure_income_bps: 100,
+            denominator_method: DenominatorMethod::AverageMarketCapMonths(12),
             ownership_verified: true,
             evidence_hash: "sha256:test".to_string(),
             reviewed_at: 1_700_000_000,
@@ -526,7 +556,9 @@ mod tests {
             business_activity_approved: true,
             debt_ratio_bps: 3_200, // 32.00% > 30.00% AAOIFI limit
             interest_bearing_cash_bps: 1_000,
+            receivables_cash_bps: None,
             impure_income_bps: 100,
+            denominator_method: DenominatorMethod::AverageMarketCapMonths(12),
             ownership_verified: true,
             evidence_hash: "sha256:test".to_string(),
             reviewed_at: 1_700_000_000,
@@ -561,7 +593,9 @@ mod tests {
             business_activity_approved: true,
             debt_ratio_bps: 2_000,
             interest_bearing_cash_bps: 1_500,
+            receivables_cash_bps: None,
             impure_income_bps: 650, // 6.50% > 5.00% limit
+            denominator_method: DenominatorMethod::AverageMarketCapMonths(12),
             ownership_verified: true,
             evidence_hash: "sha256:test".to_string(),
             reviewed_at: 1_700_000_000,
@@ -583,7 +617,9 @@ mod tests {
             business_activity_approved: true,
             debt_ratio_bps: 1_500,
             interest_bearing_cash_bps: 1_200,
+            receivables_cash_bps: None,
             impure_income_bps: 200,
+            denominator_method: DenominatorMethod::AverageMarketCapMonths(12),
             ownership_verified: true,
             evidence_hash: "   ".to_string(), // Empty / whitespace hash
             reviewed_at: 1_700_000_000,
@@ -605,7 +641,9 @@ mod tests {
             business_activity_approved: true,
             debt_ratio_bps: 2_100,
             interest_bearing_cash_bps: 1_400,
+            receivables_cash_bps: None,
             impure_income_bps: 150,
+            denominator_method: DenominatorMethod::AverageMarketCapMonths(12),
             ownership_verified: true,
             evidence_hash: "sha256:abcdef0123456789".to_string(),
             reviewed_at: 1_700_000_000,
@@ -765,13 +803,24 @@ mod tests {
         let now = 1_705_000_000;
 
         // 1. Exactly equal to limit (inclusive threshold: passes)
-        let exact_metrics = ShariahFinancialMetrics {
-            debt_ratio_bps: 3_000,
-            interest_bearing_cash_ratio_bps: 3_000,
-            impure_income_ratio_bps: 500,
-        };
+        let exact_metrics = ShariahFinancialMetrics::from_market_cap_ratios(3_000, 3_000, 500);
+        let reviewed_tech = BusinessActivityAssessment::reviewed_permissible(
+            BusinessCategory::Technology,
+            "Semiconductor design and manufacturing",
+            "SEC Form 10-K",
+        );
+        let reviewed_healthcare = BusinessActivityAssessment::reviewed_permissible(
+            BusinessCategory::Healthcare,
+            "Pharmaceutical manufacturing",
+            "Annual Report",
+        );
+        let reviewed_manufacturing = BusinessActivityAssessment::reviewed_permissible(
+            BusinessCategory::Manufacturing,
+            "Industrial equipment production",
+            "Audit Report",
+        );
         let res_exact = screen_asset(
-            &BusinessCategory::Technology,
+            &reviewed_tech,
             &exact_metrics,
             &valid_ownership,
             &policy,
@@ -781,13 +830,9 @@ mod tests {
         assert!(res_exact.is_approved());
 
         // 2. One unit below limit (passes)
-        let below_metrics = ShariahFinancialMetrics {
-            debt_ratio_bps: 2_999,
-            interest_bearing_cash_ratio_bps: 2_999,
-            impure_income_ratio_bps: 499,
-        };
+        let below_metrics = ShariahFinancialMetrics::from_market_cap_ratios(2_999, 2_999, 499);
         let res_below = screen_asset(
-            &BusinessCategory::Healthcare,
+            &reviewed_healthcare,
             &below_metrics,
             &valid_ownership,
             &policy,
@@ -796,13 +841,9 @@ mod tests {
         assert_eq!(res_below, ScreeningResult::Approved);
 
         // 3. One unit above limit: Debt failure (3,001 bps)
-        let debt_fail = ShariahFinancialMetrics {
-            debt_ratio_bps: 3_001,
-            interest_bearing_cash_ratio_bps: 1_000,
-            impure_income_ratio_bps: 100,
-        };
+        let debt_fail = ShariahFinancialMetrics::from_market_cap_ratios(3_001, 1_000, 100);
         let res_debt = screen_asset(
-            &BusinessCategory::Technology,
+            &reviewed_tech,
             &debt_fail,
             &valid_ownership,
             &policy,
@@ -816,13 +857,9 @@ mod tests {
         );
 
         // 4. One unit above limit: Cash failure (3,001 bps)
-        let cash_fail = ShariahFinancialMetrics {
-            debt_ratio_bps: 1_000,
-            interest_bearing_cash_ratio_bps: 3_001,
-            impure_income_ratio_bps: 100,
-        };
+        let cash_fail = ShariahFinancialMetrics::from_market_cap_ratios(1_000, 3_001, 100);
         let res_cash = screen_asset(
-            &BusinessCategory::Manufacturing,
+            &reviewed_manufacturing,
             &cash_fail,
             &valid_ownership,
             &policy,
@@ -836,13 +873,9 @@ mod tests {
         );
 
         // 5. One unit above limit: Impure income failure (501 bps)
-        let impure_fail = ShariahFinancialMetrics {
-            debt_ratio_bps: 1_000,
-            interest_bearing_cash_ratio_bps: 1_000,
-            impure_income_ratio_bps: 501,
-        };
+        let impure_fail = ShariahFinancialMetrics::from_market_cap_ratios(1_000, 1_000, 501);
         let res_impure = screen_asset(
-            &BusinessCategory::Technology,
+            &reviewed_tech,
             &impure_fail,
             &valid_ownership,
             &policy,
@@ -869,11 +902,7 @@ mod tests {
             verified_at: 1_700_000_000,
             expires_at: 1_710_000_000,
         };
-        let clean_metrics = ShariahFinancialMetrics {
-            debt_ratio_bps: 500,
-            interest_bearing_cash_ratio_bps: 500,
-            impure_income_ratio_bps: 50,
-        };
+        let clean_metrics = ShariahFinancialMetrics::from_market_cap_ratios(500, 500, 50);
         let now = 1_705_000_000;
 
         let prohibited_sectors = vec![
@@ -886,7 +915,11 @@ mod tests {
         ];
 
         for sector in prohibited_sectors {
-            let res = screen_asset(&sector, &clean_metrics, &valid_ownership, &policy, now);
+            let assessment = BusinessActivityAssessment::prohibited(
+                sector,
+                "Prohibited primary business activity",
+            );
+            let res = screen_asset(&assessment, &clean_metrics, &valid_ownership, &policy, now);
             assert_eq!(
                 res,
                 ScreeningResult::Rejected {
@@ -895,28 +928,85 @@ mod tests {
             );
         }
 
-        // Permissible sectors
+        // Permissible sectors (strictly reviewed)
         let permissible_sectors = vec![
             BusinessCategory::Technology,
             BusinessCategory::Healthcare,
             BusinessCategory::Manufacturing,
-            BusinessCategory::Other("Renewable Energy".to_string()),
         ];
 
         for sector in permissible_sectors {
-            let res = screen_asset(&sector, &clean_metrics, &valid_ownership, &policy, now);
+            let assessment = BusinessActivityAssessment::reviewed_permissible(
+                sector,
+                "Core business operations compliant",
+                "SEC 10-K",
+            );
+            let res = screen_asset(&assessment, &clean_metrics, &valid_ownership, &policy, now);
             assert_eq!(res, ScreeningResult::Approved);
+        }
+    }
+
+    #[test]
+    fn test_business_classification_fail_closed() {
+        let policy = ScreeningPolicy::board_approved_v1();
+        let clean_metrics = ShariahFinancialMetrics::from_market_cap_ratios(500, 500, 50);
+        let valid_ownership = OwnershipRecord {
+            verified: true,
+            issuer: "Backed Finance AG".to_string(),
+            custodian: "Maerki Baumann & Co. AG".to_string(),
+            legal_structure: "Swiss DLT Act Statutory SPV".to_string(),
+            instrument_reference: "ISIN: CH1173294265".to_string(),
+            evidence_hash: "0x1234567890abcdef".to_string(),
+            verified_at: 1_700_000_000,
+            expires_at: 1_800_000_000,
+        };
+        let now = 1_705_000_000;
+
+        // Verify fail-closed security: Any custom or unreviewed category must fail-closed
+        let unclassified_sectors = vec![
+            BusinessCategory::Other("Renewable Energy".to_string()),
+            BusinessCategory::Other("Alcohol".to_string()),
+            BusinessCategory::Other("Fintech Lending".to_string()),
+            BusinessCategory::Other("Cloud Hosting".to_string()),
+            // Even broad sectors without qualitative review must require review
+            BusinessCategory::Technology,
+            BusinessCategory::Healthcare,
+            BusinessCategory::Manufacturing,
+        ];
+
+        for sector in unclassified_sectors {
+            let assessment = BusinessActivityAssessment::unreviewed(sector);
+            assert_eq!(
+                assessment.classification(),
+                BusinessClassification::RequiresReview
+            );
+            assert_eq!(
+                screen_business_activity(&assessment),
+                Err(ShariahRejectionReason::BusinessClassificationRequiresReview)
+            );
+            assert_eq!(
+                check_business_activity(&assessment),
+                Err(ShariahRejectionReason::BusinessClassificationRequiresReview)
+            );
+            let res = screen_asset(&assessment, &clean_metrics, &valid_ownership, &policy, now);
+            assert_eq!(
+                res,
+                ScreeningResult::Rejected {
+                    reason: ShariahRejectionReason::BusinessClassificationRequiresReview
+                }
+            );
         }
     }
 
     #[test]
     fn test_screening_engine_ownership_failures() {
         let policy = ScreeningPolicy::board_approved_v1();
-        let clean_metrics = ShariahFinancialMetrics {
-            debt_ratio_bps: 500,
-            interest_bearing_cash_ratio_bps: 500,
-            impure_income_ratio_bps: 50,
-        };
+        let clean_metrics = ShariahFinancialMetrics::from_market_cap_ratios(500, 500, 50);
+        let reviewed_tech = BusinessActivityAssessment::reviewed_permissible(
+            BusinessCategory::Technology,
+            "Hardware production",
+            "SEC Form 10-K",
+        );
         let now = 1_705_000_000;
 
         // 1. Unverified ownership
@@ -931,7 +1021,7 @@ mod tests {
             expires_at: 1_710_000_000,
         };
         let res_unverified = screen_asset(
-            &BusinessCategory::Technology,
+            &reviewed_tech,
             &clean_metrics,
             &unverified_ownership,
             &policy,
@@ -956,7 +1046,7 @@ mod tests {
             expires_at: 1_704_000_000, // Expired before now (1_705_000_000)
         };
         let res_expired = screen_asset(
-            &BusinessCategory::Technology,
+            &reviewed_tech,
             &clean_metrics,
             &expired_ownership,
             &policy,
@@ -990,11 +1080,16 @@ mod tests {
             verified_at: 1_700_000_000,
             expires_at: 1_710_000_000,
         };
-        let clean_financials = ShariahFinancialMetrics {
-            debt_ratio_bps: 1_500,                  // 15% < 30%
-            interest_bearing_cash_ratio_bps: 1_200, // 12% < 30%
-            impure_income_ratio_bps: 100,           // 1% < 5%
-        };
+        let clean_financials = ShariahFinancialMetrics::from_market_cap_ratios(1_500, 1_200, 100);
+        let reviewed_tech = BusinessActivityAssessment::reviewed_permissible(
+            BusinessCategory::Technology,
+            "GPU and AI hardware design",
+            "SEC Form 10-K",
+        );
+        let prohibited_alcohol = BusinessActivityAssessment::prohibited(
+            BusinessCategory::Alcohol,
+            "Distilled beverages",
+        );
         let now = 1_705_000_000;
 
         let mut registry = ShariahAssetRegistry::new();
@@ -1005,7 +1100,7 @@ mod tests {
                 nvda_asset.clone(),
                 valid_ownership.clone(),
                 clean_financials.clone(),
-                BusinessCategory::Technology,
+                reviewed_tech.clone(),
                 &policy,
                 now,
             )
@@ -1022,7 +1117,7 @@ mod tests {
             nvda_asset.clone(),
             valid_ownership.clone(),
             clean_financials.clone(),
-            BusinessCategory::Technology,
+            reviewed_tech.clone(),
             &policy,
             now,
         );
@@ -1038,7 +1133,7 @@ mod tests {
             nvda_unverified,
             unverified_ownership,
             clean_financials.clone(),
-            BusinessCategory::Technology,
+            reviewed_tech.clone(),
             &policy,
             now,
         );
@@ -1055,7 +1150,7 @@ mod tests {
             nvda_prohibited,
             valid_ownership.clone(),
             clean_financials.clone(),
-            BusinessCategory::Alcohol,
+            prohibited_alcohol,
             &policy,
             now,
         );
@@ -1077,7 +1172,7 @@ mod tests {
             nvda_debt,
             valid_ownership.clone(),
             excess_debt_financials,
-            BusinessCategory::Technology,
+            reviewed_tech.clone(),
             &policy,
             now,
         );
@@ -1098,7 +1193,7 @@ mod tests {
             nvda_expired,
             valid_ownership.clone(),
             clean_financials.clone(),
-            BusinessCategory::Technology,
+            reviewed_tech.clone(),
             &policy,
             expired_now,
         );
@@ -1131,11 +1226,7 @@ mod tests {
         );
 
         // Case 1: Exact boundary (3,000 bps)
-        let boundary_metrics = ShariahFinancialMetrics {
-            debt_ratio_bps: 3_000,
-            interest_bearing_cash_ratio_bps: 2_000,
-            impure_income_ratio_bps: 100,
-        };
+        let boundary_metrics = ShariahFinancialMetrics::from_market_cap_ratios(3_000, 2_000, 100);
 
         // Under LessThanOrEqual: 3,000 <= 3,000 is COMPLIANT (Pass)
         assert!(screen_financial_metrics(&boundary_metrics, &policy_inclusive).is_ok());
@@ -1147,22 +1238,14 @@ mod tests {
         );
 
         // Case 2: Just below boundary (2,999 bps)
-        let below_boundary = ShariahFinancialMetrics {
-            debt_ratio_bps: 2_999,
-            interest_bearing_cash_ratio_bps: 2_000,
-            impure_income_ratio_bps: 100,
-        };
+        let below_boundary = ShariahFinancialMetrics::from_market_cap_ratios(2_999, 2_000, 100);
 
         // Both LessThanOrEqual and StrictLessThan pass for 2,999 bps
         assert!(screen_financial_metrics(&below_boundary, &policy_inclusive).is_ok());
         assert!(screen_financial_metrics(&below_boundary, &policy_strict).is_ok());
 
         // Case 3: Just above boundary (3,001 bps)
-        let above_boundary = ShariahFinancialMetrics {
-            debt_ratio_bps: 3_001,
-            interest_bearing_cash_ratio_bps: 2_000,
-            impure_income_ratio_bps: 100,
-        };
+        let above_boundary = ShariahFinancialMetrics::from_market_cap_ratios(3_001, 2_000, 100);
 
         // Both fail for 3,001 bps
         assert_eq!(
@@ -1173,5 +1256,215 @@ mod tests {
             screen_financial_metrics(&above_boundary, &policy_strict),
             Err(ShariahRejectionReason::ExcessDebt)
         );
+    }
+
+    #[test]
+    fn test_qualitative_business_activity_screening_state() {
+        let policy = ScreeningPolicy::board_approved_v1();
+        let clean_metrics = ShariahFinancialMetrics::from_market_cap_ratios(500, 500, 50);
+        let valid_ownership = OwnershipRecord {
+            verified: true,
+            issuer: "Backed Finance AG".to_string(),
+            custodian: "Maerki Baumann & Co. AG".to_string(),
+            legal_structure: "Swiss DLT Act Statutory SPV".to_string(),
+            instrument_reference: "ISIN: US67066G1040".to_string(),
+            evidence_hash: "sha256:cert123".to_string(),
+            verified_at: 1_700_000_000,
+            expires_at: 1_710_000_000,
+        };
+        let now = 1_705_000_000;
+
+        // 1. Broad Technology sector without qualitative vetting must fail closed
+        let unreviewed_tech = BusinessActivityAssessment::unreviewed(BusinessCategory::Technology);
+        assert_eq!(
+            unreviewed_tech.classification(),
+            BusinessClassification::RequiresReview
+        );
+        assert_eq!(
+            screen_asset(
+                &unreviewed_tech,
+                &clean_metrics,
+                &valid_ownership,
+                &policy,
+                now
+            ),
+            ScreeningResult::Rejected {
+                reason: ShariahRejectionReason::BusinessClassificationRequiresReview
+            }
+        );
+
+        // 2. Tech firm engaging in prohibited activities (e.g. gambling or adult platform)
+        let tech_with_gambling = BusinessActivityAssessment::prohibited(
+            BusinessCategory::Technology,
+            "Operates online gambling and wagering infrastructure",
+        );
+        assert_eq!(
+            tech_with_gambling.classification(),
+            BusinessClassification::Prohibited
+        );
+        assert_eq!(
+            screen_asset(
+                &tech_with_gambling,
+                &clean_metrics,
+                &valid_ownership,
+                &policy,
+                now
+            ),
+            ScreeningResult::Rejected {
+                reason: ShariahRejectionReason::ProhibitedBusiness
+            }
+        );
+
+        // 3. Tech firm vetted and approved
+        let reviewed_tech = BusinessActivityAssessment::reviewed_permissible(
+            BusinessCategory::Technology,
+            "Cloud enterprise hosting and data center operations",
+            "SEC Form 10-K and independent board audit",
+        );
+        assert_eq!(
+            reviewed_tech.classification(),
+            BusinessClassification::Approved
+        );
+        assert_eq!(
+            screen_asset(
+                &reviewed_tech,
+                &clean_metrics,
+                &valid_ownership,
+                &policy,
+                now
+            ),
+            ScreeningResult::Approved
+        );
+    }
+
+    #[test]
+    fn test_msci_receivables_ratio_evaluation() {
+        let msci_policy = ScreeningPolicy::msci_islamic("2024");
+        assert_eq!(
+            msci_policy.receivables_cash_limit_bps,
+            Some(BasisPoints::new(3_333).unwrap())
+        );
+
+        let base_metrics = ShariahFinancialMetrics {
+            debt_ratio_bps: 1_000,
+            interest_bearing_cash_ratio_bps: 1_000,
+            impure_income_ratio_bps: 100,
+            receivables_cash_ratio_bps: Some(3_000), // 30% <= 33.33%
+            denominator_method: DenominatorMethod::AverageMarketCapMonths(12),
+        };
+
+        // Within limit passes
+        assert!(screen_financial_metrics(&base_metrics, &msci_policy).is_ok());
+
+        // Over limit (3,334 bps) fails
+        let over_receivables = ShariahFinancialMetrics {
+            receivables_cash_ratio_bps: Some(3_334),
+            ..base_metrics
+        };
+        assert_eq!(
+            screen_financial_metrics(&over_receivables, &msci_policy),
+            Err(ShariahRejectionReason::ExcessReceivablesAndCash)
+        );
+
+        // Missing required receivables metric fails closed with MissingEvidence
+        let missing_receivables = ShariahFinancialMetrics {
+            receivables_cash_ratio_bps: None,
+            ..base_metrics
+        };
+        assert_eq!(
+            screen_financial_metrics(&missing_receivables, &msci_policy),
+            Err(ShariahRejectionReason::MissingEvidence)
+        );
+    }
+
+    #[test]
+    fn test_denominator_methodology_auditability() {
+        let board_v1 = ScreeningPolicy::board_approved_v1();
+        assert_eq!(
+            board_v1.denominator,
+            DenominatorMethod::AverageMarketCapMonths(12)
+        );
+
+        let msci_policy = ScreeningPolicy::msci_islamic("2024");
+        assert_eq!(msci_policy.denominator, DenominatorMethod::TotalAssets);
+
+        let sp_policy = ScreeningPolicy::sp_shariah("2024");
+        assert_eq!(
+            sp_policy.denominator,
+            DenominatorMethod::AverageMarketCapMonths(36)
+        );
+
+        let ftse_policy = ScreeningPolicy::ftse_idealratings("2024");
+        assert_eq!(
+            ftse_policy.denominator,
+            DenominatorMethod::AverageMarketCapMonths(24)
+        );
+
+        // Serde roundtrip preserves denominator and receivables
+        let json = serde_json::to_string(&ftse_policy).expect("Serialize policy");
+        let deserialized: ScreeningPolicy =
+            serde_json::from_str(&json).expect("Deserialize policy");
+        assert_eq!(ftse_policy, deserialized);
+        assert_eq!(
+            deserialized.denominator,
+            DenominatorMethod::AverageMarketCapMonths(24)
+        );
+    }
+
+    #[test]
+    fn test_purification_calculation_decoupled_from_approval() {
+        let policy = ScreeningPolicy::board_approved_v1();
+        let valid_ownership = OwnershipRecord {
+            verified: true,
+            issuer: "Backed Finance AG".to_string(),
+            custodian: "Maerki Baumann & Co. AG".to_string(),
+            legal_structure: "Swiss DLT Act Statutory SPV".to_string(),
+            instrument_reference: "ISIN: US67066G1040".to_string(),
+            evidence_hash: "sha256:cert123".to_string(),
+            verified_at: 1_700_000_000,
+            expires_at: 1_710_000_000,
+        };
+        let now = 1_705_000_000;
+
+        // Asset has 1.2% (120 bps) incidental impure income (under the 5.0% threshold)
+        let metrics = ShariahFinancialMetrics::from_market_cap_ratios(1_500, 1_000, 120);
+        let reviewed_business = BusinessActivityAssessment::reviewed_permissible(
+            BusinessCategory::Technology,
+            "Cloud software enterprise sales",
+            "SEC Form 10-K",
+        );
+
+        // Screening approves the asset
+        let screening_result = screen_asset(
+            &reviewed_business,
+            &metrics,
+            &valid_ownership,
+            &policy,
+            now,
+        );
+        assert_eq!(screening_result, ScreeningResult::Approved);
+
+        // Purification is calculated separately:
+        // For a gross dividend of $10,000.00 (1,000,000 cents):
+        // 120 bps = 1.2% -> 12,000 cents ($120.00) must be purified
+        let gross_dividend_cents = 1_000_000u64;
+        let purification = assess_purification(gross_dividend_cents, metrics.impure_income_ratio_bps)
+            .expect("Purification calculation succeeds");
+
+        assert_eq!(purification.dividend_amount_minor, 1_000_000);
+        assert_eq!(purification.purification_ratio_bps, 120);
+        assert_eq!(purification.purification_amount_minor, 12_000); // $120.00
+        assert_eq!(purification.net_permissible_amount_minor, 988_000); // $9,880.00
+        assert!(!purification.is_pure());
+
+        // Clean company with 0 bps impure income
+        let pure_purification = assess_purification(1_000_000, 0).unwrap();
+        assert_eq!(pure_purification.purification_amount_minor, 0);
+        assert_eq!(pure_purification.net_permissible_amount_minor, 1_000_000);
+        assert!(pure_purification.is_pure());
+
+        // Pure calculation helper
+        let direct_calc = calculate_purification(1_000_000, 120).unwrap();
+        assert_eq!(direct_calc, 12_000);
     }
 }
