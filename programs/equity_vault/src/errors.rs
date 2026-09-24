@@ -40,4 +40,16 @@ pub enum VaultError {
     ComplianceExpired,
     #[msg("Compliance PDA does not match the traded asset mint")]
     ComplianceMintMismatch,
+    #[msg("DEX program is not in the authorized DEX whitelist")]
+    UnauthorizedDexProgram,
+    #[msg("Insufficient token balance in vault token account for execution")]
+    InsufficientFunds,
+    #[msg("Trade amount or minimum output amount must be positive")]
+    InvalidAmount,
+    #[msg("Account constraint violation")]
+    ConstraintViolation,
+    #[msg("Execution order has expired")]
+    ExecutionExpired,
+    #[msg("Cross-Program Invocation to DEX failed")]
+    DexCpiFailed,
 }

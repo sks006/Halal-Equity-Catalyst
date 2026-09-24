@@ -3,6 +3,7 @@
 use anchor_lang::prelude::*;
 
 pub mod constants;
+pub mod dex;
 pub mod errors;
 pub mod events;
 pub mod instructions;
@@ -81,8 +82,8 @@ pub mod equity_vault {
         )
     }
 
-    pub fn execute_action(
-        ctx: Context<ExecuteAction>,
+    pub fn execute_action<'info>(
+        ctx: Context<'_, '_, 'info, 'info, ExecuteAction<'info>>,
         execution_id: u64,
         action_type: u8,
         input_amount: u64,
@@ -95,5 +96,13 @@ pub mod equity_vault {
             input_amount,
             min_output_amount,
         )
+    }
+
+    pub fn mock_dex_swap<'info>(
+        ctx: Context<'_, '_, 'info, 'info, MockDexSwap<'info>>,
+        amount_in: u64,
+        amount_out: u64,
+    ) -> Result<()> {
+        instructions::mock_dex_swap::mock_dex_swap(ctx, amount_in, amount_out)
     }
 }

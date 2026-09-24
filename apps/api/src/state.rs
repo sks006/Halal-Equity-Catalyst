@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{
     config::Config,
-    services::{HealthMonitor, OracleService, QuoteExecutionService, SolanaService},
+    services::{HealthMonitor, MarketDataStore, OracleService, QuoteExecutionService, SolanaService},
 };
 
 #[derive(Clone)]
@@ -19,6 +19,7 @@ pub struct AppState {
     pub solana_service: Option<SolanaService>,
     pub oracle_service: Option<Arc<OracleService>>,
     pub quote_service: Option<Arc<QuoteExecutionService>>,
+    pub market_data_store: Option<Arc<MarketDataStore>>,
     pub rate_limiter: Arc<crate::middleware::RateLimiter>,
 }
 
@@ -56,6 +57,7 @@ impl AppState {
             solana_service,
             oracle_service: None,
             quote_service: None,
+            market_data_store: None,
             rate_limiter,
         }
     }
@@ -76,6 +78,11 @@ impl AppState {
 
     pub fn with_quote_service(mut self, quote_service: Arc<QuoteExecutionService>) -> Self {
         self.quote_service = Some(quote_service);
+        self
+    }
+
+    pub fn with_market_data_store(mut self, market_data_store: Arc<MarketDataStore>) -> Self {
+        self.market_data_store = Some(market_data_store);
         self
     }
 

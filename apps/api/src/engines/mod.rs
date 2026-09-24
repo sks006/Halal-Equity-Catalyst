@@ -2,10 +2,24 @@
 
 pub mod dbc_engine;
 pub mod decision_engine;
+pub mod execution_planner;
+pub mod execution_signer;
 pub mod policy_engine;
 pub mod risk_engine;
 
 pub use dbc_engine::DbcEngine;
-pub use decision_engine::DecisionEngine;
-pub use policy_engine::PolicyEngine;
+pub use decision_engine::{CanonicalExecutionPayload, DecisionEngine, ExecutionSigner};
+pub use execution_planner::{
+    ExecutionPlan, ExecutionPlanner, IdempotencyRecord, IdempotencyStatus, IdempotencyTracker,
+    OracleReferenceInfo, PlannerError,
+};
+pub use execution_signer::{
+    DevTestSigner, ExternalSigner, KeypairSigner, RemoteHsmSigner, SignedTransaction, SignerError,
+    TransactionBuilder, TransactionSignerService, TransactionSubmitter, UnavailableSigner,
+    UnsignedTransaction,
+};
+pub use policy_engine::{
+    AllocationProposal, DeterministicPolicyAuthorizer, ExecutionAuthorization, PolicyEngine,
+    PolicyRejectionReason, PolicyValidationOutcome, ValidationContext,
+};
 pub use risk_engine::RiskEngine;

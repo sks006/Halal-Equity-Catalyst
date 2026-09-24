@@ -298,16 +298,15 @@ impl AssetMarketDataRepository {
                 Ok(rows.iter().map(AssetMarketDataMapping::from).collect())
             }
             Backend::InMemory(store) => {
-                let guard = store.read().map_err(|e| {
-                    ApiError::InternalServerError(format!("Lock acquisition failed: {}", e))
-                })?;
+                let active_models: Vec<AssetMarketDataModel> = {
+                    let guard = store.read().map_err(|e| {
+                        ApiError::InternalServerError(format!("Lock acquisition failed: {}", e))
+                    })?;
+                    guard.values().filter(|m| m.is_active).cloned().collect()
+                };
 
                 let mut active_list = Vec::new();
-                for model in guard.values() {
-                    if !model.is_active {
-                        continue;
-                    }
-
+                for model in active_models {
                     if let Some(asset) = self.asset_repo.get_asset_by_id(&model.asset_id).await? {
                         // Strict dual-check: Asset must be ACTIVE and SHARIAH_APPROVED
                         if asset.is_active && asset.approval_status == AssetApprovalStatus::Active {

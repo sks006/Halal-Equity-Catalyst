@@ -66,6 +66,7 @@ pub struct RegisteredAsset {
 
 impl RegisteredAsset {
     /// Returns true if this asset is currently permissible for spot execution at timestamp `now`.
+    /// my explanation: this function is a method which check wather the asset tradeable or not by calling the is_tradeable function and passing the current asset and the timestamp now.
     pub fn is_tradeable(&self, now: i64) -> bool {
         is_tradeable(self, now)
     }
@@ -77,6 +78,7 @@ impl RegisteredAsset {
 }
 
 /// Standalone accessor retrieving Shariah eligibility from a [`RegisteredAsset`].
+/// my explanation: here we find a function that take registeredrasset as input and match the condition
 pub fn get_eligibility(registered: &RegisteredAsset) -> &ShariahEligibility {
     &registered.eligibility
 }
@@ -199,6 +201,8 @@ pub fn register_asset_at(
 
 /// Authoritative in-memory registry holding Shariah-screened, verified assets.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+
+//my explanation: this struct has assets that is a hashmap that store the registered asset with the key as the asset id and the value as the registered asset
 pub struct ShariahAssetRegistry {
     assets: HashMap<String, RegisteredAsset>,
 }
@@ -254,6 +258,7 @@ impl ShariahAssetRegistry {
     }
 
     /// Retrieves a mutable reference to a [`RegisteredAsset`] by canonical ID or ticker symbol.
+    /// my explanation: this function returns a mutable reference to the registered asset if it exists in the registry and matches the query, otherwise it returns None. It first checks if the asset exists in the hashmap by its ID, and if not, it searches through the values of the hashmap to find a match by symbol.
     pub fn get_asset_mut(&mut self, query: &str) -> Option<&mut RegisteredAsset> {
         if self.assets.contains_key(query) {
             return self.assets.get_mut(query);

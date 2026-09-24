@@ -408,6 +408,10 @@ impl AnchorClient {
         min_output_amount: u64,
     ) -> Result<(Instruction, Pubkey), SolanaError> {
         let (execution_pda, _) = find_execution_pda(vault_pda, execution_id, &self.program_id);
+        let vault_input_token = find_associated_token_address(vault_pda, input_mint);
+        let vault_output_token = find_associated_token_address(vault_pda, output_mint);
+        let dex_program = Pubkey::from_str(JUPITER_V6_PROGRAM_ID).unwrap();
+        let spl_token = Pubkey::from_str(SPL_TOKEN_PROGRAM_ID).unwrap();
 
         let mut data = Vec::with_capacity(41);
         data.extend_from_slice(&EXECUTE_ACTION_DISCRIMINATOR);
@@ -430,7 +434,69 @@ impl AnchorClient {
             AccountMeta::new(execution_pda, false),
             AccountMeta::new_readonly(*input_mint, false),
             AccountMeta::new_readonly(*output_mint, false),
+            AccountMeta::new(vault_input_token, false),
+            AccountMeta::new(vault_output_token, false),
             AccountMeta::new_readonly(*compliance_pda, false),
+            AccountMeta::new_readonly(dex_program, false),
+            AccountMeta::new_readonly(spl_token, false),
+            AccountMeta::new_readonly(system_program::id(), false),
+        ];
+
+        let ix = Instruction {
+            program_id: self.program_id,
+            accounts,
+            data,
+        };
+
+        Ok((ix, execution_pda))
+    }
+
+    /// 7b. Execute Action with explicit DEX program and custom token accounts
+    #[allow(clippy::too_many_arguments)]
+    pub fn build_execute_action_ix_with_dex(
+        &self,
+        keeper: &Pubkey,
+        vault_pda: &Pubkey,
+        execution_id: u64,
+        action_type: u8,
+        input_mint: &Pubkey,
+        output_mint: &Pubkey,
+        vault_input_token: &Pubkey,
+        vault_output_token: &Pubkey,
+        compliance_pda: &Pubkey,
+        dex_program: &Pubkey,
+        input_amount: u64,
+        min_output_amount: u64,
+    ) -> Result<(Instruction, Pubkey), SolanaError> {
+        let (execution_pda, _) = find_execution_pda(vault_pda, execution_id, &self.program_id);
+        let spl_token = Pubkey::from_str(SPL_TOKEN_PROGRAM_ID).unwrap();
+
+        let mut data = Vec::with_capacity(41);
+        data.extend_from_slice(&EXECUTE_ACTION_DISCRIMINATOR);
+        execution_id
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        action_type
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        input_amount
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+        min_output_amount
+            .serialize(&mut data)
+            .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
+
+        let accounts = vec![
+            AccountMeta::new(*keeper, true),
+            AccountMeta::new(*vault_pda, false),
+            AccountMeta::new(execution_pda, false),
+            AccountMeta::new_readonly(*input_mint, false),
+            AccountMeta::new_readonly(*output_mint, false),
+            AccountMeta::new(*vault_input_token, false),
+            AccountMeta::new(*vault_output_token, false),
+            AccountMeta::new_readonly(*compliance_pda, false),
+            AccountMeta::new_readonly(*dex_program, false),
+            AccountMeta::new_readonly(spl_token, false),
             AccountMeta::new_readonly(system_program::id(), false),
         ];
 

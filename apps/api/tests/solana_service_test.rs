@@ -197,7 +197,7 @@ async fn test_anchor_instruction_builders_via_service() {
         )
         .expect("Failed to build execute_action ix");
     assert_eq!(action_ix.accounts[0].pubkey, authority.pubkey());
-    assert_eq!(action_ix.accounts[5].pubkey, compliance_pda);
+    assert_eq!(action_ix.accounts[7].pubkey, compliance_pda);
 
     // 7. Borrow instruction
     let borrower = Keypair::new();

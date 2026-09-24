@@ -11,6 +11,11 @@ use std::{fs, path::Path, sync::Arc};
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::{
+    config::Environment,
+    engines::execution_signer::{KeypairSigner, SignerError},
+};
+
 /// Canonical execution payload representing strictly the deterministic parameters of a financial trade.
 /// AI proposals (sentiment, natural language reasoning, prompt instructions) are quarantined
 /// and excluded from this payload.
@@ -71,7 +76,42 @@ impl std::fmt::Debug for ExecutionSigner {
 }
 
 impl ExecutionSigner {
-    /// Loads the execution keypair from the specified filesystem path or falls back to a deterministic key.
+    /// Loads the execution keypair strictly from disk for production, failing closed if absent or invalid.
+    /// NEVER falls back to any hardcoded seed or development keypair.
+    pub fn load_production(path_str: &str) -> Result<Self, SignerError> {
+        let keypair_signer = KeypairSigner::load_from_path(path_str)?;
+        let pubkey_str = keypair_signer.pubkey().to_string();
+        Ok(Self {
+            signer_pubkey: pubkey_str,
+            keypair: Arc::new(keypair_signer.to_solana_keypair()),
+        })
+    }
+
+    /// Loads the execution signer enforcing environment security policies.
+    ///
+    /// If `env == Environment::Mainnet`:
+    /// Strictly requires a valid keyfile path and FAILS CLOSED if not found.
+    ///
+    /// If `env != Environment::Mainnet`:
+    /// Fails closed unless the keyfile exists or is explicitly configured.
+    pub fn load_with_env(path_str: &str, env: Environment) -> Result<Self, SignerError> {
+        if env == Environment::Mainnet {
+            Self::load_production(path_str).map_err(|e| match e {
+                SignerError::KeyFileNotFound { path } => {
+                    SignerError::ProductionFallbackProhibited(format!(
+                        "Production Mainnet keyfile '{}' not found; fallback to test key is strictly prohibited",
+                        path
+                    ))
+                }
+                other => other,
+            })
+        } else {
+            Self::load_production(path_str)
+        }
+    }
+
+    /// Loads the execution keypair from disk if present; otherwise generates a cryptographically random
+    /// ephemeral keypair for dev/testing. NEVER falls back to a hardcoded seed like [42u8; 32].
     pub fn load_or_generate(path_str: &str) -> Self {
         let expanded_path = shellexpand(path_str);
         let path = Path::new(&expanded_path);
@@ -101,11 +141,40 @@ impl ExecutionSigner {
 
         warn!(
             path = %path_str,
-            "Signer file not found; initializing deterministic isolated execution signer"
+            "Signer file not found; generating fresh cryptographically random ephemeral keypair for dev/test (NO hardcoded seed)"
         );
-        let default_seed = [42u8; 32];
-        let keypair = Keypair::from_seed(&default_seed)
+        let keypair = Keypair::new();
+        let pubkey_str = keypair.pubkey().to_string();
+        Self {
+            signer_pubkey: pubkey_str,
+            keypair: Arc::new(keypair),
+        }
+    }
+
+    /// Explicitly creates a development/test ephemeral signer with a fresh random Keypair.
+    pub fn new_dev_ephemeral() -> Self {
+        let keypair = Keypair::new();
+        let pubkey_str = keypair.pubkey().to_string();
+        Self {
+            signer_pubkey: pubkey_str,
+            keypair: Arc::new(keypair),
+        }
+    }
+
+    /// Explicitly creates a deterministic test signer with a specified seed.
+    /// Strictly for unit tests requiring repeatable signatures.
+    pub fn new_dev_test_deterministic(seed: [u8; 32]) -> Self {
+        let keypair = Keypair::from_seed(&seed)
             .expect("Deterministic keypair generation from 32-byte seed must succeed");
+        let pubkey_str = keypair.pubkey().to_string();
+        Self {
+            signer_pubkey: pubkey_str,
+            keypair: Arc::new(keypair),
+        }
+    }
+
+    /// Constructs an ExecutionSigner from an existing verified Solana Keypair.
+    pub fn from_keypair(keypair: Keypair) -> Self {
         let pubkey_str = keypair.pubkey().to_string();
         Self {
             signer_pubkey: pubkey_str,

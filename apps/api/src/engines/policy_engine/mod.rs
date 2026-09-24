@@ -1,11 +1,16 @@
 //! Policy Engine evaluating events, conditions, rules, signals, and target allocations.
 
 pub mod allocation;
+pub mod authorization;
 pub mod conditions;
 pub mod rules;
 pub mod signals;
 
 pub use allocation::calculate_target_allocation;
+pub use authorization::{
+    AllocationProposal, DeterministicPolicyAuthorizer, ExecutionAuthorization,
+    PolicyRejectionReason, PolicyValidationOutcome, ValidationContext,
+};
 pub use conditions::*;
 pub use rules::{match_rule, PolicyRule};
 pub use signals::{generate_signal, PolicySignal};

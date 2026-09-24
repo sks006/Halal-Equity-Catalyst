@@ -11,7 +11,8 @@ pub mod portfolio;
 pub mod vault;
 
 pub use asset_market_data::{
-    AssetMarketDataMapping, AssetMarketDataModel, CreateMarketDataMappingRequest,
+    subscription_set_from_mappings, AssetMarketDataMapping, AssetMarketDataModel,
+    CreateMarketDataMappingRequest,
 };
 pub use canonical_asset::{CanonicalAssetModel, CreateAssetRequest};
 pub use dbc_pool::{CreateDbcPoolRequest, DbcPoolModel};

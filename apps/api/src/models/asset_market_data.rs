@@ -43,6 +43,8 @@ pub struct AssetMarketDataMapping {
     pub updated_at: DateTime<Utc>,
 }
 
+use equity_catalyst_pyth::{PythSubscription, SubscriptionSet};
+
 impl From<&Row> for AssetMarketDataMapping {
     fn from(row: &Row) -> Self {
         let mapping_id: Option<Uuid> = row.try_get("mapping_id").ok();
@@ -57,6 +59,34 @@ impl From<&Row> for AssetMarketDataMapping {
             updated_at: row.get("updated_at"),
         }
     }
+}
+
+impl From<&AssetMarketDataMapping> for PythSubscription {
+    fn from(mapping: &AssetMarketDataMapping) -> Self {
+        PythSubscription::new(
+            &mapping.asset_id,
+            &mapping.symbol,
+            &mapping.mint_address,
+            &mapping.pyth_feed_id,
+        )
+    }
+}
+
+impl From<AssetMarketDataMapping> for PythSubscription {
+    fn from(mapping: AssetMarketDataMapping) -> Self {
+        PythSubscription::new(
+            mapping.asset_id,
+            mapping.symbol,
+            mapping.mint_address,
+            mapping.pyth_feed_id,
+        )
+    }
+}
+
+/// Converts a slice of active `AssetMarketDataMapping` projections into a deterministic `SubscriptionSet`.
+pub fn subscription_set_from_mappings(mappings: &[AssetMarketDataMapping]) -> SubscriptionSet {
+    let subs: Vec<PythSubscription> = mappings.iter().map(PythSubscription::from).collect();
+    SubscriptionSet::new(subs)
 }
 
 /// Request payload for creating a new asset <-> Pyth feed mapping.

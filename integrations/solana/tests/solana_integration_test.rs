@@ -307,13 +307,13 @@ fn test_instruction_builders_layout() {
         )
         .unwrap();
     assert_eq!(&exec_ix.data[..8], &EXECUTE_ACTION_DISCRIMINATOR);
-    assert_eq!(exec_ix.accounts.len(), 7);
+    assert_eq!(exec_ix.accounts.len(), 11);
     assert_eq!(exec_ix.accounts[0].pubkey, keeper);
     assert_eq!(exec_ix.accounts[1].pubkey, v_pda);
     assert_eq!(exec_ix.accounts[2].pubkey, exec_pda);
     assert_eq!(exec_ix.accounts[3].pubkey, asset_mint);
     assert_eq!(exec_ix.accounts[4].pubkey, asset_mint);
-    assert_eq!(exec_ix.accounts[5].pubkey, comp_pda);
+    assert_eq!(exec_ix.accounts[7].pubkey, comp_pda);
 }
 
 #[tokio::test]
