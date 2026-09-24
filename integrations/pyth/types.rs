@@ -146,3 +146,86 @@ impl NormalizedPrice {
         })
     }
 }
+
+/// Structured errors specific to the Pyth Hermes SSE stream.
+#[derive(Debug, Error, Clone, PartialEq)]
+pub enum PythStreamError {
+    #[error("HTTP error ({status}): {message}")]
+    Http { status: u16, message: String },
+
+    #[error("Connection failure: {0}")]
+    Connection(String),
+
+    #[error("Malformed SSE event: {0}")]
+    MalformedSse(String),
+
+    #[error("Malformed JSON in SSE data payload: {error} (raw: '{raw}')")]
+    MalformedJson { raw: String, error: String },
+
+    #[error("Unknown SSE event received: event='{event}', data='{data}'")]
+    UnknownEvent { event: String, data: String },
+
+    #[error("Stream terminated unexpectedly: {0}")]
+    StreamTerminated(String),
+
+    #[error("Invalid stream configuration: {0}")]
+    InvalidConfig(String),
+}
+
+impl From<PythStreamError> for PythError {
+    fn from(err: PythStreamError) -> Self {
+        match err {
+            PythStreamError::Http { status, message } => {
+                PythError::Http(format!("Status {}: {}", status, message))
+            }
+            PythStreamError::Connection(msg) => PythError::Http(msg),
+            PythStreamError::MalformedSse(msg) => PythError::InvalidPriceData(msg),
+            PythStreamError::MalformedJson { raw, error } => {
+                PythError::Json(format!("{}: {}", error, raw))
+            }
+            PythStreamError::UnknownEvent { event, data } => {
+                PythError::InvalidPriceData(format!("Unknown event '{}': {}", event, data))
+            }
+            PythStreamError::StreamTerminated(msg) => PythError::Http(msg),
+            PythStreamError::InvalidConfig(msg) => PythError::InvalidPriceData(msg),
+        }
+    }
+}
+
+/// Binary payload component of a Pyth Hermes SSE price update event.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct PythBinaryUpdate {
+    #[serde(default)]
+    pub encoding: Option<String>,
+    #[serde(default)]
+    pub data: Vec<String>,
+}
+
+/// A parsed price update event from the Pyth Hermes `/v2/updates/price/stream` endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+pub struct PythPriceUpdateEvent {
+    #[serde(default)]
+    pub binary: Option<PythBinaryUpdate>,
+    #[serde(default)]
+    pub parsed: Option<Vec<ParsedPriceFeed>>,
+}
+
+impl PythPriceUpdateEvent {
+    /// Returns a slice of the parsed price feeds contained in this update.
+    pub fn feeds(&self) -> &[ParsedPriceFeed] {
+        self.parsed.as_deref().unwrap_or(&[])
+    }
+
+    /// Finds a parsed price feed by hex ID (normalized comparison).
+    pub fn find_feed(&self, feed_id: &str) -> Option<&ParsedPriceFeed> {
+        let clean = feed_id.trim_start_matches("0x").to_lowercase();
+        self.feeds()
+            .iter()
+            .find(|f| f.id.trim_start_matches("0x").to_lowercase() == clean)
+    }
+
+    /// Consumes the event and returns all parsed price feeds.
+    pub fn into_feeds(self) -> Vec<ParsedPriceFeed> {
+        self.parsed.unwrap_or_default()
+    }
+}

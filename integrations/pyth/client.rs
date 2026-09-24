@@ -175,4 +175,20 @@ impl PythClient {
         let feed = self.get_price_by_symbol(symbol).await?;
         NormalizedPrice::from_raw(symbol, &feed.id, &feed.price, max_staleness_secs)
     }
+
+    /// Creates a reusable real-time SSE price stream client for the provided feed IDs.
+    pub fn open_price_stream(
+        &self,
+        feed_ids: &[&str],
+        api_key: Option<String>,
+    ) -> crate::stream::PythStreamClient {
+        let mut config = crate::stream::PythStreamConfig::new(
+            &self.base_url,
+            feed_ids.iter().map(|s| s.to_string()).collect(),
+        );
+        if let Some(key) = api_key {
+            config = config.with_api_key(key);
+        }
+        crate::stream::PythStreamClient::new_with_http_client(config, self.http_client.clone())
+    }
 }

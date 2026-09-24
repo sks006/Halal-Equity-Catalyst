@@ -13,8 +13,24 @@ pub mod state;
 pub mod workers;
 
 pub use config::Config;
+pub use engines::{
+    AllocationProposal, CanonicalExecutionPayload, DecisionEngine, DeterministicPolicyAuthorizer,
+    DevTestSigner, ExecutionAuthorization, ExecutionPlan, ExecutionPlanner, ExecutionSigner,
+    ExternalSigner, IdempotencyRecord, IdempotencyStatus, IdempotencyTracker, KeypairSigner,
+    OracleReferenceInfo, PlannerError, PolicyRejectionReason, PolicyValidationOutcome,
+    RemoteHsmSigner, SignedTransaction, SignerError, TransactionBuilder, TransactionSignerService,
+    TransactionSubmitter, UnavailableSigner, UnsignedTransaction, ValidationContext,
+};
+pub use equity_catalyst_pyth::{
+    DynamicStreamManager, PriceUpdateSink, PythSubscription, StreamManagerConfig, SubscriptionSet,
+};
 pub use error::ApiError;
 pub use router::create_router;
+pub use routes::{get_market_data_handler, market_data_ws_handler, MarketDataResponse};
+pub use services::{
+    AssetSubscriptionWatcher, MarketDataError, MarketDataStore, MarketPriceUpdate, PriceFreshness,
+    SubscriptionWatcherConfig,
+};
 pub use state::AppState;
 
 use axum::Router;
@@ -69,10 +85,12 @@ pub fn build_app(config: Config, pool: Pool, redis_client: Option<redis::Client>
         Some(execution_repo),
     ));
 
+    let market_data_store = Arc::new(services::MarketDataStore::new());
     let state = Arc::new(
         AppState::new(config, pool, redis_client, solana_service)
             .with_oracle_service(oracle_service)
-            .with_quote_service(quote_service),
+            .with_quote_service(quote_service)
+            .with_market_data_store(market_data_store),
     );
     create_router(state)
 }

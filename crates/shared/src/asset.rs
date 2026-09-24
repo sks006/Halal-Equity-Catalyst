@@ -372,6 +372,259 @@ pub fn verified_mainnet_assets() -> Vec<Asset> {
     ]
 }
 
+/// Canonical asset lifecycle and approval state machine.
+///
+/// Conceptual Progression:
+/// PENDING -> VALIDATED -> SHARIAH_APPROVED -> ACTIVE
+/// ACTIVE -> DEACTIVATED
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum AssetApprovalStatus {
+    Pending,
+    Validated,
+    ShariahApproved,
+    Active,
+    Deactivated,
+}
+
+impl fmt::Display for AssetApprovalStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Pending => write!(f, "PENDING"),
+            Self::Validated => write!(f, "VALIDATED"),
+            Self::ShariahApproved => write!(f, "SHARIAH_APPROVED"),
+            Self::Active => write!(f, "ACTIVE"),
+            Self::Deactivated => write!(f, "DEACTIVATED"),
+        }
+    }
+}
+
+impl std::str::FromStr for AssetApprovalStatus {
+    type Err = ValidationError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_uppercase().as_str() {
+            "PENDING" => Ok(Self::Pending),
+            "VALIDATED" => Ok(Self::Validated),
+            "SHARIAH_APPROVED" => Ok(Self::ShariahApproved),
+            "ACTIVE" => Ok(Self::Active),
+            "DEACTIVATED" => Ok(Self::Deactivated),
+            other => Err(ValidationError::InvalidParam(format!(
+                "Invalid asset approval status: '{}'",
+                other
+            ))),
+        }
+    }
+}
+
+impl AssetApprovalStatus {
+    /// Determines whether transition from current status to `target` is permitted.
+    pub fn can_transition_to(&self, target: AssetApprovalStatus) -> bool {
+        match (self, target) {
+            // PENDING -> VALIDATED
+            (Self::Pending, Self::Validated) => true,
+            // VALIDATED -> SHARIAH_APPROVED
+            (Self::Validated, Self::ShariahApproved) => true,
+            // SHARIAH_APPROVED -> ACTIVE
+            (Self::ShariahApproved, Self::Active) => true,
+            // ACTIVE -> DEACTIVATED
+            (Self::Active, Self::Deactivated) => true,
+            // DEACTIVATED -> ACTIVE (re-activation) or DEACTIVATED -> PENDING (re-review)
+            (Self::Deactivated, Self::Active) => true,
+            (Self::Deactivated, Self::Pending) => true,
+            // Idempotent self-transitions
+            (a, b) if *a == b => true,
+            // All other transitions prohibited
+            _ => false,
+        }
+    }
+
+    /// Whether this status indicates Shariah compliance approval.
+    #[inline]
+    pub fn is_shariah_approved(&self) -> bool {
+        matches!(self, Self::ShariahApproved | Self::Active)
+    }
+
+    /// Whether this status represents an actively trading asset.
+    #[inline]
+    pub fn is_active(&self) -> bool {
+        matches!(self, Self::Active)
+    }
+}
+
+/// Canonical asset record rooted in mint identity, legally attested issuer,
+/// and custodian backing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CanonicalAssetRecord {
+    pub asset_id: String,
+    pub symbol: String,
+    pub mint_address: String,
+    pub legal_issuer: String,
+    pub custodian: String,
+    pub underlying_asset_identifier: String,
+    pub is_active: bool,
+    pub approval_status: AssetApprovalStatus,
+    pub decimals: u8,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl CanonicalAssetRecord {
+    pub fn new(
+        asset_id: impl Into<String>,
+        symbol: impl Into<String>,
+        mint_address: impl Into<String>,
+        legal_issuer: impl Into<String>,
+        custodian: impl Into<String>,
+        underlying_asset_identifier: impl Into<String>,
+        decimals: u8,
+    ) -> Result<Self, ValidationError> {
+        let asset_id = asset_id.into();
+        let symbol = symbol.into();
+        let mint_address = mint_address.into();
+        let legal_issuer = legal_issuer.into();
+        let custodian = custodian.into();
+        let underlying_asset_identifier = underlying_asset_identifier.into();
+
+        if asset_id.trim().is_empty() {
+            return Err(ValidationError::InvalidParam(
+                "asset_id cannot be empty".to_string(),
+            ));
+        }
+        if symbol.trim().is_empty() {
+            return Err(ValidationError::EmptySymbol);
+        }
+        if mint_address.trim().is_empty() {
+            return Err(ValidationError::InvalidParam(
+                "mint_address cannot be empty".to_string(),
+            ));
+        }
+        if legal_issuer.trim().is_empty() {
+            return Err(ValidationError::InvalidParam(
+                "legal_issuer cannot be empty".to_string(),
+            ));
+        }
+        if custodian.trim().is_empty() {
+            return Err(ValidationError::InvalidParam(
+                "custodian cannot be empty".to_string(),
+            ));
+        }
+        if underlying_asset_identifier.trim().is_empty() {
+            return Err(ValidationError::InvalidParam(
+                "underlying_asset_identifier cannot be empty".to_string(),
+            ));
+        }
+
+        Ok(Self {
+            asset_id,
+            symbol,
+            mint_address,
+            legal_issuer,
+            custodian,
+            underlying_asset_identifier,
+            is_active: false,
+            approval_status: AssetApprovalStatus::Pending,
+            decimals,
+            created_at: 0,
+            updated_at: 0,
+        })
+    }
+
+    /// Transitions lifecycle status if permitted by state machine rules.
+    pub fn transition_to(&mut self, next: AssetApprovalStatus) -> Result<(), ValidationError> {
+        if !self.approval_status.can_transition_to(next) {
+            return Err(ValidationError::InvalidParam(format!(
+                "Invalid status transition from {:?} to {:?}",
+                self.approval_status, next
+            )));
+        }
+        self.approval_status = next;
+        self.is_active = next == AssetApprovalStatus::Active;
+        Ok(())
+    }
+
+    /// Activates the asset for live market-data and trading.
+    /// Fails closed if the asset has not been Shariah approved.
+    pub fn activate(&mut self) -> Result<(), ValidationError> {
+        if self.approval_status != AssetApprovalStatus::ShariahApproved
+            && self.approval_status != AssetApprovalStatus::Active
+        {
+            return Err(ValidationError::InvalidParam(format!(
+                "Cannot activate asset with status {:?}; must be SHARIAH_APPROVED first",
+                self.approval_status
+            )));
+        }
+        self.approval_status = AssetApprovalStatus::Active;
+        self.is_active = true;
+        Ok(())
+    }
+
+    /// Deactivates the asset, immediately removing it from live trading and market data feeds.
+    pub fn deactivate(&mut self) {
+        self.approval_status = AssetApprovalStatus::Deactivated;
+        self.is_active = false;
+    }
+}
+
+/// Explicit database-backed mapping between an approved canonical asset and its Pyth price feed.
+///
+/// Decouples market data feed resolution from ticker symbols, names, or conventions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AssetMarketDataMapping {
+    pub mapping_id: Option<String>,
+    pub asset_id: String,
+    pub symbol: String,
+    pub mint_address: String,
+    pub pyth_feed_id: String,
+    pub is_active: bool,
+    pub created_at: i64,
+    pub updated_at: i64,
+}
+
+impl AssetMarketDataMapping {
+    pub fn new(
+        asset_id: impl Into<String>,
+        symbol: impl Into<String>,
+        mint_address: impl Into<String>,
+        pyth_feed_id: impl Into<String>,
+    ) -> Result<Self, ValidationError> {
+        let asset_id = asset_id.into();
+        let symbol = symbol.into();
+        let mint_address = mint_address.into();
+        let pyth_feed_id = pyth_feed_id.into().trim_start_matches("0x").to_lowercase();
+
+        if asset_id.trim().is_empty() {
+            return Err(ValidationError::InvalidParam(
+                "asset_id cannot be empty".to_string(),
+            ));
+        }
+        if symbol.trim().is_empty() {
+            return Err(ValidationError::EmptySymbol);
+        }
+        if mint_address.trim().is_empty() {
+            return Err(ValidationError::InvalidParam(
+                "mint_address cannot be empty".to_string(),
+            ));
+        }
+        if pyth_feed_id.trim().is_empty() {
+            return Err(ValidationError::InvalidParam(
+                "pyth_feed_id cannot be empty".to_string(),
+            ));
+        }
+
+        Ok(Self {
+            mapping_id: None,
+            asset_id,
+            symbol,
+            mint_address,
+            pyth_feed_id,
+            is_active: true,
+            created_at: 0,
+            updated_at: 0,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -547,5 +800,86 @@ mod tests {
             METEORA_SPYX_USDC_POOL,
             "CNutHtA6JUuwwWGCcJXobusHdRWZ4EgJTSUxxzXqnRj7"
         );
+    }
+
+    #[test]
+    fn test_canonical_asset_lifecycle_transitions() {
+        let mut asset = CanonicalAssetRecord::new(
+            "backed:NVDAx",
+            "NVDA",
+            BACKED_NVDA_MINT,
+            "Backed Finance AG",
+            "Maerki Baumann & Co. AG",
+            "NASDAQ:NVDA (ISIN US67066G1040)",
+            8,
+        )
+        .expect("Valid canonical asset");
+
+        assert_eq!(asset.approval_status, AssetApprovalStatus::Pending);
+        assert!(!asset.is_active);
+        assert!(!asset.approval_status.is_shariah_approved());
+
+        // Cannot activate directly from PENDING
+        assert!(asset.activate().is_err());
+
+        // PENDING -> VALIDATED
+        assert!(asset.transition_to(AssetApprovalStatus::Validated).is_ok());
+        assert_eq!(asset.approval_status, AssetApprovalStatus::Validated);
+        assert!(!asset.is_active);
+
+        // Cannot activate directly from VALIDATED
+        assert!(asset.activate().is_err());
+
+        // VALIDATED -> SHARIAH_APPROVED
+        assert!(asset.transition_to(AssetApprovalStatus::ShariahApproved).is_ok());
+        assert_eq!(asset.approval_status, AssetApprovalStatus::ShariahApproved);
+        assert!(asset.approval_status.is_shariah_approved());
+        assert!(!asset.is_active);
+
+        // SHARIAH_APPROVED -> ACTIVE (Activation)
+        assert!(asset.activate().is_ok());
+        assert_eq!(asset.approval_status, AssetApprovalStatus::Active);
+        assert!(asset.is_active);
+        assert!(asset.approval_status.is_active());
+        assert!(asset.approval_status.is_shariah_approved());
+
+        // ACTIVE -> DEACTIVATED
+        asset.deactivate();
+        assert_eq!(asset.approval_status, AssetApprovalStatus::Deactivated);
+        assert!(!asset.is_active);
+
+        // Invalid direct transition from DEACTIVATED to VALIDATED
+        assert!(asset.transition_to(AssetApprovalStatus::Validated).is_err());
+    }
+
+    #[test]
+    fn test_canonical_asset_validation_failures() {
+        // Empty asset_id
+        assert!(CanonicalAssetRecord::new("", "NVDA", "mint1", "issuer", "cust", "ref", 6).is_err());
+        // Empty symbol
+        assert!(CanonicalAssetRecord::new("id1", "  ", "mint1", "issuer", "cust", "ref", 6).is_err());
+        // Empty mint
+        assert!(CanonicalAssetRecord::new("id1", "NVDA", "", "issuer", "cust", "ref", 6).is_err());
+        // Empty issuer
+        assert!(CanonicalAssetRecord::new("id1", "NVDA", "mint1", "", "cust", "ref", 6).is_err());
+        // Empty custodian
+        assert!(CanonicalAssetRecord::new("id1", "NVDA", "mint1", "issuer", " ", "ref", 6).is_err());
+        // Empty underlying ref
+        assert!(CanonicalAssetRecord::new("id1", "NVDA", "mint1", "issuer", "cust", "", 6).is_err());
+    }
+
+    #[test]
+    fn test_asset_approval_status_formatting_and_parsing() {
+        assert_eq!(AssetApprovalStatus::Pending.to_string(), "PENDING");
+        assert_eq!(AssetApprovalStatus::Validated.to_string(), "VALIDATED");
+        assert_eq!(AssetApprovalStatus::ShariahApproved.to_string(), "SHARIAH_APPROVED");
+        assert_eq!(AssetApprovalStatus::Active.to_string(), "ACTIVE");
+        assert_eq!(AssetApprovalStatus::Deactivated.to_string(), "DEACTIVATED");
+
+        assert_eq!("pending".parse::<AssetApprovalStatus>().unwrap(), AssetApprovalStatus::Pending);
+        assert_eq!("SHARIAH_APPROVED".parse::<AssetApprovalStatus>().unwrap(), AssetApprovalStatus::ShariahApproved);
+        assert_eq!("active".parse::<AssetApprovalStatus>().unwrap(), AssetApprovalStatus::Active);
+        assert_eq!("deactivated".parse::<AssetApprovalStatus>().unwrap(), AssetApprovalStatus::Deactivated);
+        assert!("unknown_status".parse::<AssetApprovalStatus>().is_err());
     }
 }
