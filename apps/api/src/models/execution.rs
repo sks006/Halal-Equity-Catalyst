@@ -22,6 +22,9 @@ pub struct ExecutionModel {
     pub error_message: Option<String>,
     pub executed_at: DateTime<Utc>,
     pub confirmed_at: Option<DateTime<Utc>>,
+    pub quote_id: Option<String>,
+    pub policy_decision_id: Option<Uuid>,
+    pub amount_out_min: Option<u64>,
 }
 
 impl From<&Row> for ExecutionModel {
@@ -29,6 +32,9 @@ impl From<&Row> for ExecutionModel {
         let amount_in_i64: i64 = row.get("amount_in");
         let amount_out_expected_i64: i64 = row.get("amount_out_expected");
         let amount_out_actual_i64: Option<i64> = row.get("amount_out_actual");
+        let quote_id: Option<String> = row.try_get("quote_id").ok();
+        let policy_decision_id: Option<Uuid> = row.try_get("policy_decision_id").ok();
+        let amount_out_min_i64: Option<i64> = row.try_get("amount_out_min").ok().flatten();
 
         Self {
             execution_id: row.get("execution_id"),
@@ -46,6 +52,9 @@ impl From<&Row> for ExecutionModel {
             error_message: row.get("error_message"),
             executed_at: row.get("executed_at"),
             confirmed_at: row.get("confirmed_at"),
+            quote_id,
+            policy_decision_id,
+            amount_out_min: amount_out_min_i64.map(|v| v.max(0) as u64),
         }
     }
 }

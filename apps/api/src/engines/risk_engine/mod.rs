@@ -107,8 +107,10 @@ impl RiskEngine {
         }
 
         // 5. Minimum Cash Reserve check (spot solvency without leverage)
-        let required_cash_usd =
-            (total_portfolio_usd as f64 * (policy.min_cash_bps as f64 / 10_000.0)).round() as u64;
+        // Deterministic integer math without floating-point representation drift:
+        // (total_portfolio_usd * min_cash_bps + 5000) / 10000
+        let required_cash_usd = ((total_portfolio_usd as u128 * policy.min_cash_bps as u128 + 5_000)
+            / 10_000) as u64;
         if available_cash_usd < total_buy_outflow
             || (available_cash_usd - total_buy_outflow) < required_cash_usd
         {

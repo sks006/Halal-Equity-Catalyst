@@ -43,6 +43,8 @@ Status: HEALTHY (Phase 11 Independent Verification & Performance Benchmarking Re
 - **Phase 09 (Hardening)**: READY_FOR_REVIEW — Security invariants, constant-time admin auth, sliding-window rate limiting, idempotency guards, pre-signing emergency pause recheck, RPC retry classification, dead-letter storage, worker supervisor, and mathematical property tests verified.
 - **Phase 10 (Submission)**: READY_FOR_REVIEW — Final claims audit, verification matrix, database audit report, canonical mainnet evidence package, and reproducible build gates verified.
 - **Phase 11 (Benchmark & Verification)**: READY_FOR_REVIEW — Architecture freeze (v1.0.0-rc1), 12-subsystem independent audit, empirical pipeline benchmarks (15 metrics), 18-vector adversarial testing suite (100% deterministic rejection, zero signing), technical research reports (`benchmark-report.md`, `security-validation.md`, `system-limitations.md`).
+- **Phase 15 (Purification)**: DONE — Dedicated purification module (`purification.rs`); strict separation between screening ratio (`impure_income_ratio_bps`) and monetary payment value (`impure_income_value_minor_units`); explicit units and currency (`CurrencyCode`); deterministic integer math with rounding rules (`ConservativeCeiling`, `NearestHalfUp`, `Floor`); zero on-chain execution in this phase.
+- **Phase 16 (Failure/Recovery/Safety)**: DONE — Trading pipeline fails closed across 15 critical data/infrastructure failure modes (`PipelineFailure`, `TradingPipelineSafetyGuard`); zero signing or state mutations on failure; structured error codes & HTTP mappings; comprehensive 16-test recovery test suite.
 
 ## Security & Execution Boundary
 

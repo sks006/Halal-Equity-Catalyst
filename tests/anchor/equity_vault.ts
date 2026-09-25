@@ -7,6 +7,7 @@ import {
   getAccount,
   getAssociatedTokenAddressSync,
   createAssociatedTokenAccountInstruction,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { expect } from "chai";
 
@@ -574,6 +575,13 @@ describe("equity_vault - Milestones 1 & 2", () => {
       expiredCompliancePda = findCompliancePda(expiredAssetMint);
       mismatchedCompliancePda = findCompliancePda(mismatchedAssetMint);
 
+      const JUPITER_PROGRAM_ID = new PublicKey("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+      const approvedAssetVaultAta = getAssociatedTokenAddressSync(approvedAssetMint, vaultPda, true);
+      const pendingAssetVaultAta = getAssociatedTokenAddressSync(pendingAssetMint, vaultPda, true);
+      const rejectedAssetVaultAta = getAssociatedTokenAddressSync(rejectedAssetMint, vaultPda, true);
+      const expiredAssetVaultAta = getAssociatedTokenAddressSync(expiredAssetMint, vaultPda, true);
+      const mismatchedAssetVaultAta = getAssociatedTokenAddressSync(mismatchedAssetMint, vaultPda, true);
+
       const futureTimestamp = new anchor.BN(Math.floor(Date.now() / 1000) + 86400 * 30);
       const pastTimestamp = new anchor.BN(Math.floor(Date.now() / 1000) - 86400);
 
@@ -648,6 +656,9 @@ describe("equity_vault - Milestones 1 & 2", () => {
       const execId = new anchor.BN(2001);
       const execPda = findExecutionPda(vaultPda, execId);
 
+      const JUPITER_PROGRAM_ID = new PublicKey("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+      const approvedAssetVaultAta = getAssociatedTokenAddressSync(approvedAssetMint, vaultPda, true);
+
       await program.methods
         .executeAction(execId, 1, new anchor.BN(1_000_000), new anchor.BN(990_000))
         .accounts({
@@ -656,7 +667,11 @@ describe("equity_vault - Milestones 1 & 2", () => {
           execution: execPda,
           inputMint: assetMint,
           outputMint: approvedAssetMint,
+          vaultInputTokenAccount: vaultAssetAccount,
+          vaultOutputTokenAccount: approvedAssetVaultAta,
           compliance: approvedCompliancePda,
+          dexProgram: JUPITER_PROGRAM_ID,
+          tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: anchor.web3.SystemProgram.programId,
         })
         .rpc();
@@ -673,6 +688,9 @@ describe("equity_vault - Milestones 1 & 2", () => {
       const execId = new anchor.BN(2002);
       const execPda = findExecutionPda(vaultPda, execId);
 
+      const JUPITER_PROGRAM_ID = new PublicKey("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+      const pendingAssetVaultAta = getAssociatedTokenAddressSync(pendingAssetMint, vaultPda, true);
+
       try {
         await program.methods
           .executeAction(execId, 1, new anchor.BN(1_000_000), new anchor.BN(990_000))
@@ -682,7 +700,11 @@ describe("equity_vault - Milestones 1 & 2", () => {
             execution: execPda,
             inputMint: assetMint,
             outputMint: pendingAssetMint,
+            vaultInputTokenAccount: vaultAssetAccount,
+            vaultOutputTokenAccount: pendingAssetVaultAta,
             compliance: pendingCompliancePda,
+            dexProgram: JUPITER_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
             systemProgram: anchor.web3.SystemProgram.programId,
           })
           .rpc();
@@ -696,6 +718,9 @@ describe("equity_vault - Milestones 1 & 2", () => {
       const execId = new anchor.BN(2003);
       const execPda = findExecutionPda(vaultPda, execId);
 
+      const JUPITER_PROGRAM_ID = new PublicKey("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+      const rejectedAssetVaultAta = getAssociatedTokenAddressSync(rejectedAssetMint, vaultPda, true);
+
       try {
         await program.methods
           .executeAction(execId, 1, new anchor.BN(1_000_000), new anchor.BN(990_000))
@@ -705,7 +730,11 @@ describe("equity_vault - Milestones 1 & 2", () => {
             execution: execPda,
             inputMint: assetMint,
             outputMint: rejectedAssetMint,
+            vaultInputTokenAccount: vaultAssetAccount,
+            vaultOutputTokenAccount: rejectedAssetVaultAta,
             compliance: rejectedCompliancePda,
+            dexProgram: JUPITER_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
             systemProgram: anchor.web3.SystemProgram.programId,
           })
           .rpc();
@@ -719,6 +748,9 @@ describe("equity_vault - Milestones 1 & 2", () => {
       const execId = new anchor.BN(2004);
       const execPda = findExecutionPda(vaultPda, execId);
 
+      const JUPITER_PROGRAM_ID = new PublicKey("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+      const expiredAssetVaultAta = getAssociatedTokenAddressSync(expiredAssetMint, vaultPda, true);
+
       try {
         await program.methods
           .executeAction(execId, 1, new anchor.BN(1_000_000), new anchor.BN(990_000))
@@ -728,7 +760,11 @@ describe("equity_vault - Milestones 1 & 2", () => {
             execution: execPda,
             inputMint: assetMint,
             outputMint: expiredAssetMint,
+            vaultInputTokenAccount: vaultAssetAccount,
+            vaultOutputTokenAccount: expiredAssetVaultAta,
             compliance: expiredCompliancePda,
+            dexProgram: JUPITER_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
             systemProgram: anchor.web3.SystemProgram.programId,
           })
           .rpc();
@@ -742,6 +778,9 @@ describe("equity_vault - Milestones 1 & 2", () => {
       const execId = new anchor.BN(2005);
       const execPda = findExecutionPda(vaultPda, execId);
 
+      const JUPITER_PROGRAM_ID = new PublicKey("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+      const mismatchedAssetVaultAta = getAssociatedTokenAddressSync(mismatchedAssetMint, vaultPda, true);
+
       try {
         await program.methods
           .executeAction(execId, 1, new anchor.BN(1_000_000), new anchor.BN(990_000))
@@ -751,8 +790,12 @@ describe("equity_vault - Milestones 1 & 2", () => {
             execution: execPda,
             inputMint: assetMint,
             outputMint: mismatchedAssetMint,
+            vaultInputTokenAccount: vaultAssetAccount,
+            vaultOutputTokenAccount: mismatchedAssetVaultAta,
             // Supply approvedCompliancePda (which points to approvedAssetMint, not mismatchedAssetMint)
             compliance: approvedCompliancePda,
+            dexProgram: JUPITER_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
             systemProgram: anchor.web3.SystemProgram.programId,
           })
           .rpc();
@@ -809,6 +852,9 @@ describe("equity_vault - Milestones 1 & 2", () => {
       const execId = new anchor.BN(2007);
       const execPda = findExecutionPda(vaultPda, execId);
 
+      const JUPITER_PROGRAM_ID = new PublicKey("JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4");
+      const approvedAssetVaultAta = getAssociatedTokenAddressSync(approvedAssetMint, vaultPda, true);
+
       try {
         await program.methods
           .executeAction(execId, 1, new anchor.BN(1_000_000), new anchor.BN(990_000))
@@ -818,8 +864,12 @@ describe("equity_vault - Milestones 1 & 2", () => {
             execution: execPda,
             inputMint: assetMint,
             outputMint: approvedAssetMint,
+            vaultInputTokenAccount: vaultAssetAccount,
+            vaultOutputTokenAccount: approvedAssetVaultAta,
             // Supply vaultPda as wrong compliance account
             compliance: vaultPda,
+            dexProgram: JUPITER_PROGRAM_ID,
+            tokenProgram: TOKEN_PROGRAM_ID,
             systemProgram: anchor.web3.SystemProgram.programId,
           })
           .rpc();

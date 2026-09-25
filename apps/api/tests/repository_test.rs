@@ -170,6 +170,9 @@ async fn test_full_repository_lifecycle() {
         error_message: None,
         executed_at: Utc::now(),
         confirmed_at: None,
+        quote_id: Some("quote-repo-test".to_string()),
+        policy_decision_id: Some(Uuid::new_v4()),
+        amount_out_min: Some(390_000),
     };
 
     let created_exec = execution_repo

@@ -50,3 +50,18 @@ pub struct VaultPauseToggled {
     pub is_paused: bool,
     pub timestamp: i64,
 }
+
+#[event]
+pub struct ActionExecuted {
+    pub vault: Pubkey,
+    pub execution_id: u64,
+    pub action_type: u8,
+    pub input_mint: Pubkey,
+    pub output_mint: Pubkey,
+    pub requested_input: u64,
+    pub minimum_output: u64,
+    pub actual_output: u64,
+    pub before_balance: u64,
+    pub after_balance: u64,
+    pub timestamp: i64,
+}

@@ -274,74 +274,15 @@ impl ShariahFinancialMetrics {
     }
 }
 
-/// Error during calculation of dividend or investment purification amount.
-#[derive(Debug, thiserror::Error, PartialEq, Eq)]
-pub enum PurificationError {
-    #[error("Purification ratio {0} bps exceeds maximum 10,000 bps (100%)")]
-    InvalidRatio(u32),
-    #[error("Arithmetic overflow during purification calculation")]
-    Overflow,
-}
-
-/// Calculated dividend and capital purification assessment.
-///
-/// In Islamic finance governance (e.g. AAOIFI Standard No. 21, §3/4 and FTSE Shariah),
-/// an asset that satisfies quantitative screening (impure income <= 5.00%) remains fully
-/// **Approved** and eligible for spot investment.
-///
-/// However, any incidental impure dividend or income received must be purified by donating
-/// the non-permissible percentage to approved charities without claiming tax deduction or spiritual reward.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct PurificationAssessment {
-    /// True if purification is required (purification_ratio_bps > 0 and dividend_amount_minor > 0).
-    pub applicable: bool,
-    /// Percentage of dividend/income derived from incidental non-permissible activities, in basis points.
-    pub purification_ratio_bps: u32,
-    /// Gross dividend amount received, in minor currency units (e.g. cents).
-    pub dividend_amount_minor: u64,
-    /// Calculated amount that must be purified and donated to charity.
-    pub purification_amount_minor: u64,
-    /// Net permissible dividend retained by the investor or vault.
-    pub net_permissible_amount_minor: u64,
-}
-
-impl PurificationAssessment {
-    /// Returns true if the dividend is completely pure and requires zero charitable purification.
-    #[inline]
-    pub fn is_pure(&self) -> bool {
-        !self.applicable || self.purification_amount_minor == 0
-    }
-}
-
-/// Computes the exact purification amount required to be donated to charity using checked integer arithmetic.
-pub fn calculate_purification(
-    dividend_amount_minor: u64,
-    purification_ratio_bps: u32,
-) -> Result<u64, PurificationError> {
-    if purification_ratio_bps > 10_000 {
-        return Err(PurificationError::InvalidRatio(purification_ratio_bps));
-    }
-    let numerator = (dividend_amount_minor as u128)
-        .checked_mul(purification_ratio_bps as u128)
-        .ok_or(PurificationError::Overflow)?;
-    Ok((numerator / 10_000) as u64)
-}
-
-/// Generates a complete [`PurificationAssessment`] breakdown for a dividend or cashflow distribution.
-pub fn assess_purification(
-    dividend_amount_minor: u64,
-    purification_ratio_bps: u32,
-) -> Result<PurificationAssessment, PurificationError> {
-    let purification_amount = calculate_purification(dividend_amount_minor, purification_ratio_bps)?;
-    let net_permissible = dividend_amount_minor.saturating_sub(purification_amount);
-    Ok(PurificationAssessment {
-        applicable: purification_ratio_bps > 0 && dividend_amount_minor > 0,
-        purification_ratio_bps,
-        dividend_amount_minor,
-        purification_amount_minor: purification_amount,
-        net_permissible_amount_minor: net_permissible,
-    })
-}
+// --- Re-exports from dedicated purification module (Phase 15) ---
+pub use super::purification::{
+    assess_direct_impure_value, assess_dividend_purification,
+    assess_per_share_dividend_purification, assess_purification,
+    assess_purification_for_registered_asset, calculate_purification,
+    calculate_purification_value_minor_units, CurrencyCode, DirectValuePurificationRequest,
+    DividendPurificationRequest, PerShareDividendPurificationRequest, PurificationAssessment,
+    PurificationError, PurificationRoundingRule,
+};
 
 /// Outcome of deterministic Shariah compliance screening.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

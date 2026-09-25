@@ -28,6 +28,9 @@ pub enum ApiError {
 
     #[error("Domain validation error: {0}")]
     ValidationError(#[from] equity_catalyst_shared::ValidationError),
+
+    #[error("Trading pipeline failure: {0}")]
+    PipelineFailure(#[from] crate::engines::pipeline_safety::PipelineFailure),
 }
 
 #[derive(Debug, Serialize)]
@@ -74,6 +77,12 @@ impl IntoResponse for ApiError {
             ApiError::ValidationError(err) => {
                 (StatusCode::BAD_REQUEST, "VALIDATION_ERROR", err.to_string())
             }
+            ApiError::PipelineFailure(err) => (
+                StatusCode::from_u16(err.http_status_code())
+                    .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+                err.error_code(),
+                err.to_string(),
+            ),
         };
 
         let body = Json(ErrorResponse {

@@ -1,6 +1,11 @@
 //! Main executable entrypoint for Equity Catalyst API.
 
-use equity_catalyst_api::{config::Config, create_db_pool, router::create_router, state::AppState};
+use equity_catalyst_api::{
+    config::{sanitize_connection_url, Config},
+    create_db_pool,
+    router::create_router,
+    state::AppState,
+};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{error, info, warn};
@@ -15,12 +20,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .init();
 
-    // Load configuration
+    // Load and validate configuration
     let config = Config::from_env();
+    if let Err(err) = config.validate() {
+        error!(error = %err, "Configuration validation failed; failing closed");
+        return Err(Box::new(err) as Box<dyn std::error::Error>);
+    }
     let addr = config.address();
 
     info!(
         cluster = %config.solana_cluster,
+        environment = %config.environment,
         address = %addr,
         "Initializing Equity Catalyst API server"
     );
@@ -40,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize Redis client
     let redis_client = match redis::Client::open(config.redis_url.as_str()) {
         Ok(client) => {
-            info!(redis_url = %config.redis_url, "Redis client configured");
+            info!(redis_target = %sanitize_connection_url(&config.redis_url), "Redis client configured");
             Some(client)
         }
         Err(err) => {

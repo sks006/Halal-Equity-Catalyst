@@ -145,6 +145,9 @@ async fn test_duplicate_request_idempotency_gate() {
         error_message: None,
         executed_at: Utc::now(),
         confirmed_at: Some(Utc::now()),
+        quote_id: Some("quote-123".to_string()),
+        policy_decision_id: Some(Uuid::new_v4()),
+        amount_out_min: Some(940_000),
     };
     execution_repo.create(&existing_execution).await.unwrap();
 
@@ -163,6 +166,8 @@ async fn test_duplicate_request_idempotency_gate() {
         slippage_bps: 100,
         target_symbol: "NVDA".to_string(),
         fee_breakdown: None,
+        quote_id: Some("quote-123".to_string()),
+        policy_decision_id: Some(Uuid::new_v4()),
     };
 
     let keeper_keypair = Keypair::new();
@@ -229,6 +234,9 @@ async fn test_transaction_rejection_ledger_persistence() {
         error_message: Some("0x1770: Program error VaultPaused".to_string()),
         executed_at: Utc::now(),
         confirmed_at: None,
+        quote_id: None,
+        policy_decision_id: None,
+        amount_out_min: Some(485_000),
     };
 
     execution_repo.create(&failed_execution).await.unwrap();

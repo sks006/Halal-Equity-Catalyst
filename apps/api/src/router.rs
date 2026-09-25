@@ -1,6 +1,7 @@
 //! Router configuration and middleware pipeline.
 
 use axum::{
+    extract::DefaultBodyLimit,
     http::Uri,
     middleware::from_fn_with_state,
     routing::{get, post},
@@ -22,8 +23,8 @@ use crate::{
         get_price_handler, get_vault_handler, get_verified_assets_handler, health_handler,
         list_dbc_pools_handler, list_events_handler, list_executions_handler,
         list_pending_events_handler, list_policies_handler, list_vault_events_handler,
-        list_vault_executions_handler, list_vaults_handler, market_data_ws_handler, ready_handler,
-        record_dbc_pool_handler, simulate_dbc_handler,
+        list_vault_executions_handler, list_vaults_handler, market_data_ws_handler,
+        metrics_handler, ready_handler, record_dbc_pool_handler, simulate_dbc_handler,
     },
     state::AppState,
 };
@@ -53,6 +54,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route("/health/detailed", get(detailed_health_handler))
         .route("/health/monitor", get(detailed_health_handler))
         .route("/ready", get(ready_handler))
+        .route("/metrics", get(metrics_handler))
         .route("/oracle/price/:symbol", get(get_price_handler))
         .route("/market-data/ws", get(market_data_ws_handler))
         .route("/market-data/:asset_id", get(get_market_data_handler))
@@ -80,6 +82,7 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .merge(public_routes)
         .merge(admin_routes)
         .fallback(fallback_handler)
+        .layer(DefaultBodyLimit::max(1024 * 1024))
         .layer(from_fn_with_state(state.clone(), rate_limit_middleware))
         .layer(TraceLayer::new_for_http())
         .layer(cors)
