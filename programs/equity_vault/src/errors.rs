@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 
 #[error_code]
+#[derive(PartialEq, Eq)]
 pub enum VaultError {
     #[msg("Calculation resulted in arithmetic overflow")]
     MathOverflow,
@@ -52,4 +53,6 @@ pub enum VaultError {
     ExecutionExpired,
     #[msg("Cross-Program Invocation to DEX failed")]
     DexCpiFailed,
+    #[msg("Output token balance delta must be non-negative (after_balance >= before_balance)")]
+    NegativeBalanceDelta,
 }

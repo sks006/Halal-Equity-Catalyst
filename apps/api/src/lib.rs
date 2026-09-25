@@ -12,7 +12,7 @@ pub mod services;
 pub mod state;
 pub mod workers;
 
-pub use config::Config;
+pub use config::{sanitize_connection_url, Config, ConfigError};
 pub use engines::{
     AllocationProposal, CanonicalExecutionPayload, DecisionEngine, DeterministicPolicyAuthorizer,
     DevTestSigner, ExecutionAuthorization, ExecutionPlan, ExecutionPlanner, ExecutionSigner,

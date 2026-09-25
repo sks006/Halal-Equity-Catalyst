@@ -196,6 +196,8 @@ fn create_valid_request(vault_address: &str, target_symbol: &str) -> ExecutionRe
         slippage_bps: 50,
         target_symbol: target_symbol.to_string(),
         fee_breakdown: Some(fees),
+        quote_id: None,
+        policy_decision_id: None,
     }
 }
 

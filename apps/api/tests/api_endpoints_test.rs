@@ -416,6 +416,9 @@ async fn test_api_get_executions() {
         error_message: None,
         executed_at: Utc::now(),
         confirmed_at: Some(Utc::now()),
+        quote_id: None,
+        policy_decision_id: None,
+        amount_out_min: None,
     };
     exec_repo
         .create(&exec_model)

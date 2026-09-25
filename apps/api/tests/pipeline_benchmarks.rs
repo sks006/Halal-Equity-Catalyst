@@ -366,6 +366,8 @@ async fn test_run_empirical_pipeline_benchmarks() {
             slippage_bps: 50,
             target_symbol: "NVDA".to_string(),
             fee_breakdown: Some(fees),
+            quote_id: None,
+            policy_decision_id: None,
         };
         let _ = serde_json::to_string(&req).unwrap();
         prep_latencies.push(t0.elapsed().as_nanos() as f64 / 1_000.0);
@@ -402,6 +404,8 @@ async fn test_run_empirical_pipeline_benchmarks() {
             slippage_bps: 50,
             target_symbol: "NVDA".to_string(),
             fee_breakdown: Some(fee_schedule.calculate_fees(50_000, 6, None)),
+            quote_id: None,
+            policy_decision_id: None,
         };
         let res = exec_service
             .revalidate_shariah_and_spot(&req, Utc::now().timestamp())
@@ -457,6 +461,9 @@ async fn test_run_empirical_pipeline_benchmarks() {
             error_message: None,
             executed_at: Utc::now(),
             confirmed_at: Some(Utc::now()),
+            quote_id: Some("benchmark-quote".to_string()),
+            policy_decision_id: Some(Uuid::new_v4()),
+            amount_out_min: Some(49_500),
         };
 
         let t0 = Instant::now();

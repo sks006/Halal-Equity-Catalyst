@@ -337,6 +337,8 @@ async fn test_idempotency_sequential_and_concurrent_duplicate_handling() {
         slippage_bps: 50,
         target_symbol: "NVDA".to_string(),
         fee_breakdown: Some(FeeSchedule::standard_v1().calculate_fees(50_000, 6, None)),
+        quote_id: None,
+        policy_decision_id: None,
     };
 
     let keeper_keypair = Keypair::new();
@@ -453,6 +455,8 @@ async fn test_signer_spy_never_invoked_on_validation_or_risk_rejection() {
         slippage_bps: 50,
         target_symbol: "NVDA".to_string(),
         fee_breakdown: Some(FeeSchedule::standard_v1().calculate_fees(50_000, 6, None)),
+        quote_id: None,
+        policy_decision_id: None,
     };
 
     let keeper_keypair = Keypair::new();

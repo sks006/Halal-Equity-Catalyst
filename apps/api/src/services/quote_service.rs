@@ -222,6 +222,9 @@ impl QuoteExecutionService {
                 error_message: rejection_reason.clone(),
                 executed_at: Utc::now(),
                 confirmed_at: None,
+                quote_id: None,
+                policy_decision_id: None,
+                amount_out_min: None,
             };
 
             let _ = exec_repo.create(&exec_model).await;

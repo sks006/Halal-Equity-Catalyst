@@ -16,6 +16,7 @@
 pub mod eligibility;
 pub mod ownership;
 pub mod policy;
+pub mod purification;
 pub mod registry;
 pub mod screening;
 pub mod types;
@@ -24,6 +25,7 @@ pub mod validation;
 pub use eligibility::*;
 pub use ownership::*;
 pub use policy::*;
+pub use purification::*;
 pub use registry::*;
 pub use screening::*;
 pub use types::*;
@@ -1451,16 +1453,22 @@ mod tests {
         let purification = assess_purification(gross_dividend_cents, metrics.impure_income_ratio_bps)
             .expect("Purification calculation succeeds");
 
-        assert_eq!(purification.dividend_amount_minor, 1_000_000);
-        assert_eq!(purification.purification_ratio_bps, 120);
-        assert_eq!(purification.purification_amount_minor, 12_000); // $120.00
-        assert_eq!(purification.net_permissible_amount_minor, 988_000); // $9,880.00
+        assert_eq!(purification.gross_dividend_value_minor_units, 1_000_000);
+        assert_eq!(purification.impure_income_ratio_bps, 120);
+        assert_eq!(purification.purification_value_minor_units, 12_000); // $120.00
+        assert_eq!(purification.net_permissible_value_minor_units, 988_000); // $9,880.00
+        assert_eq!(purification.dividend_amount_minor(), 1_000_000);
+        assert_eq!(purification.purification_ratio_bps(), 120);
+        assert_eq!(purification.purification_amount_minor(), 12_000);
+        assert_eq!(purification.net_permissible_amount_minor(), 988_000);
         assert!(!purification.is_pure());
 
         // Clean company with 0 bps impure income
         let pure_purification = assess_purification(1_000_000, 0).unwrap();
-        assert_eq!(pure_purification.purification_amount_minor, 0);
-        assert_eq!(pure_purification.net_permissible_amount_minor, 1_000_000);
+        assert_eq!(pure_purification.purification_value_minor_units, 0);
+        assert_eq!(pure_purification.net_permissible_value_minor_units, 1_000_000);
+        assert_eq!(pure_purification.purification_amount_minor(), 0);
+        assert_eq!(pure_purification.net_permissible_amount_minor(), 1_000_000);
         assert!(pure_purification.is_pure());
 
         // Pure calculation helper

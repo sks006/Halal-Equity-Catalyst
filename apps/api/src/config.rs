@@ -245,6 +245,89 @@ impl Config {
     pub fn address(&self) -> String {
         format!("{}:{}", self.api_host, self.api_port)
     }
+
+    /// Validates configuration parameters and fails closed against unsafe deployment settings.
+    pub fn validate(&self) -> Result<(), ConfigError> {
+        if self.max_trade_size_usd == 0 {
+            return Err(ConfigError::InvalidMaxTradeSize(0));
+        }
+
+        let max_allowed_slippage = match self.environment {
+            Environment::Mainnet => 100, // Strict 1.00% max in mainnet
+            _ => 500,                    // 5.00% in testnet/dev
+        };
+
+        if self.max_slippage_bps == 0 || self.max_slippage_bps > max_allowed_slippage {
+            return Err(ConfigError::InvalidSlippageBps(
+                self.max_slippage_bps,
+                max_allowed_slippage,
+            ));
+        }
+
+        if self.rate_limit_requests_per_minute == 0 {
+            return Err(ConfigError::InvalidRateLimit(0));
+        }
+
+        if self.environment == Environment::Mainnet {
+            if self.database_url.trim().is_empty() {
+                return Err(ConfigError::MissingDatabaseUrl(Environment::Mainnet));
+            }
+
+            let admin_key = self.admin_api_key.trim();
+            if admin_key.is_empty() {
+                return Err(ConfigError::MissingAdminApiKey(Environment::Mainnet));
+            }
+            if admin_key == "catalyst-admin-secret-dev" || admin_key.len() < 16 {
+                return Err(ConfigError::DevSecretInProduction(admin_key.to_string()));
+            }
+
+            let rpc = self.solana_rpc_url.to_lowercase();
+            if rpc.contains("localhost") || rpc.contains("127.0.0.1") || rpc.contains("0.0.0.0") {
+                return Err(ConfigError::LocalhostRpcInProduction(self.solana_rpc_url.clone()));
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Masks sensitive credentials (passwords) in a database or cache connection URL before logging.
+pub fn sanitize_connection_url(raw: &str) -> String {
+    if let Some((proto, rest)) = raw.split_once("://") {
+        if let Some((creds, host_part)) = rest.split_once('@') {
+            if let Some((user, _pass)) = creds.split_once(':') {
+                return format!("{}://{}:***@{}", proto, user, host_part);
+            } else {
+                return format!("{}://***@{}", proto, host_part);
+            }
+        }
+    }
+    raw.to_string()
+}
+
+/// Errors encountered during configuration validation.
+#[derive(Debug, thiserror::Error, PartialEq, Eq)]
+pub enum ConfigError {
+    #[error("Missing required database URL in {0} environment")]
+    MissingDatabaseUrl(Environment),
+
+    #[error("Missing required administrative API key in {0} environment")]
+    MissingAdminApiKey(Environment),
+
+    #[error("Development/test admin secret '{0}' cannot be used in production Mainnet environment")]
+    DevSecretInProduction(String),
+
+    #[error("Production Mainnet cannot point to local/localhost RPC endpoint: '{0}'")]
+    LocalhostRpcInProduction(String),
+
+    #[error("Invalid slippage threshold {0} bps (must be between 1 and {1} bps)")]
+    InvalidSlippageBps(u16, u16),
+
+    #[error("Max trade size USD must be greater than zero, got {0}")]
+    InvalidMaxTradeSize(u64),
+
+    #[error("Rate limit requests per minute must be greater than zero, got {0}")]
+    InvalidRateLimit(u32),
 }
 
 impl Default for Config {

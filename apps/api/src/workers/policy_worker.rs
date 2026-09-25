@@ -181,6 +181,9 @@ impl PolicyWorker {
             },
             executed_at: Utc::now(),
             confirmed_at: None,
+            quote_id: None,
+            policy_decision_id: Some(decision.decision_id),
+            amount_out_min: None,
         };
 
         let _ = self.execution_repo.create(&execution_record).await;

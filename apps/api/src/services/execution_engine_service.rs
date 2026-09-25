@@ -55,6 +55,10 @@ pub struct ExecutionRequest {
     pub target_symbol: String,
     /// Disclosed deterministic fee breakdown required for trade execution
     pub fee_breakdown: Option<equity_catalyst_shared::fees::FeeBreakdown>,
+    /// DEX quote identifier
+    pub quote_id: Option<String>,
+    /// Approved policy decision identifier
+    pub policy_decision_id: Option<Uuid>,
 }
 
 impl ExecutionRequest {
@@ -87,6 +91,33 @@ impl ExecutionRequest {
             slippage_bps,
             target_symbol: proposal.symbol.clone(),
             fee_breakdown,
+            quote_id: None,
+            policy_decision_id: None,
+        }
+    }
+
+    /// Constructs an ExecutionRequest directly from a canonical ExecutionPlan (Phase 11).
+    pub fn from_plan(plan: &crate::engines::ExecutionPlan) -> Self {
+        Self {
+            execution_id: plan.plan_id,
+            vault_address: plan.vault_address.clone(),
+            event_id: None,
+            action_type: 1, // Swap/Rebalance
+            action_name: if plan.is_buy {
+                format!("BUY_{}", plan.symbol)
+            } else {
+                format!("SELL_{}", plan.symbol)
+            },
+            input_mint: plan.input_mint.clone(),
+            output_mint: plan.output_mint.clone(),
+            amount_in: plan.input_amount,
+            min_amount_out: plan.minimum_output_amount,
+            amount_out_expected: plan.expected_output_amount,
+            slippage_bps: plan.slippage_bps,
+            target_symbol: plan.symbol.clone(),
+            fee_breakdown: None,
+            quote_id: Some(plan.quote_id.clone()),
+            policy_decision_id: Some(plan.policy_decision_id),
         }
     }
 
@@ -96,6 +127,18 @@ impl ExecutionRequest {
         fee_breakdown: equity_catalyst_shared::fees::FeeBreakdown,
     ) -> Self {
         self.fee_breakdown = Some(fee_breakdown);
+        self
+    }
+
+    /// Attaches a DEX quote identifier
+    pub fn with_quote_id(mut self, quote_id: impl Into<String>) -> Self {
+        self.quote_id = Some(quote_id.into());
+        self
+    }
+
+    /// Attaches an approved policy decision identifier
+    pub fn with_policy_decision_id(mut self, policy_decision_id: Uuid) -> Self {
+        self.policy_decision_id = Some(policy_decision_id);
         self
     }
 }
@@ -122,6 +165,9 @@ pub struct ExecutionOutcome {
     pub simulation_success: bool,
     pub error_message: Option<String>,
     pub confirmed: bool,
+    pub execution_record: Option<crate::engines::ExecutionRecord>,
+    pub quote_id: Option<String>,
+    pub policy_decision_id: Option<Uuid>,
 }
 
 /// Production Execution Engine Service.
@@ -393,6 +439,9 @@ impl ExecutionEngineService {
                         simulation_success: true,
                         error_message: None,
                         confirmed: existing.status == "confirmed",
+                        execution_record: None,
+                        quote_id: request.quote_id.clone(),
+                        policy_decision_id: request.policy_decision_id,
                     });
                 }
             }
@@ -420,6 +469,9 @@ impl ExecutionEngineService {
                         simulation_success: true,
                         error_message: None,
                         confirmed: existing.status == "confirmed",
+                        execution_record: None,
+                        quote_id: request.quote_id.clone(),
+                        policy_decision_id: request.policy_decision_id,
                     });
                 }
             }
@@ -491,12 +543,25 @@ impl ExecutionEngineService {
             .await?;
 
         // ==========================================
-        // 3. BUILD TRANSACTION INSTRUCTIONS
+        // 3. BUILD TRANSACTION INSTRUCTIONS & PRE-CPI BALANCE RECORDING
         // ==========================================
         let input_mint = Pubkey::from_str(&request.input_mint)
             .map_err(|e| ApiError::BadRequest(format!("Invalid input mint: {}", e)))?;
         let output_mint = Pubkey::from_str(&request.output_mint)
             .map_err(|e| ApiError::BadRequest(format!("Invalid output mint: {}", e)))?;
+
+        // Derive vault output token account
+        let vault_output_ata = equity_catalyst_solana::accounts::find_associated_token_address(
+            &vault_pubkey,
+            &output_mint,
+        );
+
+        // Record pre-CPI output token balance (Requirement: Before CPI, record relevant output token balance)
+        let before_balance = self
+            .solana_service
+            .read_token_balance(&vault_output_ata.to_string())
+            .await
+            .unwrap_or(0);
 
         // Convert UUID to deterministic u64 action index
         let execution_seq = execution_id.as_u128() as u64;
@@ -624,16 +689,58 @@ impl ExecutionEngineService {
         let confirmed = confirmation_result.is_ok();
 
         // ==========================================
-        // 7. POST-EXECUTION RECONCILIATION
+        // 7. POST-EXECUTION RECONCILIATION & BALANCE DELTA RECORDING
         // ==========================================
-        // Compare intended minimum vs executed output
-        let amount_out_actual = Some(request.amount_out_expected);
-        let slippage_drift_bps = Some(0); // On-chain guaranteed bounded by min_amount_out
+        // After CPI: read output token balance again
+        let after_balance = self
+            .solana_service
+            .read_token_balance(&vault_output_ata.to_string())
+            .await
+            .unwrap_or(before_balance);
 
-        let final_status = if confirmed {
-            "confirmed"
-        } else {
-            "submitted_unconfirmed"
+        let quote_id = request
+            .quote_id
+            .clone()
+            .unwrap_or_else(|| format!("quote-{}", execution_id));
+        let policy_decision_id = request.policy_decision_id.unwrap_or(execution_id);
+        let now_ts = Utc::now().timestamp();
+
+        // Calculate: actual_output_amount = after_balance - before_balance
+        // Strictly derived from token balance deltas; never derived from min_output, expected_output,
+        // oracle price, quote estimate, or client input.
+        // Validates that after_balance >= before_balance and actual_output >= min_amount_out.
+        let execution_record = crate::engines::ExecutionRecord::from_balance_delta(
+            execution_id,
+            request.vault_address.clone(),
+            request.input_mint.clone(),
+            request.output_mint.clone(),
+            request.amount_in,
+            request.min_amount_out,
+            before_balance,
+            after_balance,
+            now_ts,
+            sig_str.clone(),
+            quote_id.clone(),
+            policy_decision_id,
+            false,
+        );
+
+        let (amount_out_actual, slippage_drift_bps, final_status, err_msg) = match execution_record {
+            Ok(ref rec) => {
+                let actual = rec.actual_output;
+                let drift = calculate_slippage_drift_bps(request.amount_out_expected, actual);
+                let status = if confirmed {
+                    "confirmed"
+                } else {
+                    "submitted_unconfirmed"
+                };
+                (Some(actual), Some(drift), status, None)
+            }
+            Err(ref e) => {
+                let err_text = format!("Balance delta reconciliation failed: {}", e);
+                warn!(execution_id = %execution_id, error = %err_text);
+                (None, None, "failed", Some(err_text))
+            }
         };
 
         self.record_state(
@@ -641,9 +748,13 @@ impl ExecutionEngineService {
             final_status,
             Some(&sig_str),
             amount_out_actual,
-            None,
+            err_msg.as_deref(),
         )
         .await?;
+
+        if let Some(err) = err_msg {
+            return Err(ApiError::BadRequest(err));
+        }
 
         Ok(ExecutionOutcome {
             execution_id,
@@ -655,6 +766,9 @@ impl ExecutionEngineService {
             simulation_success: true,
             error_message: None,
             confirmed,
+            execution_record: execution_record.ok(),
+            quote_id: Some(quote_id),
+            policy_decision_id: Some(policy_decision_id),
         })
     }
 
@@ -703,6 +817,9 @@ impl ExecutionEngineService {
                     } else {
                         None
                     },
+                    quote_id: request.quote_id.clone(),
+                    policy_decision_id: request.policy_decision_id,
+                    amount_out_min: Some(request.min_amount_out),
                 };
                 repo.create(&model).await?;
             }
@@ -732,6 +849,8 @@ mod tests {
             slippage_bps: 100,
             target_symbol: "NVDA".to_string(),
             fee_breakdown: None,
+            quote_id: None,
+            policy_decision_id: None,
         };
 
         assert_eq!(req.execution_id, exec_id);
@@ -844,6 +963,8 @@ mod tests {
             slippage_bps: 100,
             target_symbol: "NVDA".to_string(),
             fee_breakdown,
+            quote_id: None,
+            policy_decision_id: None,
         }
     }
 
@@ -865,6 +986,8 @@ mod tests {
             slippage_bps: 100,
             target_symbol: "NVDA".to_string(),
             fee_breakdown,
+            quote_id: None,
+            policy_decision_id: None,
         }
     }
 

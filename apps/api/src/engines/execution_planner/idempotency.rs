@@ -159,4 +159,28 @@ impl IdempotencyTracker {
     pub async fn is_empty(&self) -> bool {
         self.len().await == 0
     }
+
+    /// Prunes expired idempotency records from memory to prevent memory leaks in production.
+    /// Returns the number of pruned records.
+    pub async fn prune_expired(&self, current_time: i64) -> usize {
+        let mut records = self.records.write().await;
+        let mut decisions = self.decision_to_key.write().await;
+
+        let before_count = records.len();
+        let mut expired_keys = Vec::new();
+        for (key, record) in records.iter() {
+            if current_time >= record.expires_at {
+                expired_keys.push((key.clone(), record.policy_decision_id));
+            }
+        }
+
+        for (key, decision_id) in &expired_keys {
+            records.remove(key);
+            if decisions.get(decision_id).map(|k| k == key).unwrap_or(false) {
+                decisions.remove(decision_id);
+            }
+        }
+
+        before_count - records.len()
+    }
 }

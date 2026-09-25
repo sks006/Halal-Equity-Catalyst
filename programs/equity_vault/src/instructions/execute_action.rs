@@ -154,7 +154,15 @@ pub fn execute_action<'info>(
     ctx.accounts.vault_output_token_account.reload()?;
     let post_output_balance = ctx.accounts.vault_output_token_account.amount;
 
+    // Validate that: after_balance >= before_balance
+    // unless the transaction explicitly supports negative balance delta semantics.
+    require!(
+        post_output_balance >= pre_output_balance,
+        VaultError::NegativeBalanceDelta
+    );
+
     // Derive actual output strictly from token-account balance deltas (Requirements 6, 7, 8)
+    // Never derived from minimum output, expected output, oracle price, or quote estimate.
     let actual_output_amount = post_output_balance
         .checked_sub(pre_output_balance)
         .ok_or(VaultError::MathOverflow)?;
@@ -178,6 +186,21 @@ pub fn execute_action<'info>(
     execution.actual_output_amount = actual_output_amount; // REAL DERIVED BALANCE DELTA
     execution.executed_at = now;
     execution.bump = ctx.bumps.execution;
+
+    // Emit on-chain event capturing token-account balance deltas
+    emit!(crate::events::ActionExecuted {
+        vault: vault.key(),
+        execution_id,
+        action_type,
+        input_mint: input_key,
+        output_mint: output_key,
+        requested_input: input_amount,
+        minimum_output: min_output_amount,
+        actual_output: actual_output_amount,
+        before_balance: pre_output_balance,
+        after_balance: post_output_balance,
+        timestamp: now,
+    });
 
     Ok(())
 }

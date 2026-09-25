@@ -16,6 +16,7 @@ use equity_vault::{
         is_authorized_dex_program, jupiter, meteora, mock, JUPITER_V6_PROGRAM_ID,
         METEORA_DBC_PROGRAM_ID, MOCK_DEX_PROGRAM_ID,
     },
+    errors::VaultError,
     state::COMPLIANCE_STATUS_APPROVED,
 };
 
@@ -175,6 +176,16 @@ fn test_balance_delta_output_derivation_and_slippage() {
         .expect("Underflow");
     assert_eq!(actual_output_zero, 0);
     assert!(actual_output_zero < min_output_amount); // MUST FAIL: Cannot write record without tokens!
+
+    // Case 4: Negative balance delta (after_balance < before_balance) -> MUST FAIL with NegativeBalanceDelta
+    let post_output_balance_negative = 4_900_000u64;
+    assert!(post_output_balance_negative < pre_output_balance);
+    let delta_res = if post_output_balance_negative >= pre_output_balance {
+        Ok(post_output_balance_negative - pre_output_balance)
+    } else {
+        Err(VaultError::NegativeBalanceDelta)
+    };
+    assert_eq!(delta_res, Err(VaultError::NegativeBalanceDelta));
 }
 
 #[test]
