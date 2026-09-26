@@ -3,99 +3,81 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Zap, Menu, X } from "lucide-react";
+import { Zap, Menu, X, Settings as SettingsIcon } from "lucide-react";
 
-import { APP_NAVIGATION } from "@/lib/navigation";
+import { APP_NAVIGATION, SECONDARY_NAVIGATION } from "@/lib/navigation";
 import { WalletButton } from "./WalletButton";
-import { Badge } from "./ui/badge";
 
 export function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/95 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full border-b border-slate-200 bg-white/95 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Brand Logo */}
-        <div className="flex items-center gap-6 shrink-0">
-          <Link href="/dashboard" className="flex items-center gap-2.5 group shrink-0">
-            <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 group-hover:scale-105 transition-transform shadow-emerald-sm">
+        {/* Left: Brand Name */}
+        <div className="flex items-center shrink-0">
+          <Link href="/dashboard" className="flex items-center gap-2.5 group">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 transition-colors group-hover:bg-emerald-100">
               <Zap className="w-4 h-4 fill-emerald-600" />
             </div>
-            <div>
-              <span className="text-base font-bold tracking-tight text-slate-900 flex items-center gap-1.5">
-                Equity Catalyst
-              </span>
-              <span className="text-[10px] text-slate-500 block uppercase tracking-wider -mt-1 font-mono">
-                Alpha Vaults
-              </span>
-            </div>
+            <span className="text-base font-bold tracking-tight text-slate-900">
+              Equity Catalyst
+            </span>
           </Link>
-
-          {/* Desktop Navigation Links */}
-          <nav className="hidden xl:flex items-center gap-1">
-            {APP_NAVIGATION.map((item) => {
-              const Icon = item.icon;
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  title={item.description}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all shrink-0 ${
-                    isActive
-                      ? "bg-slate-900 text-white shadow-sm"
-                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                  }`}
-                >
-                  <Icon className={`w-3.5 h-3.5 ${isActive ? "text-emerald-400" : "text-slate-400"}`} />
-                  <span>{item.label}</span>
-                  {item.badge && (
-                    <span className="px-1 py-0.2 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-600">
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
-          </nav>
         </div>
 
-        {/* Medium Screen Navigation (Icon + Compact label) */}
-        <nav className="hidden md:flex xl:hidden items-center gap-0.5">
-          {APP_NAVIGATION.slice(0, 7).map((item) => {
+        {/* Center / Desktop: Primary Navigation */}
+        <nav className="hidden md:flex items-center justify-center gap-1 flex-1 max-w-md mx-auto">
+          {APP_NAVIGATION.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const isActive =
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                title={item.label}
-                className={`p-2 rounded-lg text-xs font-semibold transition-all ${
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? "bg-slate-900 text-white shadow-sm"
-                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    ? "text-emerald-800 bg-emerald-50/80 font-semibold"
+                    : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? "text-emerald-400" : "text-slate-500"}`} />
+                <Icon className={`w-4 h-4 ${isActive ? "text-emerald-600" : "text-slate-400"}`} />
+                <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Right Section: Cluster & Wallet */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <Badge variant="cyan" className="hidden sm:flex items-center gap-1.5 font-mono text-[11px] py-1">
-            <Activity className="w-3 h-3 animate-pulse text-cyan-600" />
+        {/* Right: Network Status, Secondary Settings, & Wallet Button */}
+        <div className="flex items-center gap-3 shrink-0">
+          {/* Network / Status Indicator */}
+          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
             <span>Devnet</span>
-          </Badge>
+          </span>
 
+          {/* Secondary Settings Action */}
+          <Link
+            href="/settings"
+            title="Settings"
+            className={`p-2 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors ${
+              pathname === "/settings" ? "bg-slate-100 text-slate-900" : ""
+            }`}
+            aria-label="Settings"
+          >
+            <SettingsIcon className="w-4 h-4" />
+          </Link>
+
+          {/* Prominent Wallet Button */}
           <WalletButton />
 
           {/* Mobile Menu Toggle Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="xl:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            className="md:hidden p-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             aria-label="Toggle navigation menu"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -103,25 +85,47 @@ export function Navbar() {
         </div>
       </div>
 
-      {/* Mobile / Tablet Dropdown Menu */}
+      {/* Mobile Dropdown Menu */}
       {mobileMenuOpen && (
-        <div className="xl:hidden border-t border-slate-200 bg-white/98 backdrop-blur-lg px-4 py-3 shadow-lg space-y-1 animate-in slide-in-from-top-2 duration-200">
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pb-2">
-            {APP_NAVIGATION.map((item) => {
+        <div className="md:hidden border-t border-slate-200 bg-white px-4 py-3 shadow-lg space-y-1">
+          {APP_NAVIGATION.map((item) => {
+            const Icon = item.icon;
+            const isActive =
+              pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(`${item.href}/`));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  isActive
+                    ? "bg-emerald-50 text-emerald-800 font-semibold"
+                    : "text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${isActive ? "text-emerald-600" : "text-slate-400"}`} />
+                <span>{item.label}</span>
+              </Link>
+            );
+          })}
+
+          <div className="pt-2 border-t border-slate-100">
+            {SECONDARY_NAVIGATION.map((item) => {
               const Icon = item.icon;
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
+              const isActive = pathname === item.href;
               return (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-slate-900 text-white font-bold"
-                      : "text-slate-700 hover:bg-slate-100"
+                      ? "bg-slate-100 text-slate-900 font-semibold"
+                      : "text-slate-600 hover:bg-slate-50"
                   }`}
                 >
-                  <Icon className={`w-4 h-4 ${isActive ? "text-emerald-400" : "text-slate-500"}`} />
+                  <Icon className="w-4 h-4 text-slate-400" />
                   <span>{item.label}</span>
                 </Link>
               );

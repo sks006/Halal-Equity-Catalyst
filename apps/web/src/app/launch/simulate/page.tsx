@@ -234,7 +234,9 @@ export default function SimulatorPage() {
               <div className="flex justify-between">
                 <span className="text-slate-500">Impact at ${tradeSizeTest.toLocaleString()}:</span>
                 <span className="font-bold text-emerald-700">
-                  +{getDynamicImpact(data?.config_a.price_impact_at_10k || 0.02)}%
+                  {data?.config_a?.price_impact_at_10k !== undefined
+                    ? `+${getDynamicImpact(data.config_a.price_impact_at_10k)}%`
+                    : "Unavailable"}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -280,7 +282,9 @@ export default function SimulatorPage() {
               <div className="flex justify-between">
                 <span className="text-slate-500">Impact at ${tradeSizeTest.toLocaleString()}:</span>
                 <span className="font-bold text-cyan-700">
-                  +{getDynamicImpact(data?.config_b.price_impact_at_10k || 0.09)}%
+                  {data?.config_b?.price_impact_at_10k !== undefined
+                    ? `+${getDynamicImpact(data.config_b.price_impact_at_10k)}%`
+                    : "Unavailable"}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -326,7 +330,9 @@ export default function SimulatorPage() {
               <div className="flex justify-between">
                 <span className="text-slate-500">Impact at ${tradeSizeTest.toLocaleString()}:</span>
                 <span className="font-bold text-rose-600">
-                  +{getDynamicImpact(data?.default_dbc.price_impact_at_10k || 1.85)}%
+                  {data?.default_dbc?.price_impact_at_10k !== undefined
+                    ? `+${getDynamicImpact(data.default_dbc.price_impact_at_10k)}%`
+                    : "Unavailable"}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -451,7 +457,7 @@ export default function SimulatorPage() {
               </h4>
               <p className="text-xs text-slate-700 mt-1 leading-relaxed">
                 {data?.recommendation ||
-                  "Configuration A provides 7.7x lower slippage than Default DBC, protecting treasury participants from predatory MEV frontrunning."}
+                  "Simulation recommendation unavailable. Please connect to the live backend service."}
               </p>
             </div>
           </div>

@@ -26,15 +26,15 @@ import { Progress } from "../../components/ui/progress";
 import { getApiClient, NormalizedPrice, VerifiedAsset } from "../../lib/api-client";
 
 interface EnrichedAsset extends VerifiedAsset {
-  priceUsd: number;
-  confidenceUsd: number;
-  publishTimestamp: number;
+  priceUsd: number | null;
+  confidenceUsd: number | null;
+  publishTimestamp: number | null;
   isStale: boolean;
   tvlUsd: number;
   volume24hUsd: number;
   bondingProgressPct: number;
   meteoraPoolAddress: string;
-  change24hPct: number;
+  change24hPct: number | null;
 }
 
 export default function AssetsPage() {
@@ -65,15 +65,15 @@ export default function AssetsPage() {
           const p: NormalizedPrice | undefined = prices[va.symbol];
           return {
             ...va,
-            priceUsd: p?.price_usd || 0.0,
-            confidenceUsd: p?.confidence_usd || 0.0,
-            publishTimestamp: p?.publish_time || Math.floor(Date.now() / 1000),
+            priceUsd: p?.price_usd ?? null,
+            confidenceUsd: p?.confidence_usd ?? null,
+            publishTimestamp: p?.publish_time ?? null,
             isStale: p?.is_stale ?? true,
             tvlUsd: 0,
             volume24hUsd: 0,
             bondingProgressPct: 0,
             meteoraPoolAddress: "",
-            change24hPct: 0,
+            change24hPct: null,
           };
         });
         setAssets(enriched);
@@ -116,9 +116,9 @@ export default function AssetsPage() {
       a.mint.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const ageSeconds = selectedAsset
+  const ageSeconds = selectedAsset?.publishTimestamp
     ? Math.max(0, Math.floor(Date.now() / 1000) - selectedAsset.publishTimestamp)
-    : 0;
+    : null;
 
   return (
     <div className="space-y-8">
@@ -150,9 +150,9 @@ export default function AssetsPage() {
             <span>{isRefreshing ? "Syncing..." : "Refresh Pyth Feeds"}</span>
           </Button>
 
-          <Badge variant="cyan" className="font-mono text-xs py-1">
-            <Activity className="w-3 h-3 mr-1 animate-pulse" />
-            <span>Hermes v2 Active</span>
+          <Badge variant="success" className="text-xs py-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            <span>Market data live</span>
           </Badge>
         </div>
       </div>
@@ -200,21 +200,23 @@ export default function AssetsPage() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs font-mono ${
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs ${
                           isSelected ? "bg-emerald-600 text-white" : "bg-slate-100 text-slate-700"
                         }`}>
                           {asset.symbol.slice(0, 3)}
                         </div>
                         <div>
-                          <div className="text-xs font-bold text-slate-900 font-mono">{asset.symbol}</div>
-                          <div className="text-[10px] text-slate-400 truncate max-w-[120px]">{asset.name}</div>
+                          <div className="text-xs font-bold text-slate-900">{asset.symbol}</div>
+                          <div className="text-xs text-slate-400 truncate max-w-[120px]">{asset.name}</div>
                         </div>
                       </div>
 
-                      <div className="text-right font-mono">
-                        <div className="text-xs font-bold text-slate-900">${asset.priceUsd.toFixed(2)}</div>
-                        <div className={`text-[10px] font-semibold ${asset.change24hPct >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                          {asset.change24hPct >= 0 ? "+" : ""}{asset.change24hPct.toFixed(2)}%
+                      <div className="text-right">
+                        <div className="text-xs font-bold text-slate-900">
+                          {asset.priceUsd !== null ? `$${asset.priceUsd.toFixed(2)}` : <span className="text-slate-400 font-normal">Price unavailable</span>}
+                        </div>
+                        <div className="text-xs text-slate-400 font-medium">
+                          {asset.change24hPct !== null ? `${asset.change24hPct >= 0 ? "+" : ""}${asset.change24hPct.toFixed(2)}%` : "—"}
                         </div>
                       </div>
                     </div>
@@ -223,7 +225,7 @@ export default function AssetsPage() {
               })
             ) : (
               <Card className="bg-white p-6 text-center text-slate-400 text-xs">
-                No verified assets loaded. Ensure database and Hermes oracle feeds are running.
+                No verified assets loaded. Ensure database and market oracle feeds are running.
               </Card>
             )}
           </div>
@@ -233,31 +235,33 @@ export default function AssetsPage() {
         <div className="lg:col-span-2 space-y-6">
           {selectedAsset ? (
             <Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
-              <CardHeader className="p-6 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+              <CardHeader className="p-6 border-b border-slate-100">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-extrabold text-base font-mono shadow-md">
+                    <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-extrabold text-base shadow-sm">
                       {selectedAsset.symbol}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
                         <CardTitle className="text-lg font-bold text-slate-900">{selectedAsset.name}</CardTitle>
-                        <Badge variant="emerald" className="text-[10px] font-mono">Verified RWA</Badge>
+                        <Badge variant="emerald" className="text-xs">Verified RWA</Badge>
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">{selectedAsset.regulatory_framework}</p>
                     </div>
                   </div>
 
-                  <div className="text-right font-mono">
+                  <div className="text-right">
                     <div className="text-2xl font-extrabold text-slate-900">
-                      ${selectedAsset.priceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {selectedAsset.priceUsd !== null ? (
+                        `$${selectedAsset.priceUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                      ) : (
+                        <span className="text-base text-slate-400 font-normal">Price unavailable</span>
+                      )}
                     </div>
                     <div className="flex items-center justify-end gap-2 text-xs text-slate-500">
-                      <span>±${selectedAsset.confidenceUsd.toFixed(2)} (95% CI)</span>
+                      <span>{selectedAsset.confidenceUsd !== null ? `±$${selectedAsset.confidenceUsd.toFixed(2)}` : "Unavailable"}</span>
                       <span className="text-slate-300">•</span>
-                      <span className={selectedAsset.change24hPct >= 0 ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
-                        {selectedAsset.change24hPct >= 0 ? "+" : ""}{selectedAsset.change24hPct.toFixed(2)}% (24h)
-                      </span>
+                      <span>24h: —</span>
                     </div>
                   </div>
                 </div>
@@ -266,35 +270,41 @@ export default function AssetsPage() {
               <CardContent className="p-6 space-y-6">
                 {/* Section 1: Oracle Price & Freshness Matrix */}
                 <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono mb-3">
-                    Pyth Pro Real-Time Oracle Feed
+                  <h3 className="text-xs font-semibold text-slate-700 mb-3">
+                    Oracle Price & Verification
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                     <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                      <div className="text-slate-500 text-[11px]">Normalized Price</div>
-                      <div className="font-bold text-slate-900 font-mono text-sm mt-1">${selectedAsset.priceUsd.toFixed(2)}</div>
-                      <div className="text-[10px] text-emerald-600 mt-0.5">USD Reference</div>
-                    </div>
-
-                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                      <div className="text-slate-500 text-[11px]">Confidence Interval</div>
-                      <div className="font-bold text-slate-900 font-mono text-sm mt-1">±${selectedAsset.confidenceUsd.toFixed(2)}</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5 font-mono">Hermes v2 Bound</div>
-                    </div>
-
-                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                      <div className="text-slate-500 text-[11px]">Feed Latency</div>
-                      <div className="font-bold text-slate-900 font-mono text-sm mt-1">{ageSeconds}s ago</div>
-                      <div className="text-[10px] text-emerald-600 mt-0.5 font-semibold">Sub-second stream</div>
-                    </div>
-
-                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
-                      <div className="text-slate-500 text-[11px]">Validation State</div>
-                      <div className="font-bold text-emerald-600 font-mono text-sm mt-1 flex items-center gap-1">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span>{selectedAsset.isStale ? "STALE" : "LIVE_FRESH"}</span>
+                      <div className="text-slate-500 text-xs">Normalized Price</div>
+                      <div className="font-bold text-slate-900 text-sm mt-1">
+                        {selectedAsset.priceUsd !== null ? `$${selectedAsset.priceUsd.toFixed(2)}` : "Price unavailable"}
                       </div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">Age &lt; 15s</div>
+                      <div className="text-xs text-emerald-600 mt-0.5">USD Reference</div>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="text-slate-500 text-xs">Confidence Interval</div>
+                      <div className="font-bold text-slate-900 text-sm mt-1">
+                        {selectedAsset.confidenceUsd !== null ? `±$${selectedAsset.confidenceUsd.toFixed(2)}` : "Unavailable"}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">Market data live</div>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="text-slate-500 text-xs">Feed Latency</div>
+                      <div className="font-bold text-slate-900 text-sm mt-1">
+                        {ageSeconds !== null ? `${ageSeconds}s ago` : "Unavailable"}
+                      </div>
+                      <div className="text-xs text-emerald-600 mt-0.5 font-semibold">Sub-second stream</div>
+                    </div>
+
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200">
+                      <div className="text-slate-500 text-xs">Validation State</div>
+                      <div className="font-bold text-emerald-600 text-sm mt-1 flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span>{selectedAsset.isStale || selectedAsset.priceUsd === null ? "Stale" : "Live"}</span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">Freshness verified</div>
                     </div>
                   </div>
                 </div>

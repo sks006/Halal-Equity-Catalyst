@@ -2,99 +2,83 @@
 
 import React from "react";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Layers,
-  ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  Zap,
-} from "lucide-react";
+import { ArrowRight, ShieldCheck, TrendingUp, Layers } from "lucide-react";
 
-import { Button } from "../components/ui/button";
-import { Badge } from "../components/ui/badge";
-import { Card, CardContent } from "../components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 export default function HomePage() {
   return (
     <div className="pt-8 pb-16 space-y-16">
       {/* Hero Section */}
-      <div className="max-w-4xl mx-auto text-center space-y-6">
-        <Badge variant="success" className="px-3.5 py-1.5 text-xs font-semibold gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Solana High-Performance Quantitative Vaults</span>
-        </Badge>
+      <div className="max-w-3xl mx-auto text-center space-y-6">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Simple, Protected Equity Vaults</span>
+        </span>
 
-        <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900 leading-tight">
-          Next-Generation Alpha with{" "}
-          <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
-            On-Chain Risk Shields
-          </span>
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
+          Automated Asset Management for Everyone
         </h1>
 
-        <p className="text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
-          Autonomous strategy execution powered by Pyth Network real-time price feeds,
-          Jupiter swap routing, and dual-layer risk defense managed with React Redux.
+        <p className="text-base sm:text-lg text-slate-600 max-w-xl mx-auto leading-relaxed">
+          Monitor your portfolio, trade verified equities, and rebalance automatically with transparent safety guardrails.
         </p>
 
         {/* CTA Buttons */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-2">
           <Link href="/dashboard">
-            <Button variant="emerald" size="lg" className="w-full sm:w-auto flex items-center gap-2 font-bold px-8">
-              <span>Launch Dashboard</span>
-              <ArrowRight className="w-4 h-4" />
+            <Button size="lg" className="w-full sm:w-auto font-semibold px-8 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">
+              <span>Open Dashboard</span>
+              <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </Link>
 
-          <Link href="/vault/new">
-            <Button variant="outline" size="lg" className="w-full sm:w-auto flex items-center gap-2 font-semibold px-8">
-              <Zap className="w-4 h-4 text-emerald-600" />
-              <span>Deploy Strategy Vault</span>
+          <Link href="/markets">
+            <Button variant="outline" size="lg" className="w-full sm:w-auto font-semibold px-8 border-slate-300 text-slate-700 hover:bg-slate-50">
+              <span>Explore Markets</span>
             </Button>
           </Link>
         </div>
       </div>
 
       {/* Pillar Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
         {/* Pillar 1 */}
-        <Card className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-all">
-          <CardContent className="p-6 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
+        <Card className="bg-white border-slate-200 shadow-sm rounded-xl">
+          <CardContent className="p-6 space-y-2.5">
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
               <ShieldCheck className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-slate-900">Dual-Line Risk Defense</h3>
+            <h3 className="text-base font-bold text-slate-900">Protected by Default</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Every transaction is validated first off-chain by our high-frequency Rust policy engine,
-              then cryptographically verified on-chain via Anchor CPI guardrails before execution.
+              Every rebalance is automatically bounded by cash reserve buffers and position exposure caps to protect capital.
             </p>
           </CardContent>
         </Card>
 
         {/* Pillar 2 */}
-        <Card className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-all">
-          <CardContent className="p-6 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-cyan-50 border border-cyan-200 flex items-center justify-center text-cyan-700">
+        <Card className="bg-white border-slate-200 shadow-sm rounded-xl">
+          <CardContent className="p-6 space-y-2.5">
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
               <TrendingUp className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-slate-900">Pyth Real-Time Pricing</h3>
+            <h3 className="text-base font-bold text-slate-900">Live Verified Pricing</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Zero-stale valuation. Portfolio weights and liquidation stop-losses are computed
-              using sub-second Pyth Network price feeds normalized into exact domain representations.
+              All portfolio valuations are derived directly from verified oracle price streams without simulated delays.
             </p>
           </CardContent>
         </Card>
 
         {/* Pillar 3 */}
-        <Card className="bg-white border-slate-200 shadow-sm hover:shadow-md transition-all">
-          <CardContent className="p-6 space-y-3">
-            <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-200 flex items-center justify-center text-purple-700">
+        <Card className="bg-white border-slate-200 shadow-sm rounded-xl">
+          <CardContent className="p-6 space-y-2.5">
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
               <Layers className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-slate-900">Jupiter Liquidity Routing</h3>
+            <h3 className="text-base font-bold text-slate-900">Seamless Rebalancing</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Autonomous portfolio rebalancing routes across all Solana DEX liquidity pools
-              via Jupiter swap quotes, strictly constrained by price impact thresholds.
+              One-click portfolio rebalancing automatically realigns your holdings to your target allocation.
             </p>
           </CardContent>
         </Card>

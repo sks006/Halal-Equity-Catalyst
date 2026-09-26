@@ -68,6 +68,12 @@ The platform strictly enforces the **Policy, Risk, and Execution Boundary**:
 
 ## Architectural Topology
 
+![Equity Catalyst End-to-End System Architecture](./public/diagram.png)
+
+*Figure 1: High-level architectural topology showing the complete flow from Investor/Operator through the Web presentation layer and TypeScript SDK, Axum API routing & Tokio worker pipeline, deterministic Policy & Risk engines, isolated Signing Pipeline, Redis/PostgreSQL persistence, and atomic on-chain settlement across Solana and liquidity providers (Meteora DBC, Pyth Network, Jupiter).*
+
+### Subsystem Interconnection & Security Boundary
+
 ```mermaid
 graph TB
     subgraph ClientLayer [Presentation & SDK Layer]
@@ -233,7 +239,7 @@ An independent static and architectural verification of the entire codebase was 
 8. **Pyth Integration** (`integrations/pyth/`): Dual-mode Hermes REST and Lazer WebSocket streaming verified.
 9. **Meteora DBC Integration** (`integrations/solana/`): Q64.64 sqrt-price and piecewise curve math validated.
 10. **Database Persistence** (`apps/api/src/repositories/`, `db/migrations/`): Atomic schema migrations 001–009 and idempotency guards verified.
-11. **Frontend Architecture** (`apps/web/`): 18/18 static and dynamic Next.js routes compile cleanly without secret exposure.
+11. **Frontend Architecture** (`apps/web/`): 19/19 static, dynamic, and API Next.js routes compile cleanly without secret exposure, backed by a strict production-only data policy with zero synthetic numbers.
 12. **Security Controls** (`apps/api/src/middleware/`, `apps/api/src/workers/`): Constant-time admin auth, rate limiting, and supervisor panic recovery verified.
 
 ---
@@ -352,6 +358,26 @@ All fees are unbundled, deterministic, and disclosed prior to execution:
 | **Execution & Oracle Fee** | $0.02\%$ | $2\text{ bps}$ | Reimbursement for Pyth Lazer continuous data stream validation, cryptographic checks, and Solana gas. | Node / Execution Validator |
 | **Total Transaction Fee** | **$0.15\%$** | **$15\text{ bps}$** | **Total all-inclusive fee for spot execution.** | - |
 
+### 6. Modern Streamlined Frontend & Production-Only Data Policy (Phase 8 Hardened)
+The presentation layer (`apps/web`) has been consolidated into an institutional-grade, responsive interface prioritizing data integrity, operator ergonomics, and zero synthetic inflation:
+
+* **Unified 4-View Primary Workflow**:
+  - **Dashboard (`/` or `/dashboard`)**: High-level portfolio metrics, active vault health indicators, real-time Pyth price marquee, and live keeper/RPC heartbeat.
+  - **Markets (`/markets`)**: Live Meteora Dynamic Bonding Curve spot pools, real-time Pyth Lazer/Hermes quotes, 3-regime EDC slippage curve visualizer, and deterministic 15 bps fee breakdown.
+  - **Portfolio (`/portfolio`)**: Non-custodial spot token holdings, live cash reserve tracker (enforcing $\ge 10\%$ reserve invariant), target asset allocation drift vs spot policies, Shariah compliance status per asset, and one-click rebalance execution.
+  - **Activity (`/activity`)**: Real-time event and audit ledger, confirmed Solana transaction signatures, multi-stage validation receipts, and idempotent execution status.
+* **Specialized Operational & Risk Hubs**:
+  - **Vault Launch Wizard (`/vault/new`)**: Interactive setup for deploying Anchor-governed smart spot vaults with custom risk parameters, asset whitelists, and minimum cash reserve mandates.
+  - **Risk Guardrails (`/risk`)**: Dual-line risk monitoring, single-trade caps ($10\%$), concentration limits ($25\%$), and emergency pause circuit breaker control.
+  - **Policies & Shariah Screens (`/policies`)**: Qualitative and quantitative AAOIFI Standard No. 21 ratio criteria, dividend purification tracking, and automated drift triggers.
+  - **Executions Ledger (`/executions`)**: In-depth trace inspection of simulation quotes, signer receipts, and on-chain slot finality.
+  - **System Settings (`/settings`)**: Network RPC endpoint failover configuration, Pyth WebSocket channel selectors, and keeper wallet management.
+  - **Autonomous Advisory (`/agent`)**: Macroeconomic signal streams and quarantined AI proposal inspection.
+* **Strict Production-Only Data Integrity Policy (Phase 8 Verified)**:
+  - **Zero Synthetic / Mock Numbers**: Purged all fake demo balances, synthetic mock prices, hardcoded liquidity metrics, and random jitter (`Math.random()` = 0).
+  - **Fail-Closed Presentation**: Missing oracle feeds or backend network interruptions explicitly render `"Price unavailable"` or `"Disconnected"` rather than falling back to misleading `$0.00` or stale hardcoded constants.
+  - **Live State Synchronization**: Direct integration with Pyth Hermes REST and Lazer WebSocket channels, real-time Redux and React Query stores, and live on-chain Solana RPC queries.
+
 ---
 
 ## Verified On-Chain & Network State
@@ -393,7 +419,7 @@ Production systems operate within physical and protocol constraints (detailed in
 │   ├── api/                 # Rust Axum HTTP backend, spot risk engines, workers & integration tests
 │   │   ├── src/             # Routing, auth, rate limiting, domain services, and isolated signer
 │   │   └── tests/           # 12 test suites: adversarial attacks, benchmarks, and hardening tests
-│   └── web/                 # Next.js 14 App Router: Live Ticker, Markets, Policy Builder, Simulator
+│   └── web/                 # Next.js 14 App Router: Dashboard, Markets, Portfolio, Activity, Vaults
 ├── crates/
 │   └── shared/              # Pure deterministic domain crate (spot risk math, cash reserve, AAOIFI, fees)
 ├── db/
@@ -410,6 +436,8 @@ Production systems operate within physical and protocol constraints (detailed in
 │   └── solana/              # Solana RPC failover, WebSocket & Anchor program client
 ├── programs/
 │   └── equity_vault/        # Anchor smart contract (spot vaults, minimum cash reserve, emergency pause)
+├── public/                  # Static architectural diagrams and visual assets
+│   └── diagram.png          # End-to-end system architecture and integration topology diagram
 ├── scripts/
 │   ├── verify-mainnet.ts    # Deterministic Mainnet-beta & Pyth oracle verification script
 │   ├── replay-demo.ts       # Deterministic 7-stage event-to-execution replay script
@@ -536,7 +564,7 @@ cargo test -p equity-catalyst-api --test adversarial_attack_test
 # Run empirical pipeline benchmark suite
 cargo test -p equity-catalyst-api --test pipeline_benchmarks -- --nocapture
 
-# Build Next.js frontend production bundle (18/18 routes compiled)
+# Build Next.js frontend production bundle (19/19 routes compiled)
 pnpm --prefix apps/web build
 
 # Execute mainnet and Pyth oracle verification script
@@ -560,7 +588,13 @@ pnpm install
 pnpm dev
 ```
 
-Visit `http://localhost:3000` to access the dashboard, `/markets` for live Meteora DBC curve pools with Pyth real-time pricing, and the interactive Portfolio Simulator.
+Visit `http://localhost:3000` to access the primary consolidated interface:
+- **Dashboard** (`/` or `/dashboard`): Real-time portfolio totals, active vaults, and Pyth price marquee.
+- **Markets** (`/markets`): Live Meteora DBC spot pools with Pyth Lazer/Hermes quotes and 3-regime EDC curves.
+- **Portfolio** (`/portfolio`): Non-custodial holdings, $\ge 10\%$ cash reserve tracker, and Shariah compliance statuses.
+- **Activity** (`/activity`): Real-time event log, Solana transaction signatures, and multi-stage gate validation receipts.
+- **Vault Creation** (`/vault/new`): Non-custodial Anchor spot vault deployment wizard.
+- **Risk & Policies** (`/risk`, `/policies`): Guardrails, trade caps, and AAOIFI screening rules.
 
 ---
 

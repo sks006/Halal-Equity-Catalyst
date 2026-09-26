@@ -133,11 +133,11 @@ export function DecisionTimeline({ className }: DecisionTimelineProps) {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <Badge variant="cyan" className="font-mono text-[10px] font-bold">
-                Backend Pipeline Visualizer
+              <Badge variant="cyan" className="text-xs">
+                Pipeline Visualizer
               </Badge>
-              <span className="text-xs text-slate-400 font-mono">•</span>
-              <span className="text-xs text-slate-500 font-mono">
+              <span className="text-xs text-slate-400">•</span>
+              <span className="text-xs text-slate-500 font-medium">
                 Step {activeStage} of 6
               </span>
             </div>
@@ -318,14 +318,14 @@ export function DecisionTimeline({ className }: DecisionTimelineProps) {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono font-bold text-slate-400">
+                        <span className="text-xs font-semibold text-slate-400">
                           STAGE {stageNumber}
                         </span>
-                        <h3 className="text-base font-extrabold text-slate-900">
+                        <h3 className="text-base font-bold text-slate-900">
                           {stepMeta.title}
                         </h3>
                         {isCurrent && (
-                          <Badge variant="success" className="animate-pulse text-[10px] font-mono">
+                          <Badge variant="success" className="text-xs">
                             Active Evaluation
                           </Badge>
                         )}
@@ -335,7 +335,7 @@ export function DecisionTimeline({ className }: DecisionTimelineProps) {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
+                    <div className="flex items-center gap-2 text-xs text-slate-400">
                       <Clock className="w-3.5 h-3.5 text-slate-400" />
                       <span>{stageDetails?.timestamp}</span>
                     </div>
@@ -354,10 +354,10 @@ export function DecisionTimeline({ className }: DecisionTimelineProps) {
                           key={key}
                           className="p-2 rounded-lg bg-white border border-slate-200/90 shadow-xs flex flex-col justify-between"
                         >
-                          <span className="text-[10px] uppercase font-bold text-slate-400 font-mono tracking-wider">
+                          <span className="text-xs font-medium text-slate-400">
                             {key}
                           </span>
-                          <span className="text-xs font-bold text-slate-900 font-mono mt-0.5 truncate">
+                          <span className="text-xs font-semibold text-slate-900 mt-0.5 truncate">
                             {String(val)}
                           </span>
                         </div>

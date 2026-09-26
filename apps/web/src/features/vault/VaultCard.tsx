@@ -69,7 +69,7 @@ export function VaultCard({ vault }: Props) {
           {/* Metadata */}
           <div className="mt-4 space-y-1.5 text-[11px] text-slate-500 font-mono">
             <div className="flex justify-between">
-              <span>Vault PDA:</span>
+              <span>Vault Address:</span>
               <span className="text-slate-800 font-medium">{shortAddress}</span>
             </div>
             <div className="flex justify-between">
