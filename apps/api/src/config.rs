@@ -100,7 +100,7 @@ impl Config {
     pub fn testnet() -> Self {
         Self {
             environment: Environment::Testnet,
-            api_host: "127.0.0.1".to_string(),
+            api_host: "0.0.0.0".to_string(),
             api_port: 4000,
             solana_rpc_url: "https://api.devnet.solana.com".to_string(),
             solana_fallback_rpc_urls: vec![
@@ -221,7 +221,8 @@ impl Config {
         };
 
         let api_host = env::var("API_HOST").unwrap_or(default.api_host);
-        let api_port = env::var("API_PORT")
+        let api_port = env::var("PORT")
+            .or_else(|_| env::var("API_PORT"))
             .ok()
             .and_then(|p| p.parse::<u16>().ok())
             .unwrap_or(default.api_port);
@@ -530,5 +531,30 @@ mod tests {
         );
         assert_eq!(Environment::from_str_loose("devnet"), Environment::Testnet);
         assert_eq!(Environment::from_str_loose("unknown"), Environment::Testnet);
+    }
+
+    #[test]
+    fn test_port_env_parsing() {
+        // Test PORT precedence
+        std::env::set_var("PORT", "8080");
+        std::env::set_var("API_PORT", "9090");
+        let port = std::env::var("PORT")
+            .or_else(|_| std::env::var("API_PORT"))
+            .ok()
+            .and_then(|p| p.parse::<u16>().ok())
+            .unwrap_or(4000);
+        assert_eq!(port, 8080);
+
+        // Test fallback to API_PORT
+        std::env::remove_var("PORT");
+        let port = std::env::var("PORT")
+            .or_else(|_| std::env::var("API_PORT"))
+            .ok()
+            .and_then(|p| p.parse::<u16>().ok())
+            .unwrap_or(4000);
+        assert_eq!(port, 9090);
+
+        // Cleanup
+        std::env::remove_var("API_PORT");
     }
 }
