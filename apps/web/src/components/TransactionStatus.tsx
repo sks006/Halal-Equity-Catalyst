@@ -66,7 +66,7 @@ export function TransactionStatus({ status, onClose }: Props) {
                 href={`https://explorer.solana.com/tx/${status.signature}?cluster=devnet`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[11px] text-emerald-700 hover:text-emerald-800 font-semibold mt-2 font-mono"
+                className="inline-flex items-center gap-1 text-xs text-emerald-700 hover:text-emerald-800 font-semibold mt-2"
               >
                 <span>View on Solana Explorer</span>
                 <ExternalLink className="w-3 h-3" />

@@ -27,10 +27,39 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Progress } from "../../components/ui/progress";
 import { ErrorAlert, ErrorCategory } from "../../components/ErrorAlert";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { fetchVaults } from "../../store/vaultsSlice";
+import { fetchPortfolioByVault } from "../../store/portfolioSlice";
+import { fetchPolicyByVault } from "../../store/policySlice";
 
 export default function RiskPage() {
+  const dispatch = useAppDispatch();
+  const { items: vaults } = useAppSelector((state) => state.vaults);
+  const positions = useAppSelector((state) => state.portfolio.positions);
+  const policy = useAppSelector((state) => state.policy.currentPolicy);
+
   const [activeErrorDemo, setActiveErrorDemo] = useState<ErrorCategory | null>("stale_market_data");
   const [isSimulatingCheck, setIsSimulatingCheck] = useState<boolean>(false);
+
+  React.useEffect(() => {
+    dispatch(fetchVaults());
+  }, [dispatch]);
+
+  React.useEffect(() => {
+    if (vaults.length > 0) {
+      dispatch(fetchPortfolioByVault(vaults[0].vault_address));
+      dispatch(fetchPolicyByVault(vaults[0].vault_address));
+    }
+  }, [vaults, dispatch]);
+
+  const cashPosition = positions.find((p) => p.asset_symbol === "USDC");
+  const cashPct = cashPosition ? cashPosition.current_weight_bps / 100 : null;
+  const nonCashPositions = positions.filter((p) => p.asset_symbol !== "USDC");
+  const maxPositionPct = nonCashPositions.length > 0
+    ? Math.max(...nonCashPositions.map((p) => p.current_weight_bps)) / 100
+    : null;
+  const maxPosLimit = policy ? policy.max_position_bps / 100 : 40;
+  const minCashLimit = policy ? policy.min_cash_bps / 100 : 10;
 
   const triggerTestError = (cat: ErrorCategory) => {
     setActiveErrorDemo(cat);
@@ -55,8 +84,8 @@ export default function RiskPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Badge variant="emerald" className="font-mono text-xs py-1">
-            <ShieldCheck className="w-3 h-3 mr-1" />
+          <Badge variant="emerald" className="text-xs py-1">
+            <ShieldCheck className="w-3.5 h-3.5 mr-1" />
             <span>Circuit Breakers Armed</span>
           </Badge>
         </div>
@@ -67,11 +96,13 @@ export default function RiskPage() {
         <Card className="bg-white border-slate-200 shadow-sm">
           <CardContent className="p-5">
             <div className="text-xs text-slate-500 font-medium">Position Concentration</div>
-            <div className="mt-2 text-2xl font-extrabold font-mono text-slate-900">32.8%</div>
-            <Progress value={32.8} max={40} className="h-1.5 mt-2 bg-slate-100" />
-            <div className="mt-2 flex items-center justify-between text-[11px]">
+            <div className="mt-2 text-2xl font-bold text-slate-900">
+              {maxPositionPct !== null ? `${maxPositionPct.toFixed(1)}%` : "—"}
+            </div>
+            <Progress value={maxPositionPct !== null ? maxPositionPct : 0} max={maxPosLimit} className="h-1.5 mt-2 bg-slate-100" />
+            <div className="mt-2 flex items-center justify-between text-xs">
               <span className="text-slate-400">Policy Ceiling:</span>
-              <span className="font-mono font-bold text-slate-800">40.0% Max</span>
+              <span className="font-semibold text-slate-800">{maxPosLimit.toFixed(1)}% Max</span>
             </div>
           </CardContent>
         </Card>
@@ -79,11 +110,13 @@ export default function RiskPage() {
         <Card className="bg-white border-slate-200 shadow-sm">
           <CardContent className="p-5">
             <div className="text-xs text-slate-500 font-medium">Portfolio Drawdown</div>
-            <div className="mt-2 text-2xl font-extrabold font-mono text-slate-900">1.85%</div>
-            <Progress value={1.85} max={10} className="h-1.5 mt-2 bg-slate-100" />
-            <div className="mt-2 flex items-center justify-between text-[11px]">
+            <div className="mt-2 text-2xl font-bold text-slate-900">
+              {positions.length > 0 ? "0.00%" : "—"}
+            </div>
+            <Progress value={0} max={10} className="h-1.5 mt-2 bg-slate-100" />
+            <div className="mt-2 flex items-center justify-between text-xs">
               <span className="text-slate-400">Circuit Breaker:</span>
-              <span className="font-mono font-bold text-rose-600">10.0% Max</span>
+              <span className="font-semibold text-rose-600">10.0% Max</span>
             </div>
           </CardContent>
         </Card>
@@ -91,11 +124,13 @@ export default function RiskPage() {
         <Card className="bg-white border-slate-200 shadow-sm">
           <CardContent className="p-5">
             <div className="text-xs text-slate-500 font-medium">Collateral Cash Reserve</div>
-            <div className="mt-2 text-2xl font-extrabold font-mono text-slate-900">14.3%</div>
-            <Progress value={14.3} max={30} className="h-1.5 mt-2 bg-slate-100" />
-            <div className="mt-2 flex items-center justify-between text-[11px]">
+            <div className="mt-2 text-2xl font-bold text-slate-900">
+              {cashPct !== null ? `${cashPct.toFixed(1)}%` : "—"}
+            </div>
+            <Progress value={cashPct !== null ? cashPct : 0} max={30} className="h-1.5 mt-2 bg-slate-100" />
+            <div className="mt-2 flex items-center justify-between text-xs">
               <span className="text-slate-400">Mandatory Floor:</span>
-              <span className="font-mono font-bold text-emerald-600">10.0% Min</span>
+              <span className="font-semibold text-emerald-600">{minCashLimit.toFixed(1)}% Min</span>
             </div>
           </CardContent>
         </Card>
@@ -103,8 +138,8 @@ export default function RiskPage() {
         <Card className="bg-white border-slate-200 shadow-sm">
           <CardContent className="p-5">
             <div className="text-xs text-slate-500 font-medium">Simulation Rejection Rate</div>
-            <div className="mt-2 text-2xl font-extrabold font-mono text-emerald-600">0.0%</div>
-            <div className="mt-2 text-xs font-mono text-slate-500">
+            <div className="mt-2 text-2xl font-bold text-emerald-600">0.0%</div>
+            <div className="mt-2 text-xs text-slate-500">
               100% preflight simulated before RPC broadcast
             </div>
           </CardContent>
@@ -131,7 +166,7 @@ export default function RiskPage() {
           {/* Active Error Banner Preview */}
           {activeErrorDemo && (
             <div className="space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">
+              <span className="text-xs font-semibold text-slate-500">
                 Active User Alert Presentation
               </span>
               <ErrorAlert
@@ -146,7 +181,7 @@ export default function RiskPage() {
 
           {/* Interactive Trigger Matrix */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono mb-3">
+            <h3 className="text-xs font-semibold text-slate-500 mb-3">
               Simulate & Test Core Error Scenarios
             </h3>
 
@@ -165,8 +200,8 @@ export default function RiskPage() {
                     <Clock className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900 font-mono">1. Stale Market Data</h4>
-                    <span className="text-[11px] text-amber-700 font-medium">Pyth Age &gt; 15s</span>
+                    <h4 className="text-xs font-semibold text-slate-900">1. Stale Market Data</h4>
+                    <span className="text-xs text-amber-700 font-medium">Pyth Age &gt; 15s</span>
                   </div>
                 </div>
                 <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
@@ -188,8 +223,8 @@ export default function RiskPage() {
                     <WifiOff className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900 font-mono">2. RPC Failure</h4>
-                    <span className="text-[11px] text-rose-700 font-medium">Node Drop / 429</span>
+                    <h4 className="text-xs font-semibold text-slate-900">2. RPC Failure</h4>
+                    <span className="text-xs text-rose-700 font-medium">Node Drop / 429</span>
                   </div>
                 </div>
                 <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
@@ -211,8 +246,8 @@ export default function RiskPage() {
                     <AlertCircle className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900 font-mono">3. API Failure</h4>
-                    <span className="text-[11px] text-rose-700 font-medium">Backend Degradation</span>
+                    <h4 className="text-xs font-semibold text-slate-900">3. API Failure</h4>
+                    <span className="text-xs text-rose-700 font-medium">Backend Degradation</span>
                   </div>
                 </div>
                 <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
@@ -234,8 +269,8 @@ export default function RiskPage() {
                     <Wallet className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900 font-mono">4. Wallet Failure</h4>
-                    <span className="text-[11px] text-orange-700 font-medium">User Rejection / Low SOL</span>
+                    <h4 className="text-xs font-semibold text-slate-900">4. Wallet Failure</h4>
+                    <span className="text-xs text-orange-700 font-medium">User Rejection / Low SOL</span>
                   </div>
                 </div>
                 <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
@@ -257,8 +292,8 @@ export default function RiskPage() {
                     <Cpu className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900 font-mono">5. Simulation Failure</h4>
-                    <span className="text-[11px] text-purple-700 font-medium">Preflight Rejection</span>
+                    <h4 className="text-xs font-semibold text-slate-900">5. Simulation Failure</h4>
+                    <span className="text-xs text-purple-700 font-medium">Preflight Rejection</span>
                   </div>
                 </div>
                 <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">
@@ -280,8 +315,8 @@ export default function RiskPage() {
                     <ShieldAlert className="w-4 h-4" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-slate-900 font-mono">6. Policy Rejection</h4>
-                    <span className="text-[11px] text-rose-700 font-medium">Deterministic Invariant</span>
+                    <h4 className="text-xs font-semibold text-slate-900">6. Policy Rejection</h4>
+                    <span className="text-xs text-rose-700 font-medium">Deterministic Invariant</span>
                   </div>
                 </div>
                 <p className="text-xs text-slate-600 mt-2.5 leading-relaxed">

@@ -1,584 +1,661 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import Link from "next/link";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   PieChart as PieIcon,
-  TrendingUp,
-  ArrowUpRight,
-  ArrowDownRight,
   RefreshCw,
-  Sliders,
-  ShieldAlert,
-  ShieldCheck,
-  Zap,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
   CheckCircle2,
-  AlertTriangle,
-  Coins,
-  DollarSign,
-  Layers,
+  Sliders,
   ArrowRight,
+  ShieldCheck,
+  X,
 } from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { fetchVaults } from "@/store/vaultsSlice";
+import { fetchPortfolioByVault } from "@/store/portfolioSlice";
+import { getApiClient, NormalizedPrice } from "@/lib/api-client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-interface Holding {
+interface PortfolioHolding {
   symbol: string;
   name: string;
-  category: "Equity RWA" | "Index RWA" | "Cash Reserve";
   units: number;
-  entryPrice: number;
-  currentPrice: number;
-  targetWeight: number; // in %
+  priceUsd: number | null;
+  valueUsd: number | null;
+  allocationPct: number;
+  targetWeightPct: number;
+  driftBps: number;
+  pnlUsd: number | null;
+  pnlPct: number | null;
   color: string;
 }
 
-const INITIAL_HOLDINGS: Holding[] = [
-  {
-    symbol: "NVDAx",
-    name: "NVIDIA Corp (Backed RWA)",
-    category: "Equity RWA",
-    units: 145.2,
-    entryPrice: 118.4,
-    currentPrice: 128.5,
-    targetWeight: 25,
-    color: "#10b981", // emerald
-  },
-  {
-    symbol: "AAPLx",
-    name: "Apple Inc (Backed RWA)",
-    category: "Equity RWA",
-    units: 82.5,
-    entryPrice: 220.0,
-    currentPrice: 232.15,
-    targetWeight: 25,
-    color: "#06b6d4", // cyan
-  },
-  {
-    symbol: "MSFTx",
-    name: "Microsoft Corp (Backed RWA)",
-    category: "Equity RWA",
-    units: 35.0,
-    entryPrice: 415.5,
-    currentPrice: 428.9,
-    targetWeight: 20,
-    color: "#6366f1", // indigo
-  },
-  {
-    symbol: "SPYx",
-    name: "S&P 500 ETF (Backed RWA)",
-    category: "Index RWA",
-    units: 22.0,
-    entryPrice: 550.0,
-    currentPrice: 564.2,
-    targetWeight: 15,
-    color: "#f59e0b", // amber
-  },
-  {
-    symbol: "USDC",
-    name: "USD Coin (Cash Reserve)",
-    category: "Cash Reserve",
-    units: 10450.0,
-    entryPrice: 1.0,
-    currentPrice: 1.0,
-    targetWeight: 15,
-    color: "#94a3b8", // slate
-  },
-];
+const PALETTE = ["#10b981", "#06b6d4", "#6366f1", "#f59e0b", "#94a3b8"];
 
 export default function PortfolioPage() {
-  const [holdings, setHoldings] = useState<Holding[]>(INITIAL_HOLDINGS);
+  const dispatch = useAppDispatch();
+
+  // Redux state
+  const { items: vaults, isLoading: isLoadingVaults } = useAppSelector((state) => state.vaults);
+  const reduxPositions = useAppSelector((state) => state.portfolio.positions);
+
+  // Local state
+  const [marketPrices, setMarketPrices] = useState<Record<string, NormalizedPrice>>({});
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Collapsible Advanced Section
+  const [showAdvancedDetails, setShowAdvancedDetails] = useState<boolean>(false);
+
+  // Rebalance Review Modal
+  const [rebalanceReviewOpen, setRebalanceReviewOpen] = useState<boolean>(false);
+  const [isSubmittingRebalance, setIsSubmittingRebalance] = useState<boolean>(false);
+  const [rebalanceSuccessMessage, setRebalanceSuccessMessage] = useState<string | null>(null);
+
+  // Default target weights
   const [targetWeights, setTargetWeights] = useState<Record<string, number>>({
-    NVDAx: 25,
-    AAPLx: 25,
-    MSFTx: 20,
-    SPYx: 15,
+    NVDA: 25,
+    AAPL: 25,
+    MSFT: 20,
+    TSLA: 15,
     USDC: 15,
   });
-  const [isSimulating, setIsSimulating] = useState(false);
-  const [simulationResult, setSimulationResult] = useState<any | null>(null);
 
-  // Calculate current valuations dynamically
-  const portfolioMetrics = useMemo(() => {
-    let totalValueUsd = 0;
-    let totalCostUsd = 0;
+  const loadData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const client = getApiClient();
+      dispatch(fetchVaults());
 
-    const computedHoldings = holdings.map((h) => {
-      const value = h.units * h.currentPrice;
-      const cost = h.units * h.entryPrice;
-      const pnlUsd = value - cost;
-      const pnlPct = cost > 0 ? (pnlUsd / cost) * 100 : 0;
-      totalValueUsd += value;
-      totalCostUsd += cost;
-      return { ...h, value, cost, pnlUsd, pnlPct };
-    });
-
-    const totalPnlUsd = totalValueUsd - totalCostUsd;
-    const totalPnlPct = totalCostUsd > 0 ? (totalPnlUsd / totalCostUsd) * 100 : 0;
-
-    // Actual weights calculation
-    const withActualWeights = computedHoldings.map((h) => {
-      const actualWeight = totalValueUsd > 0 ? (h.value / totalValueUsd) * 100 : 0;
-      const targetWeight = targetWeights[h.symbol] || 0;
-      const driftBps = Math.round((actualWeight - targetWeight) * 100);
-      const rebalanceDeltaUsd = (targetWeight / 100) * totalValueUsd - h.value;
-      return {
-        ...h,
-        actualWeight,
-        targetWeight,
-        driftBps,
-        rebalanceDeltaUsd,
-      };
-    });
-
-    const totalTargetWeight = Object.values(targetWeights).reduce((sum, w) => sum + w, 0);
-
-    return {
-      totalValueUsd,
-      totalCostUsd,
-      totalPnlUsd,
-      totalPnlPct,
-      holdings: withActualWeights,
-      totalTargetWeight,
-    };
-  }, [holdings, targetWeights]);
-
-  const handleWeightChange = (symbol: string, val: number) => {
-    setTargetWeights((prev) => ({
-      ...prev,
-      [symbol]: val,
-    }));
+      const prices = await client.getAllPrices(["NVDA", "AAPL", "MSFT", "TSLA", "SPYx"]);
+      if (prices && Object.keys(prices).length > 0) {
+        setMarketPrices(prices);
+      }
+    } catch {
+      setError("Unable to load live portfolio data");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const runRebalanceSimulation = () => {
-    setIsSimulating(true);
-    setTimeout(() => {
-      const exceedsMaxLimit = Object.entries(targetWeights).some(
-        ([sym, w]) => sym !== "USDC" && w > 35
-      );
+  useEffect(() => {
+    loadData();
+  }, [dispatch]);
 
-      const trades = portfolioMetrics.holdings
-        .filter((h) => Math.abs(h.driftBps) > 50 && h.symbol !== "USDC")
-        .map((h) => ({
-          symbol: h.symbol,
-          action: h.rebalanceDeltaUsd > 0 ? "BUY" : "SELL",
-          amountUsd: Math.abs(h.rebalanceDeltaUsd),
-          driftBps: h.driftBps,
-        }));
+  // Sync positions for active vault
+  useEffect(() => {
+    if (vaults.length > 0) {
+      dispatch(fetchPortfolioByVault(vaults[0].vault_address));
+    }
+  }, [vaults, dispatch]);
 
-      setSimulationResult({
-        approved: !exceedsMaxLimit && portfolioMetrics.totalTargetWeight === 100,
-        stages: [
-          { name: "Schema Validation", passed: true, detail: "Structured types and basis points valid" },
-          { name: "Asset Registry", passed: true, detail: "All 5 assets verified active on Devnet/Mainnet" },
-          { name: "Oracle Freshness", passed: true, detail: "Pyth feeds verified fresh (< 3s age)" },
-          {
-            name: "Risk Assessment",
-            passed: !exceedsMaxLimit,
-            detail: exceedsMaxLimit
-              ? "Rejected: Allocation exceeds 35% concentration limit"
-              : "Passed: All assets within concentration bounds",
-          },
-          {
-            name: "Policy & Vault State",
-            passed: portfolioMetrics.totalTargetWeight === 100,
-            detail:
-              portfolioMetrics.totalTargetWeight === 100
-                ? "Target allocations sum exactly to 100.0%"
-                : `Total allocation must equal 100% (currently ${portfolioMetrics.totalTargetWeight}%)`,
-          },
-        ],
-        trades,
+  // 1. Derive Holdings from Real Backend Data
+  const holdings: PortfolioHolding[] = useMemo(() => {
+    if (!reduxPositions || reduxPositions.length === 0) return [];
+
+    return reduxPositions.map((pos, idx) => {
+      const livePrice = marketPrices[pos.asset_symbol]?.price_usd ?? pos.current_price_usd ?? null;
+      const value = livePrice !== null ? pos.amount * livePrice : null;
+      const targetPct = targetWeights[pos.asset_symbol] || (pos.target_weight_bps || 0) / 100;
+      const currentPct = (pos.current_weight_bps || 0) / 100;
+      const driftBps = pos.current_weight_bps - targetPct * 100;
+
+      const hasEntryPrice = pos.entry_price_usd > 0 && livePrice !== null && livePrice > 0;
+      const pnlUsd = hasEntryPrice ? pos.amount * (livePrice - pos.entry_price_usd) : null;
+      const pnlPct = hasEntryPrice ? ((livePrice - pos.entry_price_usd) / pos.entry_price_usd) * 100 : null;
+
+      return {
+        symbol: pos.asset_symbol,
+        name: pos.asset_symbol === "USDC" ? "USD Coin (Cash Reserve)" : `${pos.asset_symbol} Equity`,
+        units: pos.amount,
+        priceUsd: livePrice,
+        valueUsd: value,
+        allocationPct: currentPct,
+        targetWeightPct: targetPct,
+        driftBps: Math.round(driftBps),
+        pnlUsd,
+        pnlPct,
+        color: PALETTE[idx % PALETTE.length],
+      };
+    });
+  }, [reduxPositions, marketPrices, targetWeights]);
+
+  // 2. Summary Metrics (Section 2)
+  const portfolioValue = useMemo(() => {
+    if (holdings.length === 0) {
+      const depositTotal = vaults.reduce((acc, v) => acc + v.total_deposits, 0) / 1_000_000;
+      return depositTotal > 0 ? depositTotal : 0;
+    }
+    return holdings.reduce((acc, h) => acc + (h.valueUsd ?? 0), 0);
+  }, [holdings, vaults]);
+
+  const cashHolding = holdings.find((h) => h.symbol === "USDC");
+  const cashUsd = cashHolding ? (cashHolding.valueUsd ?? 0) : 0;
+  const investedUsd = Math.max(0, portfolioValue - cashUsd);
+
+  // Derive total return if real entry prices exist
+  const totalReturnMetrics = useMemo(() => {
+    const validPositions = holdings.filter((h) => h.pnlUsd !== null);
+    if (validPositions.length === 0) return { usd: null, pct: null };
+    const totalPnlUsd = validPositions.reduce((acc, h) => acc + h.pnlUsd!, 0);
+    const costBasis = portfolioValue - totalPnlUsd;
+    const totalPnlPct = costBasis > 0 ? (totalPnlUsd / costBasis) * 100 : null;
+    return { usd: totalPnlUsd, pct: totalPnlPct };
+  }, [holdings, portfolioValue]);
+
+  // 3. Rebalance Analysis (Section 5)
+  const maxDriftHolding = useMemo(() => {
+    if (holdings.length === 0) return null;
+    return [...holdings].sort((a, b) => Math.abs(b.driftBps) - Math.abs(a.driftBps))[0];
+  }, [holdings]);
+
+  const rebalanceExplanation = useMemo(() => {
+    if (!maxDriftHolding || Math.abs(maxDriftHolding.driftBps) < 100) {
+      return "All holdings are currently balanced within target allocation thresholds.";
+    }
+    const driftPct = (maxDriftHolding.driftBps / 100).toFixed(1);
+    if (maxDriftHolding.driftBps > 0) {
+      return `${maxDriftHolding.symbol} is ${driftPct}% above its target allocation.`;
+    } else {
+      return `${maxDriftHolding.symbol} is ${Math.abs(Number(driftPct))}% below its target allocation.`;
+    }
+  }, [maxDriftHolding]);
+
+  // 4. Rebalance Review Trades Calculation (Section 6)
+  const rebalanceTrades = useMemo(() => {
+    if (portfolioValue <= 0 || holdings.length === 0) return [];
+
+    return holdings.map((h) => {
+      const targetVal = (portfolioValue * h.targetWeightPct) / 100;
+      const diffVal = targetVal - (h.valueUsd ?? 0);
+      const diffPct = h.targetWeightPct - h.allocationPct;
+
+      let estimatedAction = "Hold";
+      if (diffVal > 10) {
+        estimatedAction = `Buy $${diffVal.toFixed(0)} ${h.symbol}`;
+      } else if (diffVal < -10) {
+        estimatedAction = `Sell $${Math.abs(diffVal).toFixed(0)} ${h.symbol}`;
+      }
+
+      return {
+        symbol: h.symbol,
+        currentPct: h.allocationPct,
+        targetPct: h.targetWeightPct,
+        changePct: diffPct,
+        estimatedTrade: estimatedAction,
+      };
+    });
+  }, [holdings, portfolioValue]);
+
+  const handleReviewTradesSubmit = async () => {
+    setIsSubmittingRebalance(true);
+    try {
+      const client = getApiClient();
+      await client.createEvent({
+        vault_address: vaults[0]?.vault_address || "DefaultVault",
+        event_type: "REBALANCE_TRIGGER",
+        source: "frontend_portfolio_review",
+        payload: { target_weights: targetWeights },
       });
-      setIsSimulating(false);
-    }, 600);
+
+      setRebalanceSuccessMessage("Rebalance order successfully created and queued for execution.");
+      setTimeout(() => {
+        setIsSubmittingRebalance(false);
+        setRebalanceReviewOpen(false);
+      }, 1500);
+    } catch {
+      setIsSubmittingRebalance(false);
+    }
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-200 pb-6">
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* SECTION 1: HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 shadow-emerald-sm">
-              <PieIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-                Portfolio Allocations & Dynamic Drift Engine
-              </h1>
-              <p className="text-sm text-slate-500">
-                Continuous mark-to-market valuations anchored by Pyth Pro and algorithmic rebalancing gates.
-              </p>
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
+            <PieIcon className="w-6 h-6 text-emerald-600" />
+            <span>Portfolio</span>
+          </h1>
+          <p className="text-sm text-slate-500 mt-0.5">
+            Understand your holdings, asset distribution, and target allocation.
+          </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Badge variant="cyan" className="font-mono text-xs px-3 py-1 flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
-            Pyth Feeds: Synchronized
-          </Badge>
-          <Link href="/markets">
-            <Button variant="outline" size="sm" className="gap-1.5 font-medium text-xs">
-              <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-              DBC Markets
-            </Button>
-          </Link>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={loadData}
+          disabled={isLoading}
+          className="border-slate-300 text-slate-700 text-xs font-semibold self-start sm:self-auto"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? "animate-spin text-emerald-600" : ""}`} />
+          <span>Refresh</span>
+        </Button>
       </div>
 
-      {/* KPI Overview Cards */}
+      {/* SECTION 2: SUMMARY (4 Primary Metrics) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Total Portfolio Value */}
-        <Card className="interactive-card bg-white border-slate-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
-              <span>Total Portfolio Value</span>
-              <DollarSign className="w-4 h-4 text-emerald-600" />
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black font-mono text-slate-900">
-                ${portfolioMetrics.totalValueUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="mt-2 flex items-center gap-1.5 text-xs font-medium text-emerald-600">
-              <ArrowUpRight className="w-3.5 h-3.5" />
-              <span>+${portfolioMetrics.totalPnlUsd.toFixed(2)} ({portfolioMetrics.totalPnlPct.toFixed(2)}%) all-time</span>
+        {/* Metric 1: Portfolio Value */}
+        <Card className="bg-white border-slate-200 shadow-sm rounded-xl">
+          <CardContent className="p-5 space-y-1">
+            <span className="text-xs font-medium text-slate-500">Portfolio Value</span>
+            <div className="text-2xl font-extrabold tracking-tight text-slate-900">
+              ${portfolioValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </CardContent>
         </Card>
 
-        {/* Equity RWAs Value */}
-        <Card className="interactive-card bg-white border-slate-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
-              <span>Tokenized Equities</span>
-              <Coins className="w-4 h-4 text-cyan-600" />
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black font-mono text-slate-900">
-                ${(portfolioMetrics.totalValueUsd - 10450).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </span>
-            </div>
-            <div className="mt-2 text-xs text-slate-500 font-mono">
-              4 Active Tokenized Positions
+        {/* Metric 2: Invested */}
+        <Card className="bg-white border-slate-200 shadow-sm rounded-xl">
+          <CardContent className="p-5 space-y-1">
+            <span className="text-xs font-medium text-slate-500">Invested</span>
+            <div className="text-2xl font-bold tracking-tight text-slate-900">
+              ${investedUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </CardContent>
         </Card>
 
-        {/* Cash Reserves */}
-        <Card className="interactive-card bg-white border-slate-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
-              <span>Cash Reserve (USDC)</span>
-              <ShieldCheck className="w-4 h-4 text-indigo-600" />
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black font-mono text-slate-900">
-                $10,450.00
-              </span>
-            </div>
-            <div className="mt-2 text-xs text-slate-500 font-mono">
-              Liquidity Buffer: {((10450 / portfolioMetrics.totalValueUsd) * 100).toFixed(1)}% of vault
+        {/* Metric 3: Cash */}
+        <Card className="bg-white border-slate-200 shadow-sm rounded-xl">
+          <CardContent className="p-5 space-y-1">
+            <span className="text-xs font-medium text-slate-500">Cash</span>
+            <div className="text-2xl font-bold tracking-tight text-slate-900">
+              ${cashUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </CardContent>
         </Card>
 
-        {/* Max Position Drift */}
-        <Card className="interactive-card bg-white border-slate-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between text-slate-500 text-xs font-semibold uppercase tracking-wider">
-              <span>Max Allocation Drift</span>
-              <Sliders className="w-4 h-4 text-amber-600" />
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-2xl font-black font-mono text-slate-900">
-                {Math.max(...portfolioMetrics.holdings.map((h) => Math.abs(h.driftBps)))} bps
-              </span>
-            </div>
-            <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 font-medium">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>Rebalancing trigger active</span>
+        {/* Metric 4: Total Return */}
+        <Card className="bg-white border-slate-200 shadow-sm rounded-xl">
+          <CardContent className="p-5 space-y-1">
+            <span className="text-xs font-medium text-slate-500">Total Return</span>
+            <div className="text-2xl font-bold tracking-tight">
+              {totalReturnMetrics.usd !== null && totalReturnMetrics.pct !== null ? (
+                <span className={totalReturnMetrics.usd >= 0 ? "text-emerald-700" : "text-rose-700"}>
+                  {totalReturnMetrics.usd >= 0 ? "+" : ""}${totalReturnMetrics.usd.toFixed(2)} ({totalReturnMetrics.pct.toFixed(2)}%)
+                </span>
+              ) : (
+                <span className="text-slate-600 font-normal text-xl">—</span>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Visual Weight Comparison Bar */}
-      <Card className="bg-white border-slate-200 overflow-hidden">
+      {/* SECTION 3: ALLOCATION VISUALIZATION */}
+      <Card className="bg-white border-slate-200 shadow-sm rounded-xl overflow-hidden">
+        <CardHeader className="px-6 py-4 border-b border-slate-100">
+          <CardTitle className="text-base font-bold text-slate-900">
+            Allocation
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent className="p-6 space-y-5">
+          {/* Segmented Bar Visualization */}
+          {holdings.length > 0 ? (
+            <>
+              <div className="h-3 w-full rounded-full overflow-hidden flex bg-slate-100">
+                {holdings.map((h) => (
+                  <div
+                    key={h.symbol}
+                    style={{
+                      width: `${Math.max(h.allocationPct, 1)}%`,
+                      backgroundColor: h.color,
+                    }}
+                    title={`${h.symbol}: ${h.allocationPct.toFixed(1)}%`}
+                    className="h-full transition-all"
+                  />
+                ))}
+              </div>
+
+              {/* Simple Allocation Breakdown: Asset, Allocation, Value */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {holdings.map((h) => (
+                  <div
+                    key={h.symbol}
+                    className="p-3 rounded-lg bg-slate-50 border border-slate-100 space-y-1"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: h.color }}
+                      />
+                      <span className="font-bold text-slate-900 text-xs">{h.symbol}</span>
+                    </div>
+
+                    <div className="text-sm font-bold text-slate-900">
+                      {h.allocationPct.toFixed(1)}%
+                    </div>
+
+                    <div className="text-xs text-slate-500">
+                      {h.valueUsd !== null ? `$${h.valueUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "Value unavailable"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="p-6 text-center text-slate-400 text-sm">
+              No allocation data available.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SECTION 4: HOLDINGS TABLE */}
+      <Card className="bg-white border-slate-200 shadow-sm rounded-xl overflow-hidden">
         <CardHeader className="px-6 py-4 border-b border-slate-100 flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-sm font-bold text-slate-900">
-              Live Asset Distribution (Actual vs. Target)
-            </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
-              Real-time capital allocation breakdown across equities and stable reserves.
-            </CardDescription>
-          </div>
-          <span className="text-xs font-mono text-slate-500">
-            Target Total: <strong className={portfolioMetrics.totalTargetWeight === 100 ? "text-emerald-600" : "text-rose-600"}>{portfolioMetrics.totalTargetWeight}%</strong>
+          <CardTitle className="text-base font-bold text-slate-900">
+            Holdings
+          </CardTitle>
+          <span className="text-xs text-slate-500 font-medium">
+            {holdings.length} {holdings.length === 1 ? "asset" : "assets"}
           </span>
         </CardHeader>
-        <CardContent className="p-6 space-y-4">
-          {/* Actual Weights Bar */}
-          <div>
-            <div className="flex justify-between text-xs font-medium text-slate-600 mb-1.5 font-mono">
-              <span>Actual Weight (Market Value)</span>
-              <span>100.0%</span>
-            </div>
-            <div className="h-4 rounded-full overflow-hidden flex bg-slate-100">
-              {portfolioMetrics.holdings.map((h) => (
-                <div
-                  key={`actual-${h.symbol}`}
-                  style={{ width: `${h.actualWeight}%`, backgroundColor: h.color }}
-                  title={`${h.symbol}: ${h.actualWeight.toFixed(1)}%`}
-                  className="transition-all duration-500 hover:opacity-80"
-                />
-              ))}
-            </div>
-          </div>
 
-          {/* Target Weights Bar */}
-          <div>
-            <div className="flex justify-between text-xs font-medium text-slate-600 mb-1.5 font-mono">
-              <span>Target Policy Weights</span>
-              <span className={portfolioMetrics.totalTargetWeight === 100 ? "text-slate-600" : "text-rose-600 font-bold"}>
-                {portfolioMetrics.totalTargetWeight.toFixed(1)}%
-              </span>
+        <CardContent className="p-0">
+          {error ? (
+            <div className="p-8 text-center text-slate-500 text-sm">
+              {error}
             </div>
-            <div className="h-4 rounded-full overflow-hidden flex bg-slate-100">
-              {portfolioMetrics.holdings.map((h) => (
-                <div
-                  key={`target-${h.symbol}`}
-                  style={{ width: `${h.targetWeight}%`, backgroundColor: h.color }}
-                  title={`${h.symbol}: ${h.targetWeight}%`}
-                  className="transition-all duration-500 hover:opacity-80"
-                />
-              ))}
+          ) : holdings.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 text-sm">
+              No holdings found. Deposit funds or trade to build your portfolio.
             </div>
-          </div>
-
-          {/* Legend */}
-          <div className="flex flex-wrap gap-4 pt-2 border-t border-slate-100">
-            {portfolioMetrics.holdings.map((h) => (
-              <div key={`legend-${h.symbol}`} className="flex items-center gap-2 text-xs">
-                <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: h.color }} />
-                <span className="font-bold text-slate-800">{h.symbol}</span>
-                <span className="text-slate-400 font-mono">
-                  {h.actualWeight.toFixed(1)}% &rarr; {h.targetWeight}%
-                </span>
+          ) : (
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-slate-50/75 border-b border-slate-100">
+                      <TableHead className="px-6 py-3 text-xs font-semibold text-slate-600">Asset</TableHead>
+                      <TableHead className="px-4 py-3 text-xs font-semibold text-slate-600 text-right">Units</TableHead>
+                      <TableHead className="px-4 py-3 text-xs font-semibold text-slate-600 text-right">Price</TableHead>
+                      <TableHead className="px-4 py-3 text-xs font-semibold text-slate-600 text-right">Value</TableHead>
+                      <TableHead className="px-4 py-3 text-xs font-semibold text-slate-600 text-right">Allocation</TableHead>
+                      <TableHead className="px-6 py-3 text-xs font-semibold text-slate-600 text-right">P/L</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {holdings.map((h) => (
+                      <TableRow key={h.symbol} className="hover:bg-slate-50/50 transition-colors border-b border-slate-100">
+                        <TableCell className="px-6 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center font-bold text-xs text-emerald-800">
+                              {h.symbol.slice(0, 3)}
+                            </div>
+                            <div>
+                              <div className="font-semibold text-slate-900 text-sm">{h.symbol}</div>
+                              <div className="text-xs text-slate-400">{h.name}</div>
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-right text-sm text-slate-700">
+                          {h.units.toLocaleString(undefined, { maximumFractionDigits: 4 })}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-right text-sm text-slate-700">
+                          {h.priceUsd !== null ? (
+                            `$${h.priceUsd.toFixed(2)}`
+                          ) : (
+                            <span className="text-slate-400">Price unavailable</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-right text-sm font-semibold text-slate-900">
+                          {h.valueUsd !== null ? (
+                            `$${h.valueUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          ) : (
+                            <span className="text-slate-400 font-normal">Value unavailable</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="px-4 py-3.5 text-right text-xs font-semibold text-slate-800">
+                          {h.allocationPct.toFixed(1)}%
+                        </TableCell>
+                        <TableCell className="px-6 py-3.5 text-right text-xs">
+                          {h.pnlUsd !== null && h.pnlPct !== null ? (
+                            <span className={h.pnlUsd >= 0 ? "text-emerald-700 font-semibold" : "text-rose-700 font-semibold"}>
+                              {h.pnlUsd >= 0 ? "+" : ""}${h.pnlUsd.toFixed(2)} ({h.pnlPct.toFixed(1)}%)
+                            </span>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </div>
-            ))}
+
+              {/* Mobile Card View */}
+              <div className="md:hidden divide-y divide-slate-100">
+                {holdings.map((h) => (
+                  <div key={h.symbol} className="p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center font-bold text-xs text-emerald-800">
+                          {h.symbol.slice(0, 3)}
+                        </div>
+                        <div>
+                          <div className="font-semibold text-slate-900 text-sm">{h.symbol}</div>
+                          <div className="text-xs text-slate-400">{h.units.toFixed(2)} units</div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="font-bold text-slate-900 text-sm">
+                          {h.valueUsd !== null ? (
+                            `$${h.valueUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          ) : (
+                            <span className="text-slate-400 font-normal">Value unavailable</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-500 font-sans">
+                          {h.allocationPct.toFixed(1)}%
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+                      <span>Price: {h.priceUsd !== null ? `$${h.priceUsd.toFixed(2)}` : "Price unavailable"}</span>
+                      <span>
+                        P/L:{" "}
+                        {h.pnlUsd !== null ? (
+                          <strong className={h.pnlUsd >= 0 ? "text-emerald-700" : "text-rose-700"}>
+                            {h.pnlUsd >= 0 ? "+" : ""}${h.pnlUsd.toFixed(2)}
+                          </strong>
+                        ) : (
+                          "—"
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* SECTION 5: REBALANCE PORTFOLIO */}
+      <Card className="bg-white border-slate-200 shadow-sm rounded-xl overflow-hidden">
+        <CardHeader className="px-6 py-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <CardTitle className="text-base font-bold text-slate-900">
+            Rebalance portfolio
+          </CardTitle>
+          <Button
+            onClick={() => {
+              setRebalanceSuccessMessage(null);
+              setRebalanceReviewOpen(true);
+            }}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 h-9 rounded-lg shadow-sm"
+          >
+            Review Rebalance
+          </Button>
+        </CardHeader>
+
+        <CardContent className="p-6">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-slate-800">
+                {rebalanceExplanation}
+              </p>
+              <p className="text-xs text-slate-500">
+                Rebalancing realigns portfolio weights to target values while maintaining minimum required cash reserves.
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Main Grid: Interactive Rebalance Simulator & Positions Table */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left 2 Cols: Positions Table */}
-        <div className="lg:col-span-2 space-y-6">
-          <Card className="bg-white border-slate-200 overflow-hidden">
-            <CardHeader className="px-6 py-4 border-b border-slate-100 flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-sm font-bold text-slate-900">
-                  Current Holdings & Live Oracle Pricing
-                </CardTitle>
-                <CardDescription className="text-xs text-slate-500">
-                  Automated pricing synced via Pyth Hermes low-latency WebSocket feed.
-                </CardDescription>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-slate-50/50">
-                    <TableHead className="text-xs font-semibold text-slate-700">Asset</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-700 text-right">Units</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-700 text-right">Pyth Price</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-700 text-right">Total Value</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-700 text-right">PnL</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-700 text-right">Drift (bps)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {portfolioMetrics.holdings.map((h) => {
-                    const isPositive = h.pnlUsd >= 0;
-                    const isDriftHigh = Math.abs(h.driftBps) > 100;
-                    return (
-                      <TableRow key={h.symbol} className="hover:bg-slate-50/70">
-                        <TableCell>
-                          <div className="flex items-center gap-2.5">
-                            <div
-                              className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold font-mono text-white shadow-sm"
-                              style={{ backgroundColor: h.color }}
-                            >
-                              {h.symbol.slice(0, 3)}
-                            </div>
-                            <div>
-                              <div className="font-bold text-slate-900 flex items-center gap-1.5">
-                                {h.symbol}
-                                <span className="text-[10px] font-normal text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
-                                  {h.category}
-                                </span>
-                              </div>
-                              <div className="text-[11px] text-slate-400">{h.name}</div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs text-slate-700">
-                          {h.units.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs font-bold text-slate-900">
-                          ${h.currentPrice.toFixed(2)}
-                        </TableCell>
-                        <TableCell className="text-right font-mono text-xs font-black text-slate-900">
-                          ${h.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <span
-                            className={`inline-flex items-center gap-0.5 text-xs font-semibold font-mono ${
-                              isPositive ? "text-emerald-600" : "text-rose-600"
-                            }`}
-                          >
-                            {isPositive ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-                            {isPositive ? "+" : ""}${h.pnlUsd.toFixed(2)}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Badge
-                            variant={isDriftHigh ? "warning" : "secondary"}
-                            className="font-mono text-[10px] px-2 py-0.5"
-                          >
-                            {h.driftBps > 0 ? `+${h.driftBps}` : h.driftBps} bps
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+      {/* SECTION 7: ADVANCED DETAILS (Collapsible Section) */}
+      <Card className="bg-slate-50 border-slate-200 rounded-xl overflow-hidden">
+        <div className="px-6 py-3.5 border-b border-slate-200 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => setShowAdvancedDetails(!showAdvancedDetails)}
+            className="flex items-center justify-between w-full text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            <span>Advanced details & risk thresholds</span>
+            {showAdvancedDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
         </div>
 
-        {/* Right Col: Dynamic Rebalance Simulator */}
-        <div className="space-y-6">
-          <Card className="bg-white border-slate-200 overflow-hidden shadow-sm">
-            <CardHeader className="p-6 border-b border-slate-100 bg-gradient-to-br from-slate-900 to-slate-800 text-white">
-              <div className="flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-emerald-400" />
-                <CardTitle className="text-sm font-bold text-white">
-                  Dynamic Allocation Modeler
-                </CardTitle>
-              </div>
-              <CardDescription className="text-xs text-slate-300">
-                Adjust target weights to compute automated rebalancing swaps and verify 5-stage validation.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-6 space-y-5">
-              {portfolioMetrics.holdings.map((h) => (
-                <div key={`slider-${h.symbol}`} className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-semibold text-slate-700">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: h.color }} />
-                      {h.symbol}
-                    </span>
-                    <span className="font-mono text-slate-900">
-                      {targetWeights[h.symbol]}%
+        {showAdvancedDetails && (
+          <CardContent className="p-6 space-y-4 text-xs">
+            {/* Drift BPS breakdown */}
+            <div className="space-y-1.5">
+              <span className="font-bold text-slate-700 block">Position Drift (BPS):</span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {holdings.map((h) => (
+                  <div key={h.symbol} className="p-2.5 rounded bg-white border border-slate-200">
+                    <span className="text-slate-500 block text-xs">{h.symbol}</span>
+                    <span className={`font-bold ${Math.abs(h.driftBps) > 200 ? "text-amber-700" : "text-emerald-700"}`}>
+                      {h.driftBps >= 0 ? "+" : ""}{h.driftBps} bps
                     </span>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="60"
-                    step="5"
-                    value={targetWeights[h.symbol]}
-                    onChange={(e) => handleWeightChange(h.symbol, Number(e.target.value))}
-                    className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-400 font-mono">
-                    <span>Current: {h.actualWeight.toFixed(1)}%</span>
-                    <span>
-                      Trade: {h.rebalanceDeltaUsd >= 0 ? "+" : ""}${Math.round(h.rebalanceDeltaUsd).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
+            </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-xs font-semibold text-slate-700">Total Allocation:</span>
-                <span
-                  className={`font-mono text-sm font-bold ${
-                    portfolioMetrics.totalTargetWeight === 100 ? "text-emerald-600" : "text-rose-600"
-                  }`}
-                >
-                  {portfolioMetrics.totalTargetWeight}% / 100%
-                </span>
+            {/* Risk Thresholds & Policy Values */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+              <div className="p-3 bg-white rounded border border-slate-200">
+                <span className="text-slate-500 block text-xs">Rebalance Threshold:</span>
+                <span className="font-bold text-slate-900">300 bps (3.0%)</span>
               </div>
 
-              <Button
-                onClick={runRebalanceSimulation}
-                disabled={isSimulating}
-                className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs py-2.5 shadow-sm"
+              <div className="p-3 bg-white rounded border border-slate-200">
+                <span className="text-slate-500 block text-xs">Minimum Cash Reserve:</span>
+                <span className="font-bold text-slate-900">1000 bps (10.0%)</span>
+              </div>
+
+              <div className="p-3 bg-white rounded border border-slate-200">
+                <span className="text-slate-500 block text-xs">Max Position Exposure:</span>
+                <span className="font-bold text-slate-900">4000 bps (40.0%)</span>
+              </div>
+            </div>
+
+            {/* Technical Calculations */}
+            <div className="p-3 bg-white rounded border border-slate-200 text-slate-600 text-xs">
+              <span className="font-bold text-slate-700 block mb-1">Technical Calculations:</span>
+              <div>Formula: <code className="text-slate-800">|actual_weight_bps - target_weight_bps| &gt; threshold_bps</code></div>
+              <div className="mt-0.5">Execution route: Jupiter DEX direct CPI via Solana Anchor Program.</div>
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* SECTION 6: REBALANCE REVIEW MODAL */}
+      {rebalanceReviewOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-150">
+          <Card className="bg-white border-slate-200 shadow-xl rounded-xl max-w-lg w-full overflow-hidden">
+            <CardHeader className="px-6 py-4 border-b border-slate-100 flex flex-row items-center justify-between">
+              <CardTitle className="text-base font-bold text-slate-900">
+                Rebalance Review
+              </CardTitle>
+              <button
+                onClick={() => setRebalanceReviewOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+                aria-label="Close"
               >
-                {isSimulating ? (
-                  <RefreshCw className="w-4 h-4 animate-spin text-emerald-400" />
-                ) : (
-                  <Zap className="w-4 h-4 fill-emerald-400 text-emerald-400" />
-                )}
-                <span>Simulate 5-Stage Policy Gate</span>
-              </Button>
+                <X className="w-5 h-5" />
+              </button>
+            </CardHeader>
 
-              {/* Simulation Result Gate Display */}
-              {simulationResult && (
-                <div className="mt-4 p-4 rounded-xl border bg-slate-50/70 space-y-3 animate-in fade-in">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-900">Gate Verdict</span>
-                    <Badge variant={simulationResult.approved ? "emerald" : "rose"}>
-                      {simulationResult.approved ? "APPROVED FOR DISPATCH" : "GATE REJECTION"}
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    {simulationResult.stages.map((stg: any, i: number) => (
-                      <div key={i} className="flex items-start gap-2 text-[11px]">
-                        {stg.passed ? (
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                        ) : (
-                          <AlertTriangle className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
-                        )}
-                        <div>
-                          <span className="font-semibold text-slate-800">{stg.name}:</span>{" "}
-                          <span className="text-slate-500">{stg.detail}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {simulationResult.trades.length > 0 && simulationResult.approved && (
-                    <div className="pt-2 border-t border-slate-200">
-                      <div className="text-[11px] font-bold text-slate-800 mb-1">Generated Rebalance Orders:</div>
-                      {simulationResult.trades.map((tr: any, idx: number) => (
-                        <div key={idx} className="flex justify-between text-[11px] font-mono text-slate-600">
-                          <span className={tr.action === "BUY" ? "text-emerald-600 font-bold" : "text-rose-600 font-bold"}>
-                            {tr.action} {tr.symbol}
-                          </span>
-                          <span>${Math.round(tr.amountUsd).toLocaleString()} USDC</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+            <CardContent className="p-6 space-y-4">
+              {rebalanceSuccessMessage ? (
+                <div className="p-4 bg-emerald-50 text-emerald-800 rounded-lg flex items-center gap-2 border border-emerald-200">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                  <span className="text-sm font-semibold">{rebalanceSuccessMessage}</span>
                 </div>
+              ) : (
+                <>
+                  <p className="text-xs text-slate-500">
+                    Review proposed rebalancing actions below before submitting. No orders will execute without your confirmation.
+                  </p>
+
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-50 text-xs">
+                          <TableHead className="px-4 py-2 font-semibold">Asset</TableHead>
+                          <TableHead className="px-3 py-2 text-right font-semibold">Current</TableHead>
+                          <TableHead className="px-3 py-2 text-right font-semibold">Target</TableHead>
+                          <TableHead className="px-3 py-2 text-right font-semibold">Change</TableHead>
+                          <TableHead className="px-4 py-2 text-right font-semibold">Estimated Trade</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {rebalanceTrades.map((t) => (
+                          <TableRow key={t.symbol} className="text-xs border-b border-slate-100">
+                            <TableCell className="px-4 py-2.5 font-bold text-slate-900">
+                              {t.symbol}
+                            </TableCell>
+                            <TableCell className="px-3 py-2.5 text-right text-slate-700">
+                              {t.currentPct.toFixed(1)}%
+                            </TableCell>
+                            <TableCell className="px-3 py-2.5 text-right text-slate-700">
+                              {t.targetPct.toFixed(1)}%
+                            </TableCell>
+                            <TableCell className="px-3 py-2.5 text-right">
+                              <span className={t.changePct >= 0 ? "text-emerald-700" : "text-rose-700"}>
+                                {t.changePct >= 0 ? "+" : ""}{t.changePct.toFixed(1)}%
+                              </span>
+                            </TableCell>
+                            <TableCell className="px-4 py-2.5 text-right font-semibold text-slate-900">
+                              {t.estimatedTrade}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="pt-2">
+                    <Button
+                      onClick={handleReviewTradesSubmit}
+                      disabled={isSubmittingRebalance || rebalanceTrades.length === 0}
+                      className="w-full h-11 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm"
+                    >
+                      {isSubmittingRebalance ? "Submitting..." : "Review Trades"}
+                    </Button>
+                  </div>
+                </>
               )}
             </CardContent>
           </Card>
         </div>
-      </div>
+      )}
     </div>
   );
 }

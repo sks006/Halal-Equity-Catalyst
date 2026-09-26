@@ -1,13 +1,16 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import {
+  AlertCircle,
   ArrowUpRight,
   BarChart3,
   CheckCircle2,
   Clock,
   Layers,
   Plus,
+  RefreshCw,
   Rocket,
   ShieldCheck,
   TrendingUp,
@@ -17,79 +20,50 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Progress } from "../../components/ui/progress";
-
-interface LaunchpadPool {
-  id: string;
-  name: string;
-  symbol: string;
-  assetType: string;
-  anchorPrice: number;
-  currentPrice: number;
-  quoteToken: string;
-  quoteCollected: number;
-  graduationThreshold: number;
-  progressPct: number;
-  regime: "Regime A" | "Regime B" | "Regime C" | "Graduated";
-  poolAddress: string;
-}
-
-const SAMPLE_DBC_POOLS: LaunchpadPool[] = [
-  {
-    id: "pool-1",
-    name: "NVIDIA Synthetic xStock",
-    symbol: "NVDA-x",
-    assetType: "Tokenized Stock",
-    anchorPrice: 120.0,
-    currentPrice: 124.5,
-    quoteToken: "USDC",
-    quoteCollected: 580000,
-    graduationThreshold: 750000,
-    progressPct: 77.3,
-    regime: "Regime B",
-    poolAddress: "DBCnvd99xStock111111111111111111111111111111",
-  },
-  {
-    id: "pool-2",
-    name: "Apple Fractional Equity",
-    symbol: "AAPL-x",
-    assetType: "Tokenized Stock",
-    anchorPrice: 220.0,
-    currentPrice: 228.1,
-    quoteToken: "USDC",
-    quoteCollected: 685000,
-    graduationThreshold: 750000,
-    progressPct: 91.3,
-    regime: "Regime C",
-    poolAddress: "DBCaap11xStock222222222222222222222222222222",
-  },
-  {
-    id: "pool-3",
-    name: "Space Exploration Pre-IPO",
-    symbol: "SPCX-p",
-    assetType: "Pre-IPO Equity",
-    anchorPrice: 100.0,
-    currentPrice: 101.2,
-    quoteToken: "USDC",
-    quoteCollected: 210000,
-    graduationThreshold: 750000,
-    progressPct: 28.0,
-    regime: "Regime A",
-    poolAddress: "DBCspcx33PreIpo33333333333333333333333333333",
-  },
-];
+import { getApiClient, DbcPoolModel } from "../../lib/api-client";
 
 export default function LaunchpadPage() {
+  const [pools, setPools] = useState<DbcPoolModel[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchPools = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const client = getApiClient();
+      const livePools = await client.listDbcPools();
+      setPools(livePools || []);
+    } catch (err: any) {
+      // Fail closed: never display synthetic/sample pools
+      setError("Unable to load live launchpad pools from network.");
+      setPools([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPools();
+  }, []);
+
+  const totalLiquidityUsd = pools.reduce(
+    (acc, p) => acc + (p.current_price_usd ? p.current_price_usd * 10000 : 0),
+    0
+  );
+  const graduatedCount = pools.filter((p) => p.is_migrated).length;
+
   return (
     <div className="space-y-8 pb-12">
       {/* Hero Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 pb-6 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2 mb-2">
-            <Badge variant="emerald" className="gap-1 font-mono text-xs">
-              <Zap className="w-3 h-3" />
+            <Badge variant="emerald" className="gap-1 text-xs">
+              <Zap className="w-3.5 h-3.5" />
               Meteora DBC Architecture
             </Badge>
-            <Badge variant="purple" className="gap-1 font-mono text-xs">
+            <Badge variant="secondary" className="gap-1 text-xs">
               Program: dbcij3...aqN
             </Badge>
           </div>
@@ -120,12 +94,14 @@ export default function LaunchpadPage() {
 
       {/* Highlights Metrics Banner */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-slate-200 bg-gradient-to-br from-white to-slate-50">
+        <Card className="border-slate-200 bg-white">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <CardDescription className="text-xs font-semibold text-slate-500">
               Active DBC Pools
             </CardDescription>
-            <CardTitle className="text-2xl font-bold text-slate-900">3 Live</CardTitle>
+            <CardTitle className="text-2xl font-bold text-slate-900">
+              {loading ? "—" : error ? "Unavailable" : `${pools.length} Pools`}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
@@ -134,12 +110,14 @@ export default function LaunchpadPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 bg-gradient-to-br from-white to-slate-50">
+        <Card className="border-slate-200 bg-white">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <CardDescription className="text-xs font-semibold text-slate-500">
               Total Liquidity Locked
             </CardDescription>
-            <CardTitle className="text-2xl font-bold text-slate-900">$1,475,000</CardTitle>
+            <CardTitle className="text-2xl font-bold text-slate-900">
+              {loading ? "—" : error ? "Unavailable" : `$${totalLiquidityUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <span className="text-xs text-slate-600 font-medium">
@@ -148,12 +126,14 @@ export default function LaunchpadPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 bg-gradient-to-br from-white to-slate-50">
+        <Card className="border-slate-200 bg-white">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <CardDescription className="text-xs font-semibold text-slate-500">
               DAMM v2 Migrations
             </CardDescription>
-            <CardTitle className="text-2xl font-bold text-slate-900">1 Pool</CardTitle>
+            <CardTitle className="text-2xl font-bold text-slate-900">
+              {loading ? "—" : error ? "Unavailable" : `${graduatedCount} Pools`}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <span className="text-xs text-purple-600 font-medium flex items-center gap-1">
@@ -162,9 +142,9 @@ export default function LaunchpadPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200 bg-gradient-to-br from-white to-slate-50">
+        <Card className="border-slate-200 bg-white">
           <CardHeader className="pb-2">
-            <CardDescription className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <CardDescription className="text-xs font-semibold text-slate-500">
               Anti-Snipe Protection
             </CardDescription>
             <CardTitle className="text-2xl font-bold text-emerald-600">Active</CardTitle>
@@ -193,75 +173,87 @@ export default function LaunchpadPage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {SAMPLE_DBC_POOLS.map((pool) => (
-            <Card key={pool.id} className="border-slate-200 hover:border-slate-300 transition-all shadow-sm">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <Badge variant="outline" className="font-mono text-[10px]">
-                    {pool.assetType}
-                  </Badge>
-                  <Badge
-                    variant={
-                      pool.regime === "Regime A"
-                        ? "cyan"
-                        : pool.regime === "Regime B"
-                        ? "emerald"
-                        : "purple"
-                    }
-                    className="text-[10px] font-semibold"
-                  >
-                    {pool.regime}
-                  </Badge>
-                </div>
-                <CardTitle className="text-lg font-bold text-slate-900 mt-2 flex items-center justify-between">
-                  <span>{pool.name}</span>
-                  <span className="text-sm font-mono text-slate-500">{pool.symbol}</span>
-                </CardTitle>
-                <CardDescription className="text-xs font-mono text-slate-400 truncate">
-                  {pool.poolAddress}
-                </CardDescription>
-              </CardHeader>
+        {loading ? (
+          <Card className="bg-white p-12 text-center text-slate-400 text-xs">
+            <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-600" />
+            Loading on-chain discovery pools...
+          </Card>
+        ) : error ? (
+          <Card className="bg-white p-8 text-center border-amber-200">
+            <div className="flex items-center justify-center gap-2 text-slate-600 text-sm">
+              <AlertCircle className="w-5 h-5 text-amber-500" />
+              <span>{error}</span>
+            </div>
+          </Card>
+        ) : pools.length === 0 ? (
+          <Card className="bg-white p-12 text-center text-slate-400 text-xs">
+            No active launchpad pools found on-chain. Configure a new launch to initialize a bonding curve.
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {pools.map((pool) => (
+              <Card key={pool.pool_address} className="border-slate-200 hover:border-slate-300 transition-all shadow-sm">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <Badge variant="outline" className="text-xs">
+                      Tokenized Equity
+                    </Badge>
+                    <Badge
+                      variant={pool.is_migrated ? "emerald" : "cyan"}
+                      className="text-xs font-semibold"
+                    >
+                      {pool.is_migrated ? "Graduated" : "Active Curve"}
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-lg font-bold text-slate-900 mt-2 flex items-center justify-between">
+                    <span>{pool.token_symbol}</span>
+                    <span className="text-xs font-mono text-slate-500">{pool.quote_mint.slice(0, 4)}...</span>
+                  </CardTitle>
+                  <CardDescription className="text-xs font-mono text-slate-400 truncate">
+                    {pool.pool_address}
+                  </CardDescription>
+                </CardHeader>
 
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-lg text-xs">
-                  <div>
-                    <span className="text-slate-500 block">Anchor Fair Value</span>
-                    <span className="font-bold text-slate-900">${pool.anchorPrice.toFixed(2)}</span>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2 p-3 bg-slate-50 rounded-lg text-xs">
+                    <div>
+                      <span className="text-slate-500 block">Current Price</span>
+                      <span className="font-bold text-slate-900">
+                        {pool.current_price_usd > 0 ? `$${pool.current_price_usd.toFixed(2)}` : "Price unavailable"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 block">Status</span>
+                      <span className="font-bold text-emerald-600">
+                        {pool.is_migrated ? "Migrated DAMM" : "Bonding"}
+                      </span>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-slate-500 block">Current Price</span>
-                    <span className="font-bold text-emerald-600">${pool.currentPrice.toFixed(2)}</span>
-                  </div>
-                </div>
 
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span className="text-slate-500">Graduation Progress</span>
-                    <span className="text-slate-900 font-mono">{pool.progressPct}%</span>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs font-medium">
+                      <span className="text-slate-500">Graduation Progress</span>
+                      <span className="text-slate-900 font-mono">{pool.curve_progress_pct.toFixed(1)}%</span>
+                    </div>
+                    <Progress value={pool.curve_progress_pct} className="h-2 bg-slate-100" />
                   </div>
-                  <Progress value={pool.progressPct} className="h-2 bg-slate-100" />
-                  <div className="flex justify-between text-[11px] text-slate-400 font-mono pt-1">
-                    <span>${pool.quoteCollected.toLocaleString()} {pool.quoteToken}</span>
-                    <span>Target: ${pool.graduationThreshold.toLocaleString()}</span>
-                  </div>
-                </div>
 
-                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
-                  <span className="text-slate-500 flex items-center gap-1">
-                    <Clock className="w-3.5 h-3.5" /> Active Discovery
-                  </span>
-                  <Link
-                    href={`/launch/new?anchorPrice=${pool.anchorPrice}&asset=${encodeURIComponent(pool.name)}`}
-                    className="text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1"
-                  >
-                    Inspect Curve <ArrowUpRight className="w-3.5 h-3.5" />
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <span className="text-slate-500 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" /> Active Discovery
+                    </span>
+                    <Link
+                      href={`/launch/new?anchorPrice=${pool.current_price_usd}&asset=${encodeURIComponent(pool.token_symbol)}`}
+                      className="text-emerald-600 hover:text-emerald-700 font-semibold flex items-center gap-1"
+                    >
+                      Inspect Curve <ArrowUpRight className="w-3.5 h-3.5" />
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Architectural Philosophy Section */}

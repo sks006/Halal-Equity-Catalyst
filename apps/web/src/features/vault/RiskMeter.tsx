@@ -17,7 +17,7 @@ interface Props {
 }
 
 export function RiskMeter({
-  currentCashBps = 3500, // 35% unencumbered cash reserve
+  currentCashBps = 0,
   minCashBps = 1000,     // 10% minimum threshold
   currentPositionBps,
   maxPositionBps,

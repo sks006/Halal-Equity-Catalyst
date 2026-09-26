@@ -97,33 +97,33 @@ export default function ExecutionsPage() {
     switch (status.toLowerCase()) {
       case "confirmed":
         return (
-          <Badge variant="emerald" className="font-mono text-[10px] flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3" />
-            <span>CONFIRMED</span>
+          <Badge variant="emerald" className="text-xs flex items-center gap-1">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Confirmed</span>
           </Badge>
         );
       case "submitted":
         return (
-          <Badge variant="warning" className="font-mono text-[10px] flex items-center gap-1">
-            <Loader2 className="w-3 h-3 animate-spin" />
-            <span>SUBMITTED</span>
+          <Badge variant="warning" className="text-xs flex items-center gap-1">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            <span>Submitted</span>
           </Badge>
         );
       case "simulated":
         return (
-          <Badge variant="secondary" className="font-mono text-[10px] bg-purple-50 text-purple-700 border-purple-200">
-            SIMULATED
+          <Badge variant="secondary" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+            Simulated
           </Badge>
         );
       case "failed":
         return (
-          <Badge variant="destructive" className="font-mono text-[10px] flex items-center gap-1">
-            <XCircle className="w-3 h-3" />
-            <span>FAILED</span>
+          <Badge variant="destructive" className="text-xs flex items-center gap-1">
+            <XCircle className="w-3.5 h-3.5" />
+            <span>Failed</span>
           </Badge>
         );
       default:
-        return <Badge variant="secondary" className="font-mono text-[10px]">{status.toUpperCase()}</Badge>;
+        return <Badge variant="secondary" className="text-xs capitalize">{status}</Badge>;
     }
   };
 
@@ -137,11 +137,11 @@ export default function ExecutionsPage() {
               <History className="w-4 h-4" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-slate-900">
-              Transaction Execution Status & Ledger
+              Execution ledger
             </h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            On-chain Solana Anchor executions, cryptographic keeper signatures, and post-execution slippage reconciliation
+            On-chain Solana executions, keeper signatures, and settlement records
           </p>
         </div>
 
@@ -157,8 +157,8 @@ export default function ExecutionsPage() {
             <span>{isRefreshing ? "Syncing..." : "Sync Ledger"}</span>
           </Button>
 
-          <Badge variant="cyan" className="font-mono text-xs py-1">
-            <Activity className="w-3 h-3 mr-1 animate-pulse" />
+          <Badge variant="cyan" className="text-xs py-1">
+            <Activity className="w-3.5 h-3.5 mr-1" />
             <span>Solana Devnet</span>
           </Badge>
         </div>
@@ -178,14 +178,14 @@ export default function ExecutionsPage() {
                 <button
                   key={st}
                   onClick={() => setStatusFilter(st)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold font-mono transition-all flex items-center gap-1.5 shrink-0 ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 shrink-0 ${
                     isActive
                       ? "bg-slate-900 text-white shadow-sm"
                       : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
                   }`}
                 >
                   <span>{st}</span>
-                  <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                  <span className={`text-xs px-1.5 py-0.2 rounded-full ${
                     isActive ? "bg-slate-800 text-emerald-400" : "bg-slate-100 text-slate-500"
                   }`}>
                     {count}
@@ -241,10 +241,10 @@ export default function ExecutionsPage() {
 
                           <TableCell>
                             <div>
-                              <div className="font-bold text-xs text-slate-900 font-mono">
+                              <div className="font-semibold text-xs text-slate-900">
                                 {exec.action} {exec.symbol}
                               </div>
-                              <div className="text-[10px] text-slate-400 truncate max-w-[140px]">
+                              <div className="text-xs text-slate-400 truncate max-w-[140px]">
                                 {exec.vaultName}
                               </div>
                             </div>
@@ -271,23 +271,23 @@ export default function ExecutionsPage() {
                             )}
                           </TableCell>
 
-                          <TableCell className="text-right text-xs font-mono">
+                          <TableCell className="text-right text-xs">
                             <div>
                               <span className="font-semibold text-slate-900">
                                 {(exec.amount_in / 1_000_000).toLocaleString(undefined, { maximumFractionDigits: 1 })} USDC
                               </span>
-                              <span className="text-slate-400 block text-[10px]">
-                                $\rightarrow$ {exec.amount_out_actual ? (exec.amount_out_actual / 1_000_000).toFixed(2) : (exec.amount_out_expected / 1_000_000).toFixed(2)} {exec.symbol}
+                              <span className="text-slate-400 block text-xs">
+                                &rarr; {exec.amount_out_actual ? (exec.amount_out_actual / 1_000_000).toFixed(2) : (exec.amount_out_expected / 1_000_000).toFixed(2)} {exec.symbol}
                               </span>
                             </div>
                           </TableCell>
 
-                          <TableCell className="text-right text-xs font-mono">
+                          <TableCell className="text-right text-xs">
                             {exec.status === "confirmed" ? (
-                              <span className={`font-bold inline-flex items-center gap-0.5 ${
+                              <span className={`font-semibold inline-flex items-center gap-0.5 ${
                                 isImprovement ? "text-emerald-600" : "text-amber-600"
                               }`}>
-                                {isImprovement ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                {isImprovement ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                                 <span>{isImprovement ? "+" : ""}{exec.reconciliationDriftBps} bps</span>
                               </span>
                             ) : (
@@ -314,15 +314,15 @@ export default function ExecutionsPage() {
             <Card className="bg-white border-slate-200 shadow-sm overflow-hidden sticky top-20">
               <CardHeader className="p-5 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">
+                  <span className="text-xs font-semibold text-slate-500">
                     Execution Receipt
                   </span>
                   {getStatusBadge(selectedExecution.status)}
                 </div>
-                <CardTitle className="text-base font-bold text-slate-900 mt-2 font-mono">
+                <CardTitle className="text-base font-semibold text-slate-900 mt-2">
                   {selectedExecution.action} {selectedExecution.symbol}
                 </CardTitle>
-                <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+                <div className="text-xs text-slate-400 font-mono mt-0.5 truncate">
                   {selectedExecution.execution_id}
                 </div>
               </CardHeader>
@@ -332,24 +332,24 @@ export default function ExecutionsPage() {
                 {selectedExecution.tx_signature && (
                   <div className="space-y-1.5">
                     <span className="text-slate-500 font-semibold block">Solana Transaction Signature</span>
-                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 font-mono text-[11px] text-slate-800 break-all relative">
+                    <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 font-mono text-xs text-slate-800 break-all relative">
                       {selectedExecution.tx_signature}
                       <div className="mt-2 pt-2 border-t border-slate-200 flex items-center justify-between">
                         <button
                           onClick={() => handleCopy(selectedExecution.tx_signature!)}
                           className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-800"
                         >
-                          <Copy className="w-3 h-3" />
+                          <Copy className="w-3.5 h-3.5" />
                           <span>{copiedSig === selectedExecution.tx_signature ? "Copied!" : "Copy"}</span>
                         </button>
                         <a
                           href={`https://explorer.solana.com/tx/${selectedExecution.tx_signature}?cluster=devnet`}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-emerald-600 font-bold hover:text-emerald-700"
+                          className="inline-flex items-center gap-1 text-emerald-600 font-semibold hover:text-emerald-700"
                         >
                           <span>Solana Explorer</span>
-                          <ExternalLink className="w-3 h-3" />
+                          <ExternalLink className="w-3.5 h-3.5" />
                         </a>
                       </div>
                     </div>
@@ -359,33 +359,33 @@ export default function ExecutionsPage() {
                 {/* Error diagnostics */}
                 {selectedExecution.error_message && (
                   <div>
-                    <span className="text-rose-600 font-bold block mb-1 flex items-center gap-1">
+                    <span className="text-rose-600 font-semibold block mb-1 flex items-center gap-1">
                       <AlertCircle className="w-3.5 h-3.5" />
                       <span>Execution Halt Reason</span>
                     </span>
-                    <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 font-mono text-xs leading-relaxed">
+                    <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs leading-relaxed">
                       {selectedExecution.error_message}
                     </div>
                   </div>
                 )}
 
                 {/* Execution parameters */}
-                <div className="space-y-2 border-t border-slate-100 pt-3 font-mono">
+                <div className="space-y-2 border-t border-slate-100 pt-3">
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Vault Account:</span>
-                    <span className="text-slate-900 truncate max-w-[170px]">{selectedExecution.vault_address}</span>
+                    <span className="font-mono text-xs text-slate-900 truncate max-w-[170px]">{selectedExecution.vault_address}</span>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Input Collateral:</span>
-                    <span className="font-bold text-slate-900">
+                    <span className="font-semibold text-slate-900">
                       {(selectedExecution.amount_in / 1_000_000).toLocaleString()} USDC
                     </span>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Expected Output:</span>
-                    <span className="font-bold text-slate-900">
+                    <span className="font-semibold text-slate-900">
                       {(selectedExecution.amount_out_expected / 1_000_000).toFixed(4)} {selectedExecution.symbol}
                     </span>
                   </div>
@@ -393,7 +393,7 @@ export default function ExecutionsPage() {
                   {selectedExecution.amount_out_actual && (
                     <div className="flex items-center justify-between">
                       <span className="text-slate-500">Actual Output Received:</span>
-                      <span className="font-bold text-emerald-600">
+                      <span className="font-semibold text-emerald-600">
                         {(selectedExecution.amount_out_actual / 1_000_000).toFixed(4)} {selectedExecution.symbol}
                       </span>
                     </div>
@@ -401,13 +401,13 @@ export default function ExecutionsPage() {
 
                   <div className="flex items-center justify-between">
                     <span className="text-slate-500">Slippage Tolerance:</span>
-                    <span className="text-slate-700">{selectedExecution.slippage_bps} bps</span>
+                    <span className="font-medium text-slate-700">{selectedExecution.slippage_bps} bps</span>
                   </div>
 
                   {selectedExecution.confirmationDurationSec && (
                     <div className="flex items-center justify-between">
                       <span className="text-slate-500">Confirmation Latency:</span>
-                      <span className="text-emerald-600 font-bold">{selectedExecution.confirmationDurationSec}s</span>
+                      <span className="text-emerald-600 font-semibold">{selectedExecution.confirmationDurationSec}s</span>
                     </div>
                   )}
                 </div>

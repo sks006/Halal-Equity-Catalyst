@@ -331,41 +331,41 @@ export default function VaultDetailPage() {
         <Card className="bg-white">
           <CardContent className="p-5">
             <span className="text-xs text-slate-500 font-medium">Total Deposits</span>
-            <div className="mt-2 text-2xl font-bold text-slate-900 font-mono">
+            <div className="mt-2 text-2xl font-bold text-slate-900">
               ${totalDepositsUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <span className="text-xs text-emerald-700 font-medium mt-1 block font-mono">USDC Collateral</span>
+            <span className="text-xs text-emerald-700 font-medium mt-1 block">USDC Collateral</span>
           </CardContent>
         </Card>
 
         <Card className="bg-white">
           <CardContent className="p-5">
             <span className="text-xs text-slate-500 font-medium">Total Supply Shares</span>
-            <div className="mt-2 text-2xl font-bold text-slate-900 font-mono">
+            <div className="mt-2 text-2xl font-bold text-slate-900">
               {totalSharesUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <span className="text-xs text-slate-500 mt-1 block font-mono">{vault.symbol} Units</span>
+            <span className="text-xs text-slate-500 mt-1 block">{vault.symbol} Units</span>
           </CardContent>
         </Card>
 
         <Card className="bg-white">
           <CardContent className="p-5">
             <span className="text-xs text-slate-500 font-medium">NAV per Share</span>
-            <div className="mt-2 text-2xl font-bold text-slate-900 font-mono">
+            <div className="mt-2 text-2xl font-bold text-slate-900">
               ${sharePrice.toFixed(4)}
             </div>
-            <span className="text-xs text-emerald-700 font-medium mt-1 block font-mono">+4.2% since epoch</span>
+            <span className="text-xs text-slate-500 mt-1 block">Epoch NAV</span>
           </CardContent>
         </Card>
 
         <Card className="bg-white">
           <CardContent className="p-5">
-            <span className="text-xs text-slate-500 font-medium">Anchor CPI State</span>
+            <span className="text-xs text-slate-500 font-medium">Protection Status</span>
             <div className="mt-2 flex items-center gap-2">
-              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-lg font-bold text-slate-900 font-mono">Guarded</span>
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              <span className="text-lg font-bold text-slate-900">Protected</span>
             </div>
-            <span className="text-xs text-slate-500 mt-1 block font-mono">Dual-Layer Risk Validation</span>
+            <span className="text-xs text-slate-500 mt-1 block">Dual-Layer Risk Validation</span>
           </CardContent>
         </Card>
       </div>
@@ -392,7 +392,7 @@ export default function VaultDetailPage() {
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs">
                       <label className="font-semibold text-slate-700">Deposit Amount (USDC)</label>
-                      <span className="text-slate-400 font-mono">Available: ~5,000 USDC</span>
+                      <span className="text-slate-400">Collateral currency</span>
                     </div>
                     <div className="relative">
                       <Input
@@ -403,21 +403,12 @@ export default function VaultDetailPage() {
                         value={depositAmount}
                         onChange={(e) => setDepositAmount(e.target.value)}
                         placeholder="0.00"
-                        className="font-mono text-sm pr-14"
+                        className="text-sm"
                       />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDepositAmount("5000")}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 h-6 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50 uppercase"
-                      >
-                        Max
-                      </Button>
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs font-mono space-y-1 text-slate-500">
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs space-y-1 text-slate-500">
                     <div className="flex justify-between">
                       <span>Est. Shares Received:</span>
                       <span className="text-slate-900 font-semibold">
@@ -457,7 +448,7 @@ export default function VaultDetailPage() {
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs">
                       <label className="font-semibold text-slate-700">Shares to Redeem</label>
-                      <span className="text-slate-400 font-mono">Balance: 1,500 {vault.symbol}</span>
+                      <span className="text-slate-400">{vault.symbol} Shares</span>
                     </div>
                     <div className="relative">
                       <Input
@@ -468,21 +459,12 @@ export default function VaultDetailPage() {
                         value={withdrawShares}
                         onChange={(e) => setWithdrawShares(e.target.value)}
                         placeholder="0.00"
-                        className="font-mono text-sm pr-14"
+                        className="text-sm"
                       />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setWithdrawShares("1500")}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 h-6 text-[10px] font-bold text-cyan-700 hover:bg-cyan-50 uppercase"
-                      >
-                        Max
-                      </Button>
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs font-mono space-y-1 text-slate-500">
+                  <div className="p-3 rounded-lg bg-slate-50 border border-slate-100 text-xs space-y-1 text-slate-500">
                     <div className="flex justify-between">
                       <span>Est. USDC Withdrawn:</span>
                       <span className="text-slate-900 font-semibold">
@@ -525,12 +507,23 @@ export default function VaultDetailPage() {
 
         {/* Risk Meter & Protection Status */}
         <div className="lg:col-span-2 space-y-4">
-          <RiskMeter
-            currentCashBps={3800} // 38%
-            minCashBps={policy?.min_cash_bps || 1000}
-            currentPositionBps={positions[0]?.current_weight_bps || 4456}
-            maxPositionBps={policy?.max_position_bps || 5000}
-          />
+          {(() => {
+            const cashPos = positions.find((p) => p.asset_symbol === "USDC");
+            const cashBps = cashPos ? cashPos.current_weight_bps : 0;
+            const nonCashPositions = positions.filter((p) => p.asset_symbol !== "USDC");
+            const maxPosBps = nonCashPositions.length > 0
+              ? Math.max(...nonCashPositions.map((p) => p.current_weight_bps))
+              : 0;
+
+            return (
+              <RiskMeter
+                currentCashBps={cashBps}
+                minCashBps={policy?.min_cash_bps || 1000}
+                currentPositionBps={maxPosBps}
+                maxPositionBps={policy?.max_position_bps || 5000}
+              />
+            );
+          })()}
 
           <Card className="bg-white">
             <CardContent className="p-5">
@@ -539,27 +532,27 @@ export default function VaultDetailPage() {
                   <ShieldCheck className="w-4 h-4 text-emerald-600" />
                   <span>Autonomous Policy Safeguards Active</span>
                 </div>
-                <span className="text-[10px] font-mono text-slate-400">
+                <span className="text-xs text-slate-400">
                   Updated: {new Date(policy?.updated_at || Date.now()).toLocaleDateString()}
                 </span>
               </div>
 
               <div className="grid grid-cols-3 gap-3 mt-3 text-center text-xs">
                 <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                  <div className="text-[10px] text-slate-500">Stop Loss Limit</div>
+                  <div className="text-xs text-slate-500">Stop Loss Limit</div>
                   <div className="font-bold text-rose-600 mt-0.5">
                     -{(policy ? policy.stop_loss_bps / 100 : 8).toFixed(1)}%
                   </div>
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                  <div className="text-[10px] text-slate-500">Take Profit Target</div>
+                  <div className="text-xs text-slate-500">Take Profit Target</div>
                   <div className="font-bold text-amber-600 mt-0.5">
                     +{(policy ? policy.take_profit_bps / 100 : 20).toFixed(1)}%
                   </div>
                 </div>
                 <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                  <div className="text-[10px] text-slate-500">Rebalance Drift</div>
-                  <div className="font-bold text-cyan-700 mt-0.5">
+                  <div className="text-xs text-slate-500">Rebalance Drift</div>
+                  <div className="font-bold text-slate-800 mt-0.5">
                     ±{(policy ? policy.rebalance_threshold_bps / 100 : 1.5).toFixed(1)}%
                   </div>
                 </div>
@@ -588,7 +581,7 @@ export default function VaultDetailPage() {
           <div>
             <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
               <span>Autonomous Decision & Execution Pipeline</span>
-              <Badge variant="cyan" className="font-mono text-[10px]">
+              <Badge variant="success" className="text-xs">
                 Live Stream
               </Badge>
             </h2>

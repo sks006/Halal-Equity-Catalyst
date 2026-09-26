@@ -48,7 +48,7 @@ export function WalletButton() {
         className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer shadow-sm transition-all"
       >
         {/* SOL Balance Pill */}
-        <Badge variant="success" className="font-mono text-[11px] px-2 py-0.5">
+        <Badge variant="success" className="text-xs px-2 py-0.5">
           {isLoading ? "..." : `${balanceSol} SOL`}
         </Badge>
 
