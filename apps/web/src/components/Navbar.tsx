@@ -22,7 +22,7 @@ export function Navbar() {
               <Zap className="w-4 h-4 fill-emerald-600" />
             </div>
             <span className="text-base font-bold tracking-tight text-slate-900">
-              Equity Catalyst
+             Halal Equity Catalyst
             </span>
           </Link>
         </div>
