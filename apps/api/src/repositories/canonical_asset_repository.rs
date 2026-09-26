@@ -77,7 +77,10 @@ impl CanonicalAssetRepository {
     /// Creates a new canonical asset.
     ///
     /// Fails closed if the `mint_address` or `asset_id` is already registered.
-    pub async fn create_asset(&self, req: &CreateAssetRequest) -> Result<CanonicalAssetModel, ApiError> {
+    pub async fn create_asset(
+        &self,
+        req: &CreateAssetRequest,
+    ) -> Result<CanonicalAssetModel, ApiError> {
         Self::validate_request(req)?;
 
         let initial_status = req.approval_status.unwrap_or(AssetApprovalStatus::Pending);
@@ -185,7 +188,10 @@ impl CanonicalAssetRepository {
     }
 
     /// Retrieves an asset by its primary key (`asset_id`).
-    pub async fn get_asset_by_id(&self, asset_id: &str) -> Result<Option<CanonicalAssetModel>, ApiError> {
+    pub async fn get_asset_by_id(
+        &self,
+        asset_id: &str,
+    ) -> Result<Option<CanonicalAssetModel>, ApiError> {
         match &self.backend {
             Backend::Postgres(pool) => {
                 let client = pool.get().await.map_err(|e| {
@@ -199,10 +205,7 @@ impl CanonicalAssetRepository {
                     )
                     .await
                     .map_err(|e| {
-                        ApiError::InternalServerError(format!(
-                            "Failed to query asset by id: {}",
-                            e
-                        ))
+                        ApiError::InternalServerError(format!("Failed to query asset by id: {}", e))
                     })?;
 
                 Ok(row_opt.map(|r| CanonicalAssetModel::from(&r)))
@@ -217,12 +220,23 @@ impl CanonicalAssetRepository {
     }
 
     /// Alias for `get_asset_by_id`.
-    pub async fn find_by_id(&self, asset_id: &str) -> Result<Option<CanonicalAssetModel>, ApiError> {
+    pub async fn find_by_id(
+        &self,
+        asset_id: &str,
+    ) -> Result<Option<CanonicalAssetModel>, ApiError> {
+        self.get_asset_by_id(asset_id).await
+    }
+
+    /// Alias for `get_asset_by_id`.
+    pub async fn get_asset(&self, asset_id: &str) -> Result<Option<CanonicalAssetModel>, ApiError> {
         self.get_asset_by_id(asset_id).await
     }
 
     /// Retrieves an asset by its SPL token mint address.
-    pub async fn get_asset_by_mint(&self, mint_address: &str) -> Result<Option<CanonicalAssetModel>, ApiError> {
+    pub async fn get_asset_by_mint(
+        &self,
+        mint_address: &str,
+    ) -> Result<Option<CanonicalAssetModel>, ApiError> {
         match &self.backend {
             Backend::Postgres(pool) => {
                 let client = pool.get().await.map_err(|e| {
@@ -248,13 +262,27 @@ impl CanonicalAssetRepository {
                 let guard = store.read().map_err(|e| {
                     ApiError::InternalServerError(format!("Lock acquisition failed: {}", e))
                 })?;
-                Ok(guard.values().find(|a| a.mint_address == mint_address).cloned())
+                Ok(guard
+                    .values()
+                    .find(|a| a.mint_address == mint_address)
+                    .cloned())
             }
         }
     }
 
     /// Alias for `get_asset_by_mint`.
-    pub async fn find_by_mint(&self, mint_address: &str) -> Result<Option<CanonicalAssetModel>, ApiError> {
+    pub async fn find_by_mint(
+        &self,
+        mint_address: &str,
+    ) -> Result<Option<CanonicalAssetModel>, ApiError> {
+        self.get_asset_by_mint(mint_address).await
+    }
+
+    /// Alias for `get_asset_by_mint`.
+    pub async fn get_by_mint(
+        &self,
+        mint_address: &str,
+    ) -> Result<Option<CanonicalAssetModel>, ApiError> {
         self.get_asset_by_mint(mint_address).await
     }
 
@@ -353,9 +381,9 @@ impl CanonicalAssetRepository {
                     ApiError::InternalServerError(format!("Lock acquisition failed: {}", e))
                 })?;
 
-                let asset = guard.get_mut(asset_id).ok_or_else(|| {
-                    ApiError::NotFound(format!("Asset '{}' not found", asset_id))
-                })?;
+                let asset = guard
+                    .get_mut(asset_id)
+                    .ok_or_else(|| ApiError::NotFound(format!("Asset '{}' not found", asset_id)))?;
 
                 asset.is_active = true;
                 asset.approval_status = AssetApprovalStatus::Active;
@@ -405,9 +433,9 @@ impl CanonicalAssetRepository {
                     ApiError::InternalServerError(format!("Lock acquisition failed: {}", e))
                 })?;
 
-                let asset = guard.get_mut(asset_id).ok_or_else(|| {
-                    ApiError::NotFound(format!("Asset '{}' not found", asset_id))
-                })?;
+                let asset = guard
+                    .get_mut(asset_id)
+                    .ok_or_else(|| ApiError::NotFound(format!("Asset '{}' not found", asset_id)))?;
 
                 asset.is_active = false;
                 asset.approval_status = AssetApprovalStatus::Deactivated;
@@ -461,7 +489,10 @@ impl CanonicalAssetRepository {
                     )
                     .await
                     .map_err(|e| {
-                        ApiError::InternalServerError(format!("Failed to update asset status: {}", e))
+                        ApiError::InternalServerError(format!(
+                            "Failed to update asset status: {}",
+                            e
+                        ))
                     })?;
 
                 Ok(CanonicalAssetModel::from(&row))
@@ -471,9 +502,9 @@ impl CanonicalAssetRepository {
                     ApiError::InternalServerError(format!("Lock acquisition failed: {}", e))
                 })?;
 
-                let asset = guard.get_mut(asset_id).ok_or_else(|| {
-                    ApiError::NotFound(format!("Asset '{}' not found", asset_id))
-                })?;
+                let asset = guard
+                    .get_mut(asset_id)
+                    .ok_or_else(|| ApiError::NotFound(format!("Asset '{}' not found", asset_id)))?;
 
                 asset.approval_status = target_status;
                 asset.is_active = is_active;
@@ -506,7 +537,10 @@ impl CanonicalAssetRepository {
                     )
                     .await
                     .map_err(|e| {
-                        ApiError::InternalServerError(format!("Failed to filter assets by status: {}", e))
+                        ApiError::InternalServerError(format!(
+                            "Failed to filter assets by status: {}",
+                            e
+                        ))
                     })?;
 
                 Ok(rows.iter().map(CanonicalAssetModel::from).collect())

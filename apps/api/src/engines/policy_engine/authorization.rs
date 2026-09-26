@@ -54,10 +54,7 @@ pub enum PolicyRejectionReason {
     },
 
     /// Single trade size exceeds maximum allowed capital outlay.
-    MaxTradeSizeExceeded {
-        trade_usd: u64,
-        max_trade_usd: u64,
-    },
+    MaxTradeSizeExceeded { trade_usd: u64, max_trade_usd: u64 },
 
     /// Insufficient asset balance for SELL trade (*Bay' ma la Yamlik* prohibition).
     InsufficientAssetBalance {
@@ -387,7 +384,9 @@ impl DeterministicPolicyAuthorizer {
                         reasons.push(PolicyRejectionReason::ShariahNonCompliant {
                             asset_id: proposal.asset_id.clone(),
                             symbol: proposal.symbol.clone(),
-                            details: "Screening review has expired or evaluation timestamp is invalid".to_string(),
+                            details:
+                                "Screening review has expired or evaluation timestamp is invalid"
+                                    .to_string(),
                         });
                     }
                 }
@@ -442,8 +441,8 @@ impl DeterministicPolicyAuthorizer {
                 .unwrap_or(0);
 
             let projected_pos_usd = current_pos_usd.saturating_add(proposal.proposed_usd_value);
-            let projected_bps = ((projected_pos_usd as u128 * 10_000)
-                / context.total_portfolio_usd as u128) as u16;
+            let projected_bps =
+                ((projected_pos_usd as u128 * 10_000) / context.total_portfolio_usd as u128) as u16;
             let max_pos_bps = context.policy.max_position_bps as u16;
 
             if projected_bps > max_pos_bps {

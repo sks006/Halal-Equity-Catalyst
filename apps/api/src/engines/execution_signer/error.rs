@@ -5,11 +5,32 @@ use thiserror::Error;
 /// Errors arising during cryptographic key loading, signing, and verification.
 #[derive(Debug, Error, Clone, PartialEq, Eq)]
 pub enum SignerError {
-    #[error("Signer key file not found: {path} (failing closed; no hardcoded fallbacks permitted)")]
+    #[error(
+        "Signer key file not found: {path} (failing closed; no hardcoded fallbacks permitted)"
+    )]
     KeyFileNotFound { path: String },
 
     #[error("Invalid key file format in '{path}': {details}")]
     InvalidKeyFormat { path: String, details: String },
+
+    #[error("Missing required signer configuration: {0}")]
+    MissingConfiguration(String),
+
+    #[error("Invalid signer configuration: {0}")]
+    InvalidConfiguration(String),
+
+    #[error(
+        "Execution authority mismatch: expected public key '{expected}', actual loaded signer public key '{actual}'"
+    )]
+    AuthorityMismatch { expected: String, actual: String },
+
+    #[error(
+        "Transaction contains placeholder instruction which is strictly prohibited from signing: program={program}"
+    )]
+    PlaceholderInstructionProhibited { program: String },
+
+    #[error("Preflight transaction simulation failed: {0}")]
+    PreflightSimulationFailed(String),
 
     #[error("External signer ({signer_type}) is unavailable or offline: {reason}")]
     SignerUnavailable {

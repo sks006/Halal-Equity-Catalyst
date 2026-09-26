@@ -1,8 +1,6 @@
 //! Unit tests for PythSubscription and SubscriptionSet.
 
-use equity_catalyst_pyth::{
-    known_feeds, normalize_feed_id, PythSubscription, SubscriptionSet,
-};
+use equity_catalyst_pyth::{known_feeds, normalize_feed_id, PythSubscription, SubscriptionSet};
 
 #[test]
 fn test_pyth_subscription_creation_and_normalization() {
@@ -15,7 +13,10 @@ fn test_pyth_subscription_creation_and_normalization() {
 
     assert_eq!(sub.asset_id, "backed:AAPLx");
     assert_eq!(sub.symbol, "AAPL");
-    assert_eq!(sub.mint_address, "MintAAPLx111111111111111111111111111111111");
+    assert_eq!(
+        sub.mint_address,
+        "MintAAPLx111111111111111111111111111111111"
+    );
     // Verifies 0x prefix is stripped and normalized to lowercase
     assert_eq!(sub.pyth_feed_id, known_feeds::AAPL_USD);
 }
@@ -91,9 +92,18 @@ fn test_multiple_assets_and_deterministic_ordering() {
     let set3 = SubscriptionSet::new(vec![sub_tsla.clone(), sub_nvda.clone(), sub_aapl.clone()]);
 
     // Deterministic equality regardless of order
-    assert_eq!(set1, set2, "Sets with same subscriptions in different order must be equal");
-    assert_eq!(set2, set3, "Sets with same subscriptions in different order must be equal");
-    assert_eq!(set1, set3, "Sets with same subscriptions in different order must be equal");
+    assert_eq!(
+        set1, set2,
+        "Sets with same subscriptions in different order must be equal"
+    );
+    assert_eq!(
+        set2, set3,
+        "Sets with same subscriptions in different order must be equal"
+    );
+    assert_eq!(
+        set1, set3,
+        "Sets with same subscriptions in different order must be equal"
+    );
 
     // Feed IDs must also be deterministic and sorted
     let feed_ids1 = set1.feed_ids();
@@ -104,12 +114,7 @@ fn test_multiple_assets_and_deterministic_ordering() {
 
 #[test]
 fn test_feed_ids_deduplication() {
-    let sub1 = PythSubscription::new(
-        "asset:1",
-        "A1",
-        "Mint1",
-        known_feeds::AAPL_USD,
-    );
+    let sub1 = PythSubscription::new("asset:1", "A1", "Mint1", known_feeds::AAPL_USD);
     let sub2 = PythSubscription::new(
         "asset:2",
         "A2",

@@ -56,7 +56,9 @@ pub enum PipelineFailure {
     },
 
     /// 4. Pyth confidence interval is too wide relative to price (exceeds risk tolerance).
-    #[error("Pyth confidence too large for '{symbol}': {conf_bps} bps exceeds limit {max_conf_bps} bps")]
+    #[error(
+        "Pyth confidence too large for '{symbol}': {conf_bps} bps exceeds limit {max_conf_bps} bps"
+    )]
     PythConfidenceTooLarge {
         symbol: String,
         conf_bps: u16,
@@ -64,7 +66,9 @@ pub enum PipelineFailure {
     },
 
     /// 5. Pyth feed ID received does not match expected registered canonical feed ID.
-    #[error("Wrong feed ID for '{symbol}': expected '{expected_feed_id}', got '{received_feed_id}'")]
+    #[error(
+        "Wrong feed ID for '{symbol}': expected '{expected_feed_id}', got '{received_feed_id}'"
+    )]
     WrongFeed {
         symbol: String,
         expected_feed_id: String,
@@ -107,7 +111,9 @@ pub enum PipelineFailure {
     TransactionSubmissionFailure { details: String },
 
     /// 12. Transaction confirmation timed out without reaching cluster commitment.
-    #[error("Transaction confirmation timeout for signature '{tx_signature}' after {timeout_secs}s")]
+    #[error(
+        "Transaction confirmation timeout for signature '{tx_signature}' after {timeout_secs}s"
+    )]
     TransactionConfirmationTimeout {
         tx_signature: String,
         timeout_secs: u64,
@@ -278,10 +284,12 @@ impl TradingPipelineSafetyGuard {
         symbol: &str,
         price_result: &'a Result<MarketPriceUpdate, String>,
     ) -> Result<&'a MarketPriceUpdate, PipelineFailure> {
-        price_result.as_ref().map_err(|err| PipelineFailure::PythUnavailable {
-            symbol: symbol.to_string(),
-            details: err.clone(),
-        })
+        price_result
+            .as_ref()
+            .map_err(|err| PipelineFailure::PythUnavailable {
+                symbol: symbol.to_string(),
+                details: err.clone(),
+            })
     }
 
     // ========================================================================
@@ -325,10 +333,7 @@ impl TradingPipelineSafetyGuard {
     // ========================================================================
     // 4. Pyth Confidence Check
     // ========================================================================
-    pub fn check_pyth_confidence(
-        &self,
-        update: &MarketPriceUpdate,
-    ) -> Result<(), PipelineFailure> {
+    pub fn check_pyth_confidence(&self, update: &MarketPriceUpdate) -> Result<(), PipelineFailure> {
         if update.conf_bps > self.max_confidence_bps {
             Err(PipelineFailure::PythConfidenceTooLarge {
                 symbol: update.symbol.clone(),
@@ -442,9 +447,11 @@ impl TradingPipelineSafetyGuard {
         &self,
         quoter_result: &'a Result<T, String>,
     ) -> Result<&'a T, PipelineFailure> {
-        quoter_result.as_ref().map_err(|err| PipelineFailure::DexUnavailable {
-            details: err.clone(),
-        })
+        quoter_result
+            .as_ref()
+            .map_err(|err| PipelineFailure::DexUnavailable {
+                details: err.clone(),
+            })
     }
 
     // ========================================================================
@@ -457,7 +464,8 @@ impl TradingPipelineSafetyGuard {
         if !signer.is_available() {
             Err(PipelineFailure::SignerUnavailable {
                 signer_type: signer.signer_type().to_string(),
-                details: "Signer is offline, key is not loaded, or hardware device is detached".to_string(),
+                details: "Signer is offline, key is not loaded, or hardware device is detached"
+                    .to_string(),
             })
         } else {
             Ok(())
@@ -563,7 +571,10 @@ impl TradingPipelineSafetyGuard {
         let price = self.check_pyth_availability(ctx.symbol, ctx.price_update)?;
 
         // 2. Pyth stream connected
-        self.check_pyth_stream_connected(ctx.is_stream_connected, "Pyth price stream is disconnected")?;
+        self.check_pyth_stream_connected(
+            ctx.is_stream_connected,
+            "Pyth price stream is disconnected",
+        )?;
 
         // 3. Pyth data fresh
         self.check_pyth_freshness(price, ctx.now)?;
@@ -596,7 +607,8 @@ impl TradingPipelineSafetyGuard {
         if !ctx.is_signer_available {
             return Err(PipelineFailure::SignerUnavailable {
                 signer_type: ctx.signer_type.to_string(),
-                details: "Signer is offline, key is not loaded, or hardware device is detached".to_string(),
+                details: "Signer is offline, key is not loaded, or hardware device is detached"
+                    .to_string(),
             });
         }
 
@@ -700,7 +712,10 @@ mod tests {
 
         // 2. Stream disconnected
         let res2 = guard.check_pyth_stream_connected(false, "SSE dropped");
-        assert!(matches!(res2, Err(PipelineFailure::PythStreamDisconnected { .. })));
+        assert!(matches!(
+            res2,
+            Err(PipelineFailure::PythStreamDisconnected { .. })
+        ));
         assert!(guard.check_pyth_stream_connected(true, "OK").is_ok());
 
         // 3. Stale price
@@ -736,12 +751,17 @@ mod tests {
         )
         .unwrap();
         let res4 = guard.check_pyth_confidence(&wide_conf_update);
-        assert!(matches!(res4, Err(PipelineFailure::PythConfidenceTooLarge { .. })));
+        assert!(matches!(
+            res4,
+            Err(PipelineFailure::PythConfidenceTooLarge { .. })
+        ));
 
         // 5. Wrong feed
         let res5 = guard.check_feed_id("NVDA", "0xexpectedfeed", "0xwrongfeed");
         assert!(matches!(res5, Err(PipelineFailure::WrongFeed { .. })));
-        assert!(guard.check_feed_id("NVDA", "0xfeed1234", "feed1234").is_ok());
+        assert!(guard
+            .check_feed_id("NVDA", "0xfeed1234", "feed1234")
+            .is_ok());
     }
 
     #[test]
@@ -751,18 +771,34 @@ mod tests {
 
         // 6. Asset deactivated
         let res6 = guard.check_asset_active("NVDA", false, "Suspended");
-        assert!(matches!(res6, Err(PipelineFailure::AssetDeactivated { .. })));
+        assert!(matches!(
+            res6,
+            Err(PipelineFailure::AssetDeactivated { .. })
+        ));
         assert!(guard.check_asset_active("NVDA", true, "Active").is_ok());
 
         // 7. Shariah approval revoked
-        let res7 = guard.check_shariah_approval("NVDA", ShariahStatus::Revoked, now - 1000, now + 1000, now);
-        assert!(matches!(res7, Err(PipelineFailure::ShariahApprovalRevoked { .. })));
-        assert!(guard.check_shariah_approval("NVDA", ShariahStatus::Approved, now - 1000, now + 1000, now).is_ok());
+        let res7 = guard.check_shariah_approval(
+            "NVDA",
+            ShariahStatus::Revoked,
+            now - 1000,
+            now + 1000,
+            now,
+        );
+        assert!(matches!(
+            res7,
+            Err(PipelineFailure::ShariahApprovalRevoked { .. })
+        ));
+        assert!(guard
+            .check_shariah_approval("NVDA", ShariahStatus::Approved, now - 1000, now + 1000, now)
+            .is_ok());
 
         // 8. DEX quote expired
         let res8 = guard.check_dex_quote_expiry("quote-1", now - 10, now);
         assert!(matches!(res8, Err(PipelineFailure::DexQuoteExpired { .. })));
-        assert!(guard.check_dex_quote_expiry("quote-1", now + 60, now).is_ok());
+        assert!(guard
+            .check_dex_quote_expiry("quote-1", now + 60, now)
+            .is_ok());
 
         // 9. DEX unavailable
         let dex_down: Result<(), String> = Err("504 Gateway Timeout".to_string());
@@ -777,7 +813,10 @@ mod tests {
         // 10. Signer unavailable
         let offline_signer = UnavailableSigner::new();
         let res10 = guard.check_signer_availability(&offline_signer);
-        assert!(matches!(res10, Err(PipelineFailure::SignerUnavailable { .. })));
+        assert!(matches!(
+            res10,
+            Err(PipelineFailure::SignerUnavailable { .. })
+        ));
 
         let online_signer = DevTestSigner::new_ephemeral();
         assert!(guard.check_signer_availability(&online_signer).is_ok());
@@ -785,27 +824,44 @@ mod tests {
         // 11. Transaction submission failure
         let sub_err: Result<(), String> = Err("RPC TCP drop".to_string());
         let res11 = guard.check_submission_result(&sub_err);
-        assert!(matches!(res11, Err(PipelineFailure::TransactionSubmissionFailure { .. })));
+        assert!(matches!(
+            res11,
+            Err(PipelineFailure::TransactionSubmissionFailure { .. })
+        ));
 
         // 12. Transaction confirmation timeout
         let res12 = guard.check_confirmation("sig123", false, 30);
-        assert!(matches!(res12, Err(PipelineFailure::TransactionConfirmationTimeout { .. })));
+        assert!(matches!(
+            res12,
+            Err(PipelineFailure::TransactionConfirmationTimeout { .. })
+        ));
         assert!(guard.check_confirmation("sig123", true, 30).is_ok());
 
         // 13. Duplicate execution request
         let exec_id = Uuid::new_v4();
         let res13 = guard.check_idempotency(exec_id, true, Some("confirmed"));
-        assert!(matches!(res13, Err(PipelineFailure::DuplicateExecutionRequest { .. })));
+        assert!(matches!(
+            res13,
+            Err(PipelineFailure::DuplicateExecutionRequest { .. })
+        ));
         assert!(guard.check_idempotency(exec_id, false, None).is_ok());
 
         // 14. Database unavailable
         let db_down: Result<(), String> = Err("Connection refused".to_string());
         let res14 = guard.check_database_availability(&db_down);
-        assert!(matches!(res14, Err(PipelineFailure::DatabaseUnavailable { .. })));
+        assert!(matches!(
+            res14,
+            Err(PipelineFailure::DatabaseUnavailable { .. })
+        ));
 
         // 15. WebSocket client disconnected
         let res15 = guard.check_websocket_client_connected(false, "Client TCP reset");
-        assert!(matches!(res15, Err(PipelineFailure::WebSocketClientDisconnected { .. })));
-        assert!(guard.check_websocket_client_connected(true, "Client active").is_ok());
+        assert!(matches!(
+            res15,
+            Err(PipelineFailure::WebSocketClientDisconnected { .. })
+        ));
+        assert!(guard
+            .check_websocket_client_connected(true, "Client active")
+            .is_ok());
     }
 }

@@ -121,7 +121,17 @@ mod tests {
         let tok_prog = Pubkey::new_unique();
 
         let ix = build_cpi_instruction(
-            &jup, &vault, &in_tok, &out_tok, &in_mint, &out_mint, &tok_prog, &[], 100_000, 95_000, None,
+            &jup,
+            &vault,
+            &in_tok,
+            &out_tok,
+            &in_mint,
+            &out_mint,
+            &tok_prog,
+            &[],
+            100_000,
+            95_000,
+            None,
         );
 
         assert_eq!(ix.program_id, jup);

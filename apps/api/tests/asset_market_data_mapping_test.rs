@@ -51,7 +51,10 @@ async fn test_valid_mapping_creation_and_retrieval() {
 
     assert_eq!(mapping.asset_id, "backed:NVDAx");
     assert_eq!(mapping.symbol, "NVDA");
-    assert_eq!(mapping.mint_address, "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh");
+    assert_eq!(
+        mapping.mint_address,
+        "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+    );
     assert_eq!(mapping.pyth_feed_id, NVDA_FEED_ID);
     assert!(mapping.is_active);
 
@@ -72,7 +75,9 @@ async fn test_nonexistent_asset_rejection() {
     let asset_repo = CanonicalAssetRepository::new_in_memory();
     let market_repo = AssetMarketDataRepository::new_in_memory(asset_repo);
 
-    let res = market_repo.create_mapping("nonexistent:ASSET", NVDA_FEED_ID).await;
+    let res = market_repo
+        .create_mapping("nonexistent:ASSET", NVDA_FEED_ID)
+        .await;
     assert!(res.is_err(), "Must reject mapping for non-existent asset");
     assert!(res.unwrap_err().to_string().contains("does not exist"));
 }
@@ -82,21 +87,47 @@ async fn test_duplicate_mapping_rejection() {
     let asset_repo = CanonicalAssetRepository::new_in_memory();
     let market_repo = AssetMarketDataRepository::new_in_memory(asset_repo.clone());
 
-    let req1 = sample_asset_request("backed:NVDAx", "NVDA", "MintNVDA11111111111111111111111111111", AssetApprovalStatus::ShariahApproved);
-    let req2 = sample_asset_request("backed:AAPLx", "AAPL", "MintAAPL11111111111111111111111111111", AssetApprovalStatus::ShariahApproved);
+    let req1 = sample_asset_request(
+        "backed:NVDAx",
+        "NVDA",
+        "MintNVDA11111111111111111111111111111",
+        AssetApprovalStatus::ShariahApproved,
+    );
+    let req2 = sample_asset_request(
+        "backed:AAPLx",
+        "AAPL",
+        "MintAAPL11111111111111111111111111111",
+        AssetApprovalStatus::ShariahApproved,
+    );
     asset_repo.create_asset(&req1).await.unwrap();
     asset_repo.create_asset(&req2).await.unwrap();
 
-    market_repo.create_mapping("backed:NVDAx", NVDA_FEED_ID).await.unwrap();
+    market_repo
+        .create_mapping("backed:NVDAx", NVDA_FEED_ID)
+        .await
+        .unwrap();
 
     // 1. Duplicate active mapping for the SAME asset must be rejected
-    let dup_asset = market_repo.create_mapping("backed:NVDAx", AAPL_FEED_ID).await;
-    assert!(dup_asset.is_err(), "Must reject duplicate active mapping for the same asset");
-    assert!(dup_asset.unwrap_err().to_string().contains("already exists"));
+    let dup_asset = market_repo
+        .create_mapping("backed:NVDAx", AAPL_FEED_ID)
+        .await;
+    assert!(
+        dup_asset.is_err(),
+        "Must reject duplicate active mapping for the same asset"
+    );
+    assert!(dup_asset
+        .unwrap_err()
+        .to_string()
+        .contains("already exists"));
 
     // 2. Duplicate active feed mapping to ANOTHER asset must be rejected
-    let dup_feed = market_repo.create_mapping("backed:AAPLx", NVDA_FEED_ID).await;
-    assert!(dup_feed.is_err(), "Must reject mapping an active Pyth feed to multiple assets");
+    let dup_feed = market_repo
+        .create_mapping("backed:AAPLx", NVDA_FEED_ID)
+        .await;
+    assert!(
+        dup_feed.is_err(),
+        "Must reject mapping an active Pyth feed to multiple assets"
+    );
     assert!(dup_feed.unwrap_err().to_string().contains("already mapped"));
 }
 
@@ -106,33 +137,68 @@ async fn test_inactive_mapping_and_inactive_asset_filtering() {
     let market_repo = AssetMarketDataRepository::new_in_memory(asset_repo.clone());
 
     // Asset A: Active asset, Active mapping -> MUST BE INCLUDED
-    let r1 = sample_asset_request("asset:A", "AA", "MintA1111111111111111111111111111111111", AssetApprovalStatus::ShariahApproved);
+    let r1 = sample_asset_request(
+        "asset:A",
+        "AA",
+        "MintA1111111111111111111111111111111111",
+        AssetApprovalStatus::ShariahApproved,
+    );
     asset_repo.create_asset(&r1).await.unwrap();
     asset_repo.activate_asset("asset:A").await.unwrap();
-    market_repo.create_mapping("asset:A", NVDA_FEED_ID).await.unwrap();
+    market_repo
+        .create_mapping("asset:A", NVDA_FEED_ID)
+        .await
+        .unwrap();
 
     // Asset B: Active asset, Mapping deactivated -> MUST BE EXCLUDED
-    let r2 = sample_asset_request("asset:B", "BB", "MintB1111111111111111111111111111111111", AssetApprovalStatus::ShariahApproved);
+    let r2 = sample_asset_request(
+        "asset:B",
+        "BB",
+        "MintB1111111111111111111111111111111111",
+        AssetApprovalStatus::ShariahApproved,
+    );
     asset_repo.create_asset(&r2).await.unwrap();
     asset_repo.activate_asset("asset:B").await.unwrap();
-    market_repo.create_mapping("asset:B", AAPL_FEED_ID).await.unwrap();
+    market_repo
+        .create_mapping("asset:B", AAPL_FEED_ID)
+        .await
+        .unwrap();
     market_repo.deactivate_mapping("asset:B").await.unwrap();
 
     // Asset C: Mapping active, but Asset deactivated -> MUST BE EXCLUDED
-    let r3 = sample_asset_request("asset:C", "CC", "MintC1111111111111111111111111111111111", AssetApprovalStatus::ShariahApproved);
+    let r3 = sample_asset_request(
+        "asset:C",
+        "CC",
+        "MintC1111111111111111111111111111111111",
+        AssetApprovalStatus::ShariahApproved,
+    );
     asset_repo.create_asset(&r3).await.unwrap();
     asset_repo.activate_asset("asset:C").await.unwrap();
-    market_repo.create_mapping("asset:C", TSLA_FEED_ID).await.unwrap();
+    market_repo
+        .create_mapping("asset:C", TSLA_FEED_ID)
+        .await
+        .unwrap();
     asset_repo.deactivate_asset("asset:C").await.unwrap(); // Deactivate underlying asset
 
     // Asset D: ShariahApproved but NOT activated -> MUST BE EXCLUDED
-    let r4 = sample_asset_request("asset:D", "DD", "MintD1111111111111111111111111111111111", AssetApprovalStatus::ShariahApproved);
+    let r4 = sample_asset_request(
+        "asset:D",
+        "DD",
+        "MintD1111111111111111111111111111111111",
+        AssetApprovalStatus::ShariahApproved,
+    );
     asset_repo.create_asset(&r4).await.unwrap();
-    market_repo.create_mapping("asset:D", MSFT_FEED_ID).await.unwrap();
+    market_repo
+        .create_mapping("asset:D", MSFT_FEED_ID)
+        .await
+        .unwrap();
 
     // Answer the core acceptance criteria:
     // "For every currently active approved asset, which Pyth feed should provide its reference price?"
-    let active_mappings = market_repo.get_active_mappings().await.expect("Query failed");
+    let active_mappings = market_repo
+        .get_active_mappings()
+        .await
+        .expect("Query failed");
 
     // Only Asset A must be returned
     assert_eq!(active_mappings.len(), 1);
@@ -140,7 +206,10 @@ async fn test_inactive_mapping_and_inactive_asset_filtering() {
     assert_eq!(active_mappings[0].symbol, "AA");
     assert_eq!(active_mappings[0].pyth_feed_id, NVDA_FEED_ID);
 
-    let active_ids: Vec<&str> = active_mappings.iter().map(|m| m.asset_id.as_str()).collect();
+    let active_ids: Vec<&str> = active_mappings
+        .iter()
+        .map(|m| m.asset_id.as_str())
+        .collect();
     assert!(!active_ids.contains(&"asset:B"));
     assert!(!active_ids.contains(&"asset:C"));
     assert!(!active_ids.contains(&"asset:D"));
@@ -151,11 +220,19 @@ async fn test_feed_mapping_update() {
     let asset_repo = CanonicalAssetRepository::new_in_memory();
     let market_repo = AssetMarketDataRepository::new_in_memory(asset_repo.clone());
 
-    let req = sample_asset_request("backed:NVDAx", "NVDA", "MintNVDA11111111111111111111111111111", AssetApprovalStatus::ShariahApproved);
+    let req = sample_asset_request(
+        "backed:NVDAx",
+        "NVDA",
+        "MintNVDA11111111111111111111111111111",
+        AssetApprovalStatus::ShariahApproved,
+    );
     asset_repo.create_asset(&req).await.unwrap();
     asset_repo.activate_asset("backed:NVDAx").await.unwrap();
 
-    market_repo.create_mapping("backed:NVDAx", NVDA_FEED_ID).await.unwrap();
+    market_repo
+        .create_mapping("backed:NVDAx", NVDA_FEED_ID)
+        .await
+        .unwrap();
 
     // Update to new feed ID
     let updated = market_repo
@@ -165,7 +242,11 @@ async fn test_feed_mapping_update() {
 
     assert_eq!(updated.pyth_feed_id, TSLA_FEED_ID);
 
-    let fetched = market_repo.get_mapping_for_asset("backed:NVDAx").await.unwrap().unwrap();
+    let fetched = market_repo
+        .get_mapping_for_asset("backed:NVDAx")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(fetched.pyth_feed_id, TSLA_FEED_ID);
 
     // Verify active mappings list reflects updated feed
@@ -180,24 +261,48 @@ async fn test_approved_vs_non_approved_asset_behavior() {
     let market_repo = AssetMarketDataRepository::new_in_memory(asset_repo.clone());
 
     // 1. Pending asset -> MUST FAIL
-    let r_pending = sample_asset_request("pnd:1", "PND", "MintP11111111111111111111111111111111", AssetApprovalStatus::Pending);
+    let r_pending = sample_asset_request(
+        "pnd:1",
+        "PND",
+        "MintP11111111111111111111111111111111",
+        AssetApprovalStatus::Pending,
+    );
     asset_repo.create_asset(&r_pending).await.unwrap();
     let res_pending = market_repo.create_mapping("pnd:1", NVDA_FEED_ID).await;
     assert!(res_pending.is_err(), "Must reject mapping to PENDING asset");
-    assert!(res_pending.unwrap_err().to_string().contains("unapproved asset"));
+    assert!(res_pending
+        .unwrap_err()
+        .to_string()
+        .contains("unapproved asset"));
 
     // 2. Validated asset -> MUST FAIL
-    let r_val = sample_asset_request("val:1", "VAL", "MintV11111111111111111111111111111111", AssetApprovalStatus::Validated);
+    let r_val = sample_asset_request(
+        "val:1",
+        "VAL",
+        "MintV11111111111111111111111111111111",
+        AssetApprovalStatus::Validated,
+    );
     asset_repo.create_asset(&r_val).await.unwrap();
     let res_val = market_repo.create_mapping("val:1", AAPL_FEED_ID).await;
     assert!(res_val.is_err(), "Must reject mapping to VALIDATED asset");
-    assert!(res_val.unwrap_err().to_string().contains("unapproved asset"));
+    assert!(res_val
+        .unwrap_err()
+        .to_string()
+        .contains("unapproved asset"));
 
     // 3. ShariahApproved asset -> MUST SUCCEED
-    let r_app = sample_asset_request("app:1", "APP", "MintA11111111111111111111111111111111", AssetApprovalStatus::ShariahApproved);
+    let r_app = sample_asset_request(
+        "app:1",
+        "APP",
+        "MintA11111111111111111111111111111111",
+        AssetApprovalStatus::ShariahApproved,
+    );
     asset_repo.create_asset(&r_app).await.unwrap();
     let res_app = market_repo.create_mapping("app:1", TSLA_FEED_ID).await;
-    assert!(res_app.is_ok(), "Must allow mapping to SHARIAH_APPROVED asset");
+    assert!(
+        res_app.is_ok(),
+        "Must allow mapping to SHARIAH_APPROVED asset"
+    );
 }
 
 #[tokio::test]
@@ -205,7 +310,12 @@ async fn test_empty_feed_id_rejection() {
     let asset_repo = CanonicalAssetRepository::new_in_memory();
     let market_repo = AssetMarketDataRepository::new_in_memory(asset_repo.clone());
 
-    let req = sample_asset_request("app:1", "APP", "MintA11111111111111111111111111111111", AssetApprovalStatus::ShariahApproved);
+    let req = sample_asset_request(
+        "app:1",
+        "APP",
+        "MintA11111111111111111111111111111111",
+        AssetApprovalStatus::ShariahApproved,
+    );
     asset_repo.create_asset(&req).await.unwrap();
 
     assert!(market_repo.create_mapping("app:1", "").await.is_err());

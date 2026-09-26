@@ -5,7 +5,10 @@ pub mod websocket;
 
 pub use accounts::*;
 pub use anchor_client::AnchorClient;
-pub use rpc::{AccountInfo, SignatureStatus, SolanaRpcClient, TokenAccountBalance};
+pub use rpc::{
+    AccountInfo, SignatureStatus, SolanaRpcClient, TokenAccountBalance,
+    TransactionConfirmationStatus,
+};
 pub use websocket::{AccountNotification, LogsNotification, SolanaWebSocketClient};
 
 use thiserror::Error;
@@ -50,4 +53,10 @@ pub enum SolanaError {
 
     #[error("Invalid public key string: {0}")]
     InvalidPublicKey(String),
+
+    #[error("Unauthorized DEX program ID: {0}. Only whitelisted DEX programs (Jupiter, Meteora) are permitted.")]
+    UnauthorizedDexProgram(String),
+
+    #[error("Invalid execution parameters: {0}")]
+    InvalidParameters(String),
 }

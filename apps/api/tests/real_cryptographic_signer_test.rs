@@ -191,10 +191,10 @@ async fn test_unavailable_signer_fails_closed() {
     );
 
     // 3. Test through TransactionSignerService pipeline
-    let payer = Pubkey::new_unique();
+    let payer = hsm.pubkey();
     let ix = sample_instruction(&payer);
     let blockhash = Hash::new_unique();
-    let unsigned_tx = TransactionBuilder::build_unsigned(&[ix], &payer, blockhash).unwrap();
+    let unsigned_tx = TransactionBuilder::build_unsigned(&[ix], &payer, blockhash, 1000).unwrap();
 
     let pipeline_result = TransactionSignerService::sign(&hsm, &unsigned_tx).await;
     assert!(
@@ -286,7 +286,11 @@ async fn test_separated_transaction_lifecycle_construction_signing_submission() 
     // Unsigned transaction has 0 signatures
     assert!(
         unsigned.transaction.signatures.is_empty()
-            || unsigned.transaction.signatures.iter().all(|s| *s == solana_sdk::signature::Signature::default()),
+            || unsigned
+                .transaction
+                .signatures
+                .iter()
+                .all(|s| *s == solana_sdk::signature::Signature::default()),
         "Unsigned transaction must not be signed"
     );
 

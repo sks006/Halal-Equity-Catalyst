@@ -411,7 +411,7 @@ async fn test_api_get_executions() {
         amount_out_expected: 49_800,
         amount_out_actual: Some(49_850),
         slippage_bps: 50,
-        tx_signature: Some("5xyzSignature".to_string()),
+        tx_signature: Some(format!("5xyzSig_{}", Uuid::new_v4().simple())),
         status: "CONFIRMED".to_string(),
         error_message: None,
         executed_at: Utc::now(),

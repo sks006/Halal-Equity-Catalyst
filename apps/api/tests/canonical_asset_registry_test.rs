@@ -1,6 +1,5 @@
 use equity_catalyst_api::{
-    models::canonical_asset::CreateAssetRequest,
-    repositories::CanonicalAssetRepository,
+    models::canonical_asset::CreateAssetRequest, repositories::CanonicalAssetRepository,
 };
 use equity_catalyst_shared::AssetApprovalStatus;
 
@@ -34,10 +33,16 @@ async fn test_create_and_retrieve_asset() {
         None,
     );
 
-    let created = repo.create_asset(&req).await.expect("Failed to create asset");
+    let created = repo
+        .create_asset(&req)
+        .await
+        .expect("Failed to create asset");
     assert_eq!(created.asset_id, "backed:NVDAx");
     assert_eq!(created.symbol, "NVDA");
-    assert_eq!(created.mint_address, "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh");
+    assert_eq!(
+        created.mint_address,
+        "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh"
+    );
     assert_eq!(created.legal_issuer, "Backed Finance AG");
     assert_eq!(created.custodian, "Maerki Baumann & Co. AG");
     assert_eq!(created.approval_status, AssetApprovalStatus::Pending);
@@ -62,8 +67,16 @@ async fn test_create_and_retrieve_asset() {
     assert_eq!(by_mint.asset_id, created.asset_id);
 
     // Non-existent lookups
-    assert!(repo.get_asset_by_id("non_existent").await.unwrap().is_none());
-    assert!(repo.get_asset_by_mint("non_existent_mint").await.unwrap().is_none());
+    assert!(repo
+        .get_asset_by_id("non_existent")
+        .await
+        .unwrap()
+        .is_none());
+    assert!(repo
+        .get_asset_by_mint("non_existent_mint")
+        .await
+        .unwrap()
+        .is_none());
 }
 
 #[tokio::test]
@@ -72,12 +85,17 @@ async fn test_duplicate_mint_rejection() {
     let mint = "DuplicateMintAddress1111111111111111111111";
 
     let req1 = create_sample_request("backed:NVDAx", "NVDA", mint, None);
-    repo.create_asset(&req1).await.expect("First asset creation should succeed");
+    repo.create_asset(&req1)
+        .await
+        .expect("First asset creation should succeed");
 
     // Attempt second asset with different asset_id and symbol but SAME mint address
     let req2 = create_sample_request("prestocks:NVDA", "NVDA-P", mint, None);
     let result = repo.create_asset(&req2).await;
-    assert!(result.is_err(), "Duplicate mint address must be strictly rejected");
+    assert!(
+        result.is_err(),
+        "Duplicate mint address must be strictly rejected"
+    );
     let err = result.unwrap_err();
     assert!(err.to_string().contains("already exists"));
 }
@@ -86,12 +104,27 @@ async fn test_duplicate_mint_rejection() {
 async fn test_duplicate_asset_id_rejection() {
     let repo = CanonicalAssetRepository::new_in_memory();
 
-    let req1 = create_sample_request("backed:NVDAx", "NVDA", "MintA11111111111111111111111111111111111", None);
-    repo.create_asset(&req1).await.expect("First asset creation should succeed");
+    let req1 = create_sample_request(
+        "backed:NVDAx",
+        "NVDA",
+        "MintA11111111111111111111111111111111111",
+        None,
+    );
+    repo.create_asset(&req1)
+        .await
+        .expect("First asset creation should succeed");
 
-    let req2 = create_sample_request("backed:NVDAx", "NVDA", "MintB11111111111111111111111111111111111", None);
+    let req2 = create_sample_request(
+        "backed:NVDAx",
+        "NVDA",
+        "MintB11111111111111111111111111111111111",
+        None,
+    );
     let result = repo.create_asset(&req2).await;
-    assert!(result.is_err(), "Duplicate asset ID must be strictly rejected");
+    assert!(
+        result.is_err(),
+        "Duplicate asset ID must be strictly rejected"
+    );
 }
 
 #[tokio::test]
@@ -133,7 +166,10 @@ async fn test_list_active_approved_assets_excludes_inactive() {
         Some(AssetApprovalStatus::ShariahApproved),
     );
     repo.create_asset(&req_active).await.unwrap();
-    let activated = repo.activate_asset("asset:ACTIVE").await.expect("Activation should succeed");
+    let activated = repo
+        .activate_asset("asset:ACTIVE")
+        .await
+        .expect("Activation should succeed");
     assert!(activated.is_active);
     assert_eq!(activated.approval_status, AssetApprovalStatus::Active);
 
@@ -150,7 +186,10 @@ async fn test_list_active_approved_assets_excludes_inactive() {
     assert!(active_approved[0].is_active);
 
     // Verify all other assets were strictly excluded
-    let active_ids: Vec<&str> = active_approved.iter().map(|a| a.asset_id.as_str()).collect();
+    let active_ids: Vec<&str> = active_approved
+        .iter()
+        .map(|a| a.asset_id.as_str())
+        .collect();
     assert!(!active_ids.contains(&"asset:PENDING"));
     assert!(!active_ids.contains(&"asset:VALIDATED"));
     assert!(!active_ids.contains(&"asset:SHARIAH_APPROVED"));
@@ -160,27 +199,54 @@ async fn test_list_active_approved_assets_excludes_inactive() {
 async fn test_approval_status_filtering() {
     let repo = CanonicalAssetRepository::new_in_memory();
 
-    let p1 = create_sample_request("id:1", "S1", "Mint111111111111111111111111111111111111111", Some(AssetApprovalStatus::Pending));
-    let v1 = create_sample_request("id:2", "S2", "Mint222222222222222222222222222222222222222", Some(AssetApprovalStatus::Validated));
-    let s1 = create_sample_request("id:3", "S3", "Mint333333333333333333333333333333333333333", Some(AssetApprovalStatus::ShariahApproved));
+    let p1 = create_sample_request(
+        "id:1",
+        "S1",
+        "Mint111111111111111111111111111111111111111",
+        Some(AssetApprovalStatus::Pending),
+    );
+    let v1 = create_sample_request(
+        "id:2",
+        "S2",
+        "Mint222222222222222222222222222222222222222",
+        Some(AssetApprovalStatus::Validated),
+    );
+    let s1 = create_sample_request(
+        "id:3",
+        "S3",
+        "Mint333333333333333333333333333333333333333",
+        Some(AssetApprovalStatus::ShariahApproved),
+    );
 
     repo.create_asset(&p1).await.unwrap();
     repo.create_asset(&v1).await.unwrap();
     repo.create_asset(&s1).await.unwrap();
 
-    let pending_list = repo.list_by_status(AssetApprovalStatus::Pending).await.unwrap();
+    let pending_list = repo
+        .list_by_status(AssetApprovalStatus::Pending)
+        .await
+        .unwrap();
     assert_eq!(pending_list.len(), 1);
     assert_eq!(pending_list[0].asset_id, "id:1");
 
-    let val_list = repo.list_by_status(AssetApprovalStatus::Validated).await.unwrap();
+    let val_list = repo
+        .list_by_status(AssetApprovalStatus::Validated)
+        .await
+        .unwrap();
     assert_eq!(val_list.len(), 1);
     assert_eq!(val_list[0].asset_id, "id:2");
 
-    let shariah_list = repo.list_by_status(AssetApprovalStatus::ShariahApproved).await.unwrap();
+    let shariah_list = repo
+        .list_by_status(AssetApprovalStatus::ShariahApproved)
+        .await
+        .unwrap();
     assert_eq!(shariah_list.len(), 1);
     assert_eq!(shariah_list[0].asset_id, "id:3");
 
-    let active_list = repo.list_by_status(AssetApprovalStatus::Active).await.unwrap();
+    let active_list = repo
+        .list_by_status(AssetApprovalStatus::Active)
+        .await
+        .unwrap();
     assert!(active_list.is_empty());
 }
 
@@ -199,7 +265,10 @@ async fn test_activation_and_deactivation_lifecycle() {
     // 1. Activation directly from PENDING must fail closed
     let act_err = repo.activate_asset("backed:AAPLx").await;
     assert!(act_err.is_err(), "Must reject activation of PENDING asset");
-    assert!(act_err.unwrap_err().to_string().contains("must be 'SHARIAH_APPROVED'"));
+    assert!(act_err
+        .unwrap_err()
+        .to_string()
+        .contains("must be 'SHARIAH_APPROVED'"));
 
     // 2. Transition PENDING -> VALIDATED
     let validated = repo
@@ -217,7 +286,10 @@ async fn test_activation_and_deactivation_lifecycle() {
         .update_approval_status("backed:AAPLx", AssetApprovalStatus::ShariahApproved)
         .await
         .expect("Transition to SHARIAH_APPROVED should succeed");
-    assert_eq!(shariah.approval_status, AssetApprovalStatus::ShariahApproved);
+    assert_eq!(
+        shariah.approval_status,
+        AssetApprovalStatus::ShariahApproved
+    );
     assert!(!shariah.is_active);
 
     // 5. Activation from SHARIAH_APPROVED succeeds
@@ -236,11 +308,17 @@ async fn test_activation_and_deactivation_lifecycle() {
         .deactivate_asset("backed:AAPLx")
         .await
         .expect("Deactivation should succeed");
-    assert_eq!(deactivated.approval_status, AssetApprovalStatus::Deactivated);
+    assert_eq!(
+        deactivated.approval_status,
+        AssetApprovalStatus::Deactivated
+    );
     assert!(!deactivated.is_active);
 
     let active_list_after = repo.list_active_approved_assets().await.unwrap();
-    assert!(active_list_after.is_empty(), "Deactivated asset must NOT be in active list");
+    assert!(
+        active_list_after.is_empty(),
+        "Deactivated asset must NOT be in active list"
+    );
 }
 
 #[tokio::test]
@@ -261,13 +339,33 @@ async fn test_symbol_is_not_canonical_identity() {
         Some(AssetApprovalStatus::ShariahApproved),
     );
 
-    let a1 = repo.create_asset(&req1).await.expect("Creation 1 succeeded");
-    let a2 = repo.create_asset(&req2).await.expect("Creation 2 succeeded");
+    let a1 = repo
+        .create_asset(&req1)
+        .await
+        .expect("Creation 1 succeeded");
+    let a2 = repo
+        .create_asset(&req2)
+        .await
+        .expect("Creation 2 succeeded");
 
     assert_ne!(a1.asset_id, a2.asset_id);
     assert_ne!(a1.mint_address, a2.mint_address);
     assert_eq!(a1.symbol, a2.symbol);
 
-    assert_eq!(repo.get_asset_by_id("backed:NVDAx").await.unwrap().unwrap().mint_address, a1.mint_address);
-    assert_eq!(repo.get_asset_by_id("tessera:NVDA").await.unwrap().unwrap().mint_address, a2.mint_address);
+    assert_eq!(
+        repo.get_asset_by_id("backed:NVDAx")
+            .await
+            .unwrap()
+            .unwrap()
+            .mint_address,
+        a1.mint_address
+    );
+    assert_eq!(
+        repo.get_asset_by_id("tessera:NVDA")
+            .await
+            .unwrap()
+            .unwrap()
+            .mint_address,
+        a2.mint_address
+    );
 }

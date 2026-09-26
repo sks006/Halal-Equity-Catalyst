@@ -172,6 +172,54 @@ impl ExecutionRecord {
             status: "confirmed".to_string(),
         })
     }
+
+    /// Constructs a verified ExecutionRecord marked SUCCESS after on-chain cluster confirmation
+    /// and balance delta verification (Phase P7).
+    #[allow(clippy::too_many_arguments)]
+    pub fn from_verified_execution(
+        execution_id: Uuid,
+        vault_address: String,
+        input_mint: String,
+        output_mint: String,
+        requested_input: u64,
+        minimum_output: u64,
+        before_balance: u64,
+        after_balance: u64,
+        execution_timestamp: i64,
+        transaction_signature: String,
+        quote_id: String,
+        policy_decision_id: Uuid,
+    ) -> Result<Self, ExecutionRecorderError> {
+        let mut record = Self::from_balance_delta(
+            execution_id,
+            vault_address,
+            input_mint,
+            output_mint,
+            requested_input,
+            minimum_output,
+            before_balance,
+            after_balance,
+            execution_timestamp,
+            transaction_signature,
+            quote_id,
+            policy_decision_id,
+            false,
+        )?;
+        record.status = "SUCCESS".to_string();
+        Ok(record)
+    }
+
+    pub fn is_success(&self) -> bool {
+        self.status.to_uppercase() == "SUCCESS" || self.status.to_lowercase() == "confirmed"
+    }
+
+    pub fn mark_success(&mut self) {
+        self.status = "SUCCESS".to_string();
+    }
+
+    pub fn mark_status(&mut self, status: &str) {
+        self.status = status.to_string();
+    }
 }
 
 /// Stateful tracker that enforces the exact chronological lifecycle:
@@ -237,10 +285,7 @@ impl ExecutionBalanceTracker {
             .ok_or(ExecutionRecorderError::MissingAfterBalance)?;
 
         if !allow_negative_delta && after < before {
-            return Err(ExecutionRecorderError::NegativeBalanceDelta {
-                before,
-                after,
-            });
+            return Err(ExecutionRecorderError::NegativeBalanceDelta { before, after });
         }
 
         let actual = if after >= before {

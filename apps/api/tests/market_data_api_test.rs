@@ -16,7 +16,8 @@ use axum::{
 };
 use chrono::Utc;
 use equity_catalyst_api::{
-    config::Config, create_db_pool, create_router,
+    config::Config,
+    create_db_pool, create_router,
     routes::MarketDataResponse,
     services::{MarketDataStore, MarketPriceUpdate, PriceFreshness},
     state::AppState,
@@ -56,10 +57,8 @@ fn setup_test_app() -> (axum::Router, Arc<MarketDataStore>) {
     let config = Config::from_env();
     let pool = create_db_pool(&config.database_url).expect("Failed to initialize test pool");
     let store = Arc::new(MarketDataStore::new());
-    let state = Arc::new(
-        AppState::new(config, pool, None, None)
-            .with_market_data_store(store.clone()),
-    );
+    let state =
+        Arc::new(AppState::new(config, pool, None, None).with_market_data_store(store.clone()));
     let router = create_router(state);
     (router, store)
 }
@@ -91,12 +90,15 @@ async fn test_rest_get_market_data_by_canonical_asset_id() {
     assert_eq!(response.status(), StatusCode::OK);
 
     let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
-    let data: MarketDataResponse = serde_json::from_slice(&body_bytes)
-        .expect("Failed to deserialize MarketDataResponse");
+    let data: MarketDataResponse =
+        serde_json::from_slice(&body_bytes).expect("Failed to deserialize MarketDataResponse");
 
     assert_eq!(data.asset_id, "backed:AAPLx");
     assert_eq!(data.symbol, "AAPL");
-    assert_eq!(data.mint_address, "AAPL111111111111111111111111111111111111111");
+    assert_eq!(
+        data.mint_address,
+        "AAPL111111111111111111111111111111111111111"
+    );
     assert_eq!(data.price_scaled, 225_500_000);
     assert_eq!(data.price_usd, 225.50);
     assert_eq!(data.conf_scaled, 150_000);

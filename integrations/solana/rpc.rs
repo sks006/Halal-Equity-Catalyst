@@ -33,6 +33,59 @@ pub struct SignatureStatus {
     pub confirmation_status: Option<String>,
 }
 
+/// Solana cluster transaction confirmation state (Phase P7).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TransactionConfirmationStatus {
+    /// Confirmed on-chain without error.
+    ConfirmedSuccess {
+        slot: u64,
+        confirmations: Option<usize>,
+    },
+    /// Transaction landed on-chain but execution failed / reverted with an error.
+    ConfirmedFailure { slot: u64, error: String },
+    /// Block height exceeded transaction lastValidBlockHeight before confirmation landed.
+    ExpiredTransaction {
+        last_valid_block_height: u64,
+        current_block_height: u64,
+    },
+    /// Polling duration exceeded timeout before cluster confirmed or proved expiration.
+    RpcTimeout { timeout_secs: u64 },
+    /// RPC returned an unknown or indeterminate status.
+    UnknownStatus { reason: String },
+}
+
+impl TransactionConfirmationStatus {
+    pub fn is_success(&self) -> bool {
+        matches!(self, Self::ConfirmedSuccess { .. })
+    }
+
+    pub fn is_failure(&self) -> bool {
+        matches!(self, Self::ConfirmedFailure { .. })
+    }
+
+    pub fn is_expired(&self) -> bool {
+        matches!(self, Self::ExpiredTransaction { .. })
+    }
+
+    pub fn is_timeout(&self) -> bool {
+        matches!(self, Self::RpcTimeout { .. })
+    }
+
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, Self::UnknownStatus { .. })
+    }
+
+    pub fn status_code(&self) -> &'static str {
+        match self {
+            Self::ConfirmedSuccess { .. } => "CONFIRMED_SUCCESS",
+            Self::ConfirmedFailure { .. } => "CONFIRMED_FAILURE",
+            Self::ExpiredTransaction { .. } => "EXPIRED_TRANSACTION",
+            Self::RpcTimeout { .. } => "RPC_TIMEOUT",
+            Self::UnknownStatus { .. } => "UNKNOWN_STATUS",
+        }
+    }
+}
+
 pub struct SolanaRpcClient {
     client: reqwest::Client,
     rpc_url: String,
@@ -538,6 +591,167 @@ impl SolanaRpcClient {
 
         Err(crate::SolanaError::ConfirmationTimeout {
             signature: sig.to_string(),
+            timeout_secs: timeout.as_secs(),
+        })
+    }
+
+    #[instrument(skip(self))]
+    pub async fn get_block_height(&self) -> Result<u64, crate::SolanaError> {
+        let params = json!([{
+            "commitment": self.commitment,
+        }]);
+
+        let result = self.send_rpc_request("getBlockHeight", params).await?;
+        result.as_u64().ok_or_else(|| crate::SolanaError::RpcError {
+            code: -1,
+            message: "Missing or invalid getBlockHeight in RPC response".to_string(),
+        })
+    }
+
+    #[instrument(skip(self), fields(sig = %sig))]
+    pub async fn get_transaction(
+        &self,
+        sig: &Signature,
+    ) -> Result<Option<Value>, crate::SolanaError> {
+        let params = json!([
+            sig.to_string(),
+            {
+                "encoding": "json",
+                "commitment": self.commitment,
+                "maxSupportedTransactionVersion": 0
+            }
+        ]);
+
+        let result = self.send_rpc_request("getTransaction", params).await?;
+        if result.is_null() {
+            Ok(None)
+        } else {
+            Ok(Some(result))
+        }
+    }
+
+    /// Tracks transaction confirmation on the Solana cluster (Phase P7).
+    ///
+    /// Distinguishes between:
+    /// - ConfirmedSuccess: On-chain confirmed with err == null
+    /// - ConfirmedFailure: On-chain confirmed with err != null (reverted)
+    /// - ExpiredTransaction: Cluster block height exceeded last_valid_block_height without transaction landing
+    /// - RpcTimeout: Polling timeout reached before resolution
+    /// - UnknownStatus: Status indeterminate
+    #[instrument(skip(self), fields(sig = %sig))]
+    pub async fn track_transaction_confirmation(
+        &self,
+        sig: &Signature,
+        last_valid_block_height: Option<u64>,
+        timeout: Duration,
+    ) -> Result<TransactionConfirmationStatus, crate::SolanaError> {
+        let start = std::time::Instant::now();
+        let poll_interval = Duration::from_millis(500);
+
+        while start.elapsed() < timeout {
+            // 1. Check signature status
+            match self.get_signature_status(sig).await {
+                Ok(Some(status)) => {
+                    if let Some(ref err) = status.err {
+                        warn!(
+                            sig = %sig,
+                            slot = status.slot,
+                            error = %err,
+                            "Transaction landed but confirmed failure on Solana cluster"
+                        );
+                        return Ok(TransactionConfirmationStatus::ConfirmedFailure {
+                            slot: status.slot,
+                            error: err.to_string(),
+                        });
+                    }
+
+                    if let Some(ref conf) = status.confirmation_status {
+                        if conf == "confirmed" || conf == "finalized" {
+                            info!(
+                                sig = %sig,
+                                slot = status.slot,
+                                status = %conf,
+                                "Transaction confirmed successfully on Solana cluster"
+                            );
+                            return Ok(TransactionConfirmationStatus::ConfirmedSuccess {
+                                slot: status.slot,
+                                confirmations: status.confirmations,
+                            });
+                        }
+                    }
+                }
+                Ok(None) => {
+                    // Not in recent signature cache, check if block height expired
+                    if let Some(last_valid) = last_valid_block_height {
+                        if let Ok(current_height) = self.get_block_height().await {
+                            if current_height > last_valid {
+                                // Final check via getTransaction in case getSignatureStatuses dropped it
+                                if let Ok(Some(tx_val)) = self.get_transaction(sig).await {
+                                    let slot =
+                                        tx_val.get("slot").and_then(|s| s.as_u64()).unwrap_or(0);
+                                    let meta_err = tx_val
+                                        .get("meta")
+                                        .and_then(|m| m.get("err"))
+                                        .filter(|e| !e.is_null());
+                                    if let Some(err) = meta_err {
+                                        return Ok(
+                                            TransactionConfirmationStatus::ConfirmedFailure {
+                                                slot,
+                                                error: err.to_string(),
+                                            },
+                                        );
+                                    } else {
+                                        return Ok(
+                                            TransactionConfirmationStatus::ConfirmedSuccess {
+                                                slot,
+                                                confirmations: None,
+                                            },
+                                        );
+                                    }
+                                }
+                                warn!(
+                                    sig = %sig,
+                                    current_height,
+                                    last_valid,
+                                    "Transaction expired: cluster block height exceeded last valid block height"
+                                );
+                                return Ok(TransactionConfirmationStatus::ExpiredTransaction {
+                                    last_valid_block_height: last_valid,
+                                    current_block_height: current_height,
+                                });
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    debug!(sig = %sig, error = %e, "Transient RPC poll error");
+                }
+            }
+
+            tokio::time::sleep(poll_interval).await;
+        }
+
+        // Final query before timing out: check get_transaction one last time
+        if let Ok(Some(tx_val)) = self.get_transaction(sig).await {
+            let slot = tx_val.get("slot").and_then(|s| s.as_u64()).unwrap_or(0);
+            let meta_err = tx_val
+                .get("meta")
+                .and_then(|m| m.get("err"))
+                .filter(|e| !e.is_null());
+            if let Some(err) = meta_err {
+                return Ok(TransactionConfirmationStatus::ConfirmedFailure {
+                    slot,
+                    error: err.to_string(),
+                });
+            } else {
+                return Ok(TransactionConfirmationStatus::ConfirmedSuccess {
+                    slot,
+                    confirmations: None,
+                });
+            }
+        }
+
+        Ok(TransactionConfirmationStatus::RpcTimeout {
             timeout_secs: timeout.as_secs(),
         })
     }

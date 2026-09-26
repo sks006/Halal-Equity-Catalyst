@@ -140,7 +140,10 @@ async fn test_multiple_assets_and_deterministic_comparison() {
 
     let set_order_a = SubscriptionSet::new(vec![s1.clone(), s2.clone()]);
     let set_order_b = SubscriptionSet::new(vec![s2.clone(), s1.clone()]);
-    assert_eq!(set_order_a, set_order_b, "Ordering differences must not produce inequality");
+    assert_eq!(
+        set_order_a, set_order_b,
+        "Ordering differences must not produce inequality"
+    );
 }
 
 /// ACCEPTANCE CRITERIA:
@@ -173,7 +176,11 @@ async fn test_acceptance_criteria_dynamic_subscription_update() {
 
     listener_rx.changed().await.unwrap();
     let set_1 = listener_rx.borrow().clone();
-    assert_eq!(set_1.len(), 2, "SubscriptionSet #1 must contain AAPL and TSLA");
+    assert_eq!(
+        set_1.len(),
+        2,
+        "SubscriptionSet #1 must contain AAPL and TSLA"
+    );
     assert!(set_1.contains_symbol("AAPL") || set_1.contains_asset("backed:AAPLx"));
     assert!(set_1.contains_symbol("TSLA") || set_1.contains_asset("backed:TSLAx"));
     assert_eq!(set_1.feed_ids().len(), 2);
@@ -194,11 +201,18 @@ async fn test_acceptance_criteria_dynamic_subscription_update() {
 
     // Next poll -> detects SubscriptionSet #2
     let changed_2 = watcher.poll_once().await.unwrap();
-    assert!(changed_2, "Poll must detect NVDA addition and notify listener of Set #2");
+    assert!(
+        changed_2,
+        "Poll must detect NVDA addition and notify listener of Set #2"
+    );
 
     listener_rx.changed().await.unwrap();
     let set_2 = listener_rx.borrow().clone();
-    assert_eq!(set_2.len(), 3, "SubscriptionSet #2 must contain AAPL, TSLA, and NVDA");
+    assert_eq!(
+        set_2.len(),
+        3,
+        "SubscriptionSet #2 must contain AAPL, TSLA, and NVDA"
+    );
     assert!(set_2.contains_asset("backed:AAPLx"));
     assert!(set_2.contains_asset("backed:TSLAx"));
     assert!(set_2.contains_asset("backed:NVDAx"));
@@ -254,10 +268,18 @@ async fn test_feed_id_replacement() {
     let asset_repo = CanonicalAssetRepository::new_in_memory();
     let market_repo = AssetMarketDataRepository::new_in_memory(asset_repo.clone());
 
-    let req = sample_asset_request("backed:AAPLx", "AAPL", "MintAAPL", AssetApprovalStatus::ShariahApproved);
+    let req = sample_asset_request(
+        "backed:AAPLx",
+        "AAPL",
+        "MintAAPL",
+        AssetApprovalStatus::ShariahApproved,
+    );
     asset_repo.create_asset(&req).await.unwrap();
     asset_repo.activate_asset("backed:AAPLx").await.unwrap();
-    market_repo.create_mapping("backed:AAPLx", AAPL_FEED).await.unwrap();
+    market_repo
+        .create_mapping("backed:AAPLx", AAPL_FEED)
+        .await
+        .unwrap();
 
     let config = SubscriptionWatcherConfig::new(Duration::from_millis(50));
     let watcher = AssetSubscriptionWatcher::new_initialized(market_repo.clone(), config)
@@ -265,7 +287,10 @@ async fn test_feed_id_replacement() {
         .unwrap();
     let mut rx = watcher.subscribe();
 
-    assert_eq!(watcher.current_subscription_set().feed_ids(), vec![AAPL_FEED.to_string()]);
+    assert_eq!(
+        watcher.current_subscription_set().feed_ids(),
+        vec![AAPL_FEED.to_string()]
+    );
 
     // Replace feed ID for AAPL to MSFT_FEED
     market_repo
@@ -281,7 +306,10 @@ async fn test_feed_id_replacement() {
     assert_eq!(updated_set.len(), 1);
     assert_eq!(updated_set.feed_ids(), vec![MSFT_FEED.to_string()]);
     assert_eq!(
-        updated_set.get_by_asset("backed:AAPLx").unwrap().pyth_feed_id,
+        updated_set
+            .get_by_asset("backed:AAPLx")
+            .unwrap()
+            .pyth_feed_id,
         MSFT_FEED
     );
 }
@@ -293,12 +321,20 @@ async fn test_asset_activation_and_deactivation_lifecycle() {
     let market_repo = AssetMarketDataRepository::new_in_memory(asset_repo.clone());
 
     // Create asset with ShariahApproved status, but is_active = false
-    let req = sample_asset_request("backed:NVDAx", "NVDA", "MintNVDA", AssetApprovalStatus::ShariahApproved);
+    let req = sample_asset_request(
+        "backed:NVDAx",
+        "NVDA",
+        "MintNVDA",
+        AssetApprovalStatus::ShariahApproved,
+    );
     asset_repo.create_asset(&req).await.unwrap();
     // Inactive asset mapping cannot be created or is not active in get_active_mappings
     // Activate to create mapping
     asset_repo.activate_asset("backed:NVDAx").await.unwrap();
-    market_repo.create_mapping("backed:NVDAx", NVDA_FEED).await.unwrap();
+    market_repo
+        .create_mapping("backed:NVDAx", NVDA_FEED)
+        .await
+        .unwrap();
 
     let config = SubscriptionWatcherConfig::new(Duration::from_millis(50));
     let watcher = AssetSubscriptionWatcher::new_initialized(market_repo.clone(), config)
@@ -310,14 +346,23 @@ async fn test_asset_activation_and_deactivation_lifecycle() {
     asset_repo.deactivate_asset("backed:NVDAx").await.unwrap();
 
     let changed = watcher.poll_once().await.unwrap();
-    assert!(changed, "Asset deactivation must remove it from SubscriptionSet");
+    assert!(
+        changed,
+        "Asset deactivation must remove it from SubscriptionSet"
+    );
     assert_eq!(watcher.current_subscription_set().len(), 0);
 
     // Re-activate canonical asset via state machine transition (DEACTIVATED -> ACTIVE)
-    asset_repo.update_approval_status("backed:NVDAx", AssetApprovalStatus::Active).await.unwrap();
+    asset_repo
+        .update_approval_status("backed:NVDAx", AssetApprovalStatus::Active)
+        .await
+        .unwrap();
 
     let changed_reactivated = watcher.poll_once().await.unwrap();
-    assert!(changed_reactivated, "Asset re-activation must re-add it to SubscriptionSet");
+    assert!(
+        changed_reactivated,
+        "Asset re-activation must re-add it to SubscriptionSet"
+    );
     assert_eq!(watcher.current_subscription_set().len(), 1);
 }
 
@@ -339,10 +384,18 @@ async fn test_background_watcher_loop_and_graceful_shutdown() {
     assert!(rx.borrow().is_empty());
 
     // Add an approved asset
-    let req = sample_asset_request("backed:AAPLx", "AAPL", "MintAAPL", AssetApprovalStatus::ShariahApproved);
+    let req = sample_asset_request(
+        "backed:AAPLx",
+        "AAPL",
+        "MintAAPL",
+        AssetApprovalStatus::ShariahApproved,
+    );
     asset_repo.create_asset(&req).await.unwrap();
     asset_repo.activate_asset("backed:AAPLx").await.unwrap();
-    market_repo.create_mapping("backed:AAPLx", AAPL_FEED).await.unwrap();
+    market_repo
+        .create_mapping("backed:AAPLx", AAPL_FEED)
+        .await
+        .unwrap();
 
     // The background watcher should automatically pick up the change within ~100ms
     tokio::time::timeout(Duration::from_millis(500), async {
@@ -364,4 +417,133 @@ async fn test_background_watcher_loop_and_graceful_shutdown() {
         .await
         .expect("Watcher handle must terminate gracefully")
         .expect("Task must not panic");
+}
+
+/// Phase P2 explicit repository methods and direct SubscriptionSet generation test.
+#[tokio::test]
+async fn test_phase_p2_repository_methods_and_subscription_set() {
+    let asset_repo = CanonicalAssetRepository::new_in_memory();
+    let market_repo = AssetMarketDataRepository::new_in_memory(asset_repo.clone());
+
+    // 1. Initially empty subscription set built from database
+    let empty_set = market_repo
+        .build_subscription_set()
+        .await
+        .expect("Building subscription set should succeed");
+    assert!(empty_set.is_empty());
+    assert_eq!(empty_set.len(), 0);
+
+    // 2. Register assets with various lifecycle states
+    // Asset 1: ShariahApproved & Activated
+    let req1 = sample_asset_request(
+        "backed:AAPLx",
+        "AAPL",
+        "MintAAPL111111111111111111111111111111111",
+        AssetApprovalStatus::ShariahApproved,
+    );
+    asset_repo.create_asset(&req1).await.unwrap();
+    asset_repo.activate_asset("backed:AAPLx").await.unwrap();
+    market_repo
+        .create_mapping("backed:AAPLx", AAPL_FEED)
+        .await
+        .unwrap();
+
+    // Asset 2: Pending (unapproved) - cannot have active mapping
+    let req2 = sample_asset_request(
+        "pnd:TSLAx",
+        "TSLA",
+        "MintTSLA111111111111111111111111111111111",
+        AssetApprovalStatus::Pending,
+    );
+    asset_repo.create_asset(&req2).await.unwrap();
+    assert!(market_repo
+        .create_mapping("pnd:TSLAx", TSLA_FEED)
+        .await
+        .is_err());
+
+    // Asset 3: ShariahApproved but not activated
+    let req3 = sample_asset_request(
+        "backed:NVDAx",
+        "NVDA",
+        "MintNVDA111111111111111111111111111111111",
+        AssetApprovalStatus::ShariahApproved,
+    );
+    asset_repo.create_asset(&req3).await.unwrap();
+    market_repo
+        .create_mapping("backed:NVDAx", NVDA_FEED)
+        .await
+        .unwrap();
+
+    // 3. Test exact repository methods:
+    // list_active_approved_assets
+    let active_approved_assets = market_repo.list_active_approved_assets().await.unwrap();
+    assert_eq!(active_approved_assets.len(), 1);
+    assert_eq!(active_approved_assets[0].asset_id, "backed:AAPLx");
+
+    let canonical_active_approved = asset_repo.list_active_approved_assets().await.unwrap();
+    assert_eq!(canonical_active_approved.len(), 1);
+    assert_eq!(canonical_active_approved[0].asset_id, "backed:AAPLx");
+
+    // get_asset
+    let asset_aapl = market_repo
+        .get_asset("backed:AAPLx")
+        .await
+        .unwrap()
+        .expect("Asset must be found");
+    assert_eq!(asset_aapl.symbol, "AAPL");
+
+    let canonical_asset_aapl = asset_repo
+        .get_asset("backed:AAPLx")
+        .await
+        .unwrap()
+        .expect("Asset must be found");
+    assert_eq!(canonical_asset_aapl.symbol, "AAPL");
+
+    // get_by_mint
+    let asset_by_mint = market_repo
+        .get_by_mint("MintAAPL111111111111111111111111111111111")
+        .await
+        .unwrap()
+        .expect("Asset must be found by mint");
+    assert_eq!(asset_by_mint.asset_id, "backed:AAPLx");
+
+    let canonical_by_mint = asset_repo
+        .get_by_mint("MintAAPL111111111111111111111111111111111")
+        .await
+        .unwrap()
+        .expect("Asset must be found by mint");
+    assert_eq!(canonical_by_mint.asset_id, "backed:AAPLx");
+
+    // get_pyth_mapping
+    let mapping_aapl = market_repo
+        .get_pyth_mapping("backed:AAPLx")
+        .await
+        .unwrap()
+        .expect("Mapping must be found");
+    assert_eq!(mapping_aapl.pyth_feed_id, AAPL_FEED);
+
+    // list_active_pyth_mappings (only active approved assets with active mapping)
+    let active_mappings = market_repo.list_active_pyth_mappings().await.unwrap();
+    assert_eq!(active_mappings.len(), 1);
+    assert_eq!(active_mappings[0].asset_id, "backed:AAPLx");
+
+    // 4. Build SubscriptionSet directly from database:
+    let sub_set = market_repo.build_subscription_set().await.unwrap();
+    assert_eq!(sub_set.len(), 1);
+    assert_eq!(sub_set.feed_ids(), vec![AAPL_FEED.to_string()]);
+    assert_eq!(sub_set.symbols(), vec!["AAPL".to_string()]);
+
+    // 5. Activate Asset 3 (NVDA) in database -> automatically appears in SubscriptionSet
+    asset_repo.activate_asset("backed:NVDAx").await.unwrap();
+    let updated_sub_set = market_repo.build_subscription_set().await.unwrap();
+    assert_eq!(updated_sub_set.len(), 2);
+    assert!(updated_sub_set.contains_asset("backed:AAPLx"));
+    assert!(updated_sub_set.contains_asset("backed:NVDAx"));
+
+    // 6. Deactivate Asset 1 (AAPL) -> automatically removed from SubscriptionSet
+    asset_repo.deactivate_asset("backed:AAPLx").await.unwrap();
+    let final_sub_set = market_repo.build_subscription_set().await.unwrap();
+    assert_eq!(final_sub_set.len(), 1);
+    assert!(!final_sub_set.contains_asset("backed:AAPLx"));
+    assert!(final_sub_set.contains_asset("backed:NVDAx"));
 }

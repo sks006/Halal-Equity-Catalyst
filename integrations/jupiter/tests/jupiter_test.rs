@@ -1,7 +1,13 @@
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use equity_catalyst_jupiter::{
-    calculate_effective_rate, parse_price_impact_bps, validate_quote_price_impact, JupiterClient,
-    JupiterError, QuoteRequest, QuoteResponse, RoutePlanStep, SwapInfo,
+    calculate_effective_rate, decode_swap_transaction, parse_price_impact_bps,
+    validate_quote_price_impact, JupiterClient, JupiterError, QuoteRequest, QuoteResponse,
+    RoutePlanStep, SwapInfo, SwapResponse,
 };
+use solana_sdk::message::v0::Message;
+use solana_sdk::message::VersionedMessage;
+use solana_sdk::pubkey::Pubkey;
+use solana_sdk::transaction::VersionedTransaction;
 
 fn sample_quote() -> QuoteResponse {
     QuoteResponse {
@@ -29,6 +35,16 @@ fn sample_quote() -> QuoteResponse {
         context_slot: Some(290_000_000),
         time_taken: Some(0.012),
     }
+}
+
+fn create_valid_serialized_tx(payer: &Pubkey) -> String {
+    let msg = Message::try_compile(payer, &[], &[], solana_sdk::hash::Hash::default()).unwrap();
+    let tx = VersionedTransaction {
+        signatures: vec![solana_sdk::signature::Signature::default()],
+        message: VersionedMessage::V0(msg),
+    };
+    let tx_bytes = bincode::serialize(&tx).unwrap();
+    BASE64.encode(tx_bytes)
 }
 
 #[test]
@@ -73,7 +89,7 @@ fn test_calculate_effective_rate() {
 }
 
 #[tokio::test]
-async fn test_mock_client_quote_and_swap() {
+async fn test_mock_client_quote_and_swap_with_real_tx() {
     let client = JupiterClient::new_mock();
     let quote = sample_quote();
 
@@ -81,6 +97,18 @@ async fn test_mock_client_quote_and_swap() {
         "So11111111111111111111111111111111111111112",
         "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
         quote.clone(),
+    );
+
+    let authority = Pubkey::new_unique();
+    let valid_tx_base64 = create_valid_serialized_tx(&authority);
+
+    client.set_mock_swap(
+        "145000000",
+        SwapResponse {
+            swap_transaction: valid_tx_base64.clone(),
+            last_valid_block_height: 250_000_000,
+            prioritization_fee_lamports: Some(10_000),
+        },
     );
 
     let req = QuoteRequest::new(
@@ -95,15 +123,81 @@ async fn test_mock_client_quote_and_swap() {
         .expect("Failed to get mock quote");
     assert_eq!(fetched.out_amount, "145000000");
 
-    let swap_req = equity_catalyst_jupiter::build_swap_request(
-        &fetched,
-        "11111111111111111111111111111111",
-        Some(10_000),
-    );
+    let swap_req =
+        equity_catalyst_jupiter::build_swap_request(&fetched, &authority.to_string(), Some(10_000))
+            .expect("Should build valid swap request for execution authority");
 
     let swap_resp = client
         .build_swap(&swap_req)
         .await
         .expect("Failed to build swap");
-    assert!(!swap_resp.swap_transaction.is_empty());
+    assert_eq!(swap_resp.swap_transaction, valid_tx_base64);
+
+    let decoded_tx = decode_swap_transaction(&swap_resp.swap_transaction)
+        .expect("Should decode valid VersionedTransaction");
+    assert_eq!(decoded_tx.signatures.len(), 1);
+}
+
+#[tokio::test]
+async fn test_mock_client_swap_without_mock_fails_never_returns_dummy() {
+    let client = JupiterClient::new_mock();
+    let quote = sample_quote();
+
+    client.set_mock_quote(
+        "So11111111111111111111111111111111111111112",
+        "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+        quote.clone(),
+    );
+
+    let authority = Pubkey::new_unique();
+    let swap_req =
+        equity_catalyst_jupiter::build_swap_request(&quote, &authority.to_string(), Some(5_000))
+            .unwrap();
+
+    // With no mock swap configured, client must return error and NEVER return dummy transaction
+    let result = client.build_swap(&swap_req).await;
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        JupiterError::InvalidTransaction(msg) => {
+            assert!(msg.contains("No mock swap response configured"));
+        }
+        other => panic!("Expected InvalidTransaction, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_swap_request_validates_execution_authority() {
+    let quote = sample_quote();
+
+    // Invalid base58 pubkey
+    let invalid = equity_catalyst_jupiter::build_swap_request(&quote, "not_a_valid_pubkey", None);
+    assert!(invalid.is_err());
+
+    // Empty authority
+    let empty = equity_catalyst_jupiter::build_swap_request(&quote, "   ", None);
+    assert!(empty.is_err());
+
+    // Valid execution authority
+    let valid_authority = Pubkey::new_unique();
+    let valid = equity_catalyst_jupiter::build_swap_request(
+        &quote,
+        &valid_authority.to_string(),
+        Some(1_000),
+    );
+    assert!(valid.is_ok());
+    assert_eq!(valid.unwrap().user_public_key, valid_authority.to_string());
+}
+
+#[test]
+fn test_decode_swap_transaction_rejects_dummy_payload() {
+    let dummy = "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAEDBg==";
+    let res = decode_swap_transaction(dummy);
+    assert!(res.is_err());
+    assert!(matches!(
+        res.unwrap_err(),
+        JupiterError::InvalidTransaction(_)
+    ));
+
+    let empty = decode_swap_transaction("");
+    assert!(empty.is_err());
 }

@@ -17,7 +17,12 @@ use equity_catalyst_pyth::{ParsedPriceFeed, PythRawPrice, PythSubscription};
 use std::sync::Arc;
 use std::time::Duration;
 
-fn make_test_subscription(asset_id: &str, symbol: &str, mint: &str, feed_id: &str) -> PythSubscription {
+fn make_test_subscription(
+    asset_id: &str,
+    symbol: &str,
+    mint: &str,
+    feed_id: &str,
+) -> PythSubscription {
     PythSubscription {
         asset_id: asset_id.to_string(),
         symbol: symbol.to_string(),
@@ -26,7 +31,13 @@ fn make_test_subscription(asset_id: &str, symbol: &str, mint: &str, feed_id: &st
     }
 }
 
-fn make_test_pyth_feed(feed_id: &str, price: i64, conf: u64, expo: i32, publish_time: i64) -> ParsedPriceFeed {
+fn make_test_pyth_feed(
+    feed_id: &str,
+    price: i64,
+    conf: u64,
+    expo: i32,
+    publish_time: i64,
+) -> ParsedPriceFeed {
     ParsedPriceFeed {
         id: feed_id.to_string(),
         price: PythRawPrice {
@@ -53,7 +64,8 @@ async fn test_market_data_store_insert_and_lookup() {
     // $225.50 = 22550000000 with expo -8
     let pyth_feed = make_test_pyth_feed(&sub.pyth_feed_id, 22_550_000_000, 15_000_000, -8, now_ts);
 
-    let update = MarketPriceUpdate::from_pyth(&sub, &pyth_feed).expect("Failed to build MarketPriceUpdate");
+    let update =
+        MarketPriceUpdate::from_pyth(&sub, &pyth_feed).expect("Failed to build MarketPriceUpdate");
     assert_eq!(update.asset_id, "asset-aapl-uuid-001");
     // 225.50 USD in micro-USD (6 decimals) = 225_500_000
     assert_eq!(update.price_scaled, 225_500_000);
@@ -87,7 +99,10 @@ async fn test_market_data_store_insert_and_lookup() {
     let clean_feed = sub.pyth_feed_id.trim_start_matches("0x");
     let retrieved_by_clean_feed = store.get_by_feed(clean_feed).await;
     assert!(retrieved_by_clean_feed.is_some());
-    assert_eq!(retrieved_by_clean_feed.unwrap().asset_id, "asset-aapl-uuid-001");
+    assert_eq!(
+        retrieved_by_clean_feed.unwrap().asset_id,
+        "asset-aapl-uuid-001"
+    );
 
     // 4. Secondary lookup by symbol (case insensitive)
     let retrieved_by_sym = store.get_by_symbol("aapl").await;
@@ -156,9 +171,18 @@ async fn test_market_data_store_get_all() {
     let f2 = make_test_pyth_feed("0xFEED2", 175_0000_0000, 10_0000, -8, 1700000000);
     let f3 = make_test_pyth_feed("0xFEED3", 250_0000_0000, 10_0000, -8, 1700000000);
 
-    store.update(MarketPriceUpdate::from_pyth(&sub1, &f1).unwrap()).await.unwrap();
-    store.update(MarketPriceUpdate::from_pyth(&sub2, &f2).unwrap()).await.unwrap();
-    store.update(MarketPriceUpdate::from_pyth(&sub3, &f3).unwrap()).await.unwrap();
+    store
+        .update(MarketPriceUpdate::from_pyth(&sub1, &f1).unwrap())
+        .await
+        .unwrap();
+    store
+        .update(MarketPriceUpdate::from_pyth(&sub2, &f2).unwrap())
+        .await
+        .unwrap();
+    store
+        .update(MarketPriceUpdate::from_pyth(&sub3, &f3).unwrap())
+        .await
+        .unwrap();
 
     let all = store.get_all().await;
     assert_eq!(all.len(), 3);
@@ -200,7 +224,10 @@ async fn test_market_data_store_subscribe_broadcast() {
 async fn test_market_data_store_integer_scaling_precision() {
     // 1. Pyth expo -8 (common for USD equities)
     // raw = 185_5000_0000 ($185.50) -> 185_500_000 micro-USD
-    assert_eq!(calculate_scaled_int(185_5000_0000, -8).unwrap(), 185_500_000);
+    assert_eq!(
+        calculate_scaled_int(185_5000_0000, -8).unwrap(),
+        185_500_000
+    );
 
     // 2. Pyth expo -6: 1:1 match with micro-USD
     assert_eq!(calculate_scaled_int(1_000_000, -6).unwrap(), 1_000_000);
@@ -281,7 +308,10 @@ async fn test_market_data_store_freshness_metadata() {
         is_stale: true,
         ..fresh_update.clone()
     };
-    assert_eq!(future_update.freshness_status(30), PriceFreshness::FutureSkew);
+    assert_eq!(
+        future_update.freshness_status(30),
+        PriceFreshness::FutureSkew
+    );
 }
 
 #[tokio::test]
@@ -297,8 +327,17 @@ async fn test_market_data_store_concurrent_reads_and_writes() {
             &format!("MINT{i}"),
             &format!("0xFEED{i:04}"),
         );
-        let feed = make_test_pyth_feed(&sub.pyth_feed_id, (100 + i as i64) * 1_0000_0000, 10_0000, -8, 1700000000);
-        store.update(MarketPriceUpdate::from_pyth(&sub, &feed).unwrap()).await.unwrap();
+        let feed = make_test_pyth_feed(
+            &sub.pyth_feed_id,
+            (100 + i as i64) * 1_0000_0000,
+            10_0000,
+            -8,
+            1700000000,
+        );
+        store
+            .update(MarketPriceUpdate::from_pyth(&sub, &feed).unwrap())
+            .await
+            .unwrap();
     }
 
     // Spawn 15 concurrent reader tasks
@@ -352,7 +391,9 @@ async fn test_market_data_store_concurrent_reads_and_writes() {
     }
 
     for handle in handles {
-        handle.await.expect("Task panicked during concurrent execution");
+        handle
+            .await
+            .expect("Task panicked during concurrent execution");
     }
 
     assert_eq!(store.len().await, 10);

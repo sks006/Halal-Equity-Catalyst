@@ -313,14 +313,18 @@ pub fn calculate_purification_value_minor_units(
     let rounded_quotient = match rounding_rule {
         PurificationRoundingRule::ConservativeCeiling => {
             if remainder > 0 {
-                quotient.checked_add(1).ok_or(PurificationError::ArithmeticOverflow)?
+                quotient
+                    .checked_add(1)
+                    .ok_or(PurificationError::ArithmeticOverflow)?
             } else {
                 quotient
             }
         }
         PurificationRoundingRule::NearestHalfUp => {
             if remainder * 2 >= 10_000 {
-                quotient.checked_add(1).ok_or(PurificationError::ArithmeticOverflow)?
+                quotient
+                    .checked_add(1)
+                    .ok_or(PurificationError::ArithmeticOverflow)?
             } else {
                 quotient
             }
@@ -479,11 +483,16 @@ pub fn assess_purification(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::asset::{Asset, AssetIdentity, AssetProvider, AssetStatus, AssetType, Network, ProviderConfig, TokenDetails};
+    use crate::asset::{
+        Asset, AssetIdentity, AssetProvider, AssetStatus, AssetType, Network, ProviderConfig,
+        TokenDetails,
+    };
     use crate::shariah::ownership::OwnershipRecord;
     use crate::shariah::policy::ScreeningPolicy;
     use crate::shariah::registry::register_asset_at;
-    use crate::shariah::screening::{BusinessActivityAssessment, BusinessCategory, ShariahFinancialMetrics};
+    use crate::shariah::screening::{
+        BusinessActivityAssessment, BusinessCategory, ShariahFinancialMetrics,
+    };
     use crate::shariah::types::ShariahStatus;
 
     #[test]
@@ -509,8 +518,7 @@ mod tests {
 
         // CRITICAL INVARIANT: The ratio itself (120) is NOT the payment value (12,000)!
         assert_ne!(
-            assessment.purification_value_minor_units,
-            impure_income_ratio_bps as u64,
+            assessment.purification_value_minor_units, impure_income_ratio_bps as u64,
             "Purification payment amount must never equal the dimensionless ratio itself!"
         );
 
@@ -578,7 +586,8 @@ mod tests {
 
         // 1. Asset has 150 bps impure income (1.50% <= 5.00% threshold)
         // Asset is fully APPROVED for trading:
-        let approved_financials = ShariahFinancialMetrics::from_market_cap_ratios(1_500, 1_000, 150);
+        let approved_financials =
+            ShariahFinancialMetrics::from_market_cap_ratios(1_500, 1_000, 150);
         let registered = register_asset_at(
             asset.clone(),
             ownership.clone(),
@@ -632,7 +641,10 @@ mod tests {
         .unwrap();
 
         assert_eq!(clean_purification.purification_value_minor_units, 0);
-        assert_eq!(clean_purification.net_permissible_value_minor_units, 2_000_000);
+        assert_eq!(
+            clean_purification.net_permissible_value_minor_units,
+            2_000_000
+        );
         assert!(clean_purification.is_pure());
         assert!(!clean_purification.purification_required);
     }
@@ -649,7 +661,8 @@ mod tests {
                 exact_gross,
                 exact_ratio,
                 PurificationRoundingRule::Floor
-            ).unwrap(),
+            )
+            .unwrap(),
             100
         );
         assert_eq!(
@@ -657,7 +670,8 @@ mod tests {
                 exact_gross,
                 exact_ratio,
                 PurificationRoundingRule::NearestHalfUp
-            ).unwrap(),
+            )
+            .unwrap(),
             100
         );
         assert_eq!(
@@ -665,7 +679,8 @@ mod tests {
                 exact_gross,
                 exact_ratio,
                 PurificationRoundingRule::ConservativeCeiling
-            ).unwrap(),
+            )
+            .unwrap(),
             100
         );
 
@@ -680,7 +695,8 @@ mod tests {
                 frac_low_gross,
                 frac_low_ratio,
                 PurificationRoundingRule::Floor
-            ).unwrap(),
+            )
+            .unwrap(),
             0
         );
         // NearestHalfUp: 3,300 * 2 = 6,600 < 10,000 -> rounds down to 0
@@ -689,7 +705,8 @@ mod tests {
                 frac_low_gross,
                 frac_low_ratio,
                 PurificationRoundingRule::NearestHalfUp
-            ).unwrap(),
+            )
+            .unwrap(),
             0
         );
         // ConservativeCeiling: remainder > 0 -> rounds UP to 1 cent (Islamic precaution)
@@ -698,7 +715,8 @@ mod tests {
                 frac_low_gross,
                 frac_low_ratio,
                 PurificationRoundingRule::ConservativeCeiling
-            ).unwrap(),
+            )
+            .unwrap(),
             1
         );
 
@@ -713,7 +731,8 @@ mod tests {
                 half_gross,
                 half_ratio,
                 PurificationRoundingRule::Floor
-            ).unwrap(),
+            )
+            .unwrap(),
             0
         );
         // NearestHalfUp: 5,000 * 2 = 10,000 >= 10,000 -> rounds UP to 1 cent
@@ -722,7 +741,8 @@ mod tests {
                 half_gross,
                 half_ratio,
                 PurificationRoundingRule::NearestHalfUp
-            ).unwrap(),
+            )
+            .unwrap(),
             1
         );
         // ConservativeCeiling -> rounds UP to 1 cent
@@ -731,7 +751,8 @@ mod tests {
                 half_gross,
                 half_ratio,
                 PurificationRoundingRule::ConservativeCeiling
-            ).unwrap(),
+            )
+            .unwrap(),
             1
         );
 
@@ -745,7 +766,8 @@ mod tests {
                 frac_high_gross,
                 frac_high_ratio,
                 PurificationRoundingRule::Floor
-            ).unwrap(),
+            )
+            .unwrap(),
             7
         );
         assert_eq!(
@@ -753,7 +775,8 @@ mod tests {
                 frac_high_gross,
                 frac_high_ratio,
                 PurificationRoundingRule::NearestHalfUp
-            ).unwrap(),
+            )
+            .unwrap(),
             8
         );
         assert_eq!(
@@ -761,7 +784,8 @@ mod tests {
                 frac_high_gross,
                 frac_high_ratio,
                 PurificationRoundingRule::ConservativeCeiling
-            ).unwrap(),
+            )
+            .unwrap(),
             8
         );
     }
@@ -773,7 +797,8 @@ mod tests {
             0,
             120,
             PurificationRoundingRule::ConservativeCeiling,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(zero_gross, 0);
 
         // Zero ratio yields 0
@@ -781,7 +806,8 @@ mod tests {
             1_000_000,
             0,
             PurificationRoundingRule::ConservativeCeiling,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(zero_ratio, 0);
 
         // 10,000 bps (100% impure)
@@ -789,7 +815,8 @@ mod tests {
             50_000,
             10_000,
             PurificationRoundingRule::ConservativeCeiling,
-        ).unwrap();
+        )
+        .unwrap();
         assert_eq!(full_impure, 50_000);
 
         // Ratio > 10,000 bps errors
@@ -800,7 +827,9 @@ mod tests {
         );
         assert!(matches!(
             invalid_ratio,
-            Err(PurificationError::RatioExceedsMaximum { impure_income_ratio_bps: 10_001 })
+            Err(PurificationError::RatioExceedsMaximum {
+                impure_income_ratio_bps: 10_001
+            })
         ));
     }
 
@@ -819,8 +848,8 @@ mod tests {
             rounding_rule: PurificationRoundingRule::ConservativeCeiling,
         };
 
-        let assessment = assess_per_share_dividend_purification(&req)
-            .expect("Per-share purification succeeds");
+        let assessment =
+            assess_per_share_dividend_purification(&req).expect("Per-share purification succeeds");
 
         assert_eq!(assessment.gross_dividend_value_minor_units, 750_000);
         assert_eq!(assessment.impure_income_ratio_bps, 80);
@@ -901,11 +930,13 @@ mod tests {
 
         assert_eq!(deserialized, assessment);
         assert_eq!(deserialized.currency_code(), &CurrencyCode::Usdc);
-        assert_eq!(deserialized.rounding_rule(), PurificationRoundingRule::ConservativeCeiling);
+        assert_eq!(
+            deserialized.rounding_rule(),
+            PurificationRoundingRule::ConservativeCeiling
+        );
         assert_eq!(deserialized.purification_value_minor_units(), 12_000);
         assert_eq!(deserialized.net_permissible_value_minor_units(), 988_000);
         assert_eq!(deserialized.gross_dividend_value_minor_units(), 1_000_000);
         assert_eq!(deserialized.impure_income_ratio_bps(), 120);
     }
 }
-

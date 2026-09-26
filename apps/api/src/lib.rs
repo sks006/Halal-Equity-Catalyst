@@ -14,12 +14,14 @@ pub mod workers;
 
 pub use config::{sanitize_connection_url, Config, ConfigError};
 pub use engines::{
-    AllocationProposal, CanonicalExecutionPayload, DecisionEngine, DeterministicPolicyAuthorizer,
-    DevTestSigner, ExecutionAuthorization, ExecutionPlan, ExecutionPlanner, ExecutionSigner,
-    ExternalSigner, IdempotencyRecord, IdempotencyStatus, IdempotencyTracker, KeypairSigner,
+    load_production_signer, AllocationProposal, AnchorExecutionConnector, AnchorExecutionError,
+    CanonicalExecutionPayload, DecisionEngine, DeterministicPolicyAuthorizer, DevTestSigner,
+    ExecutionAuthorization, ExecutionPlan, ExecutionPlanner, ExecutionSigner, ExternalSigner,
+    HsmSigner, IdempotencyRecord, IdempotencyStatus, IdempotencyTracker, KeypairSigner, KmsSigner,
     OracleReferenceInfo, PlannerError, PolicyRejectionReason, PolicyValidationOutcome,
-    RemoteHsmSigner, SignedTransaction, SignerError, TransactionBuilder, TransactionSignerService,
-    TransactionSubmitter, UnavailableSigner, UnsignedTransaction, ValidationContext,
+    PreconditionParameters, RemoteHsmSigner, SignedTransaction, SignerError, SigningLifecycle,
+    TransactionBuilder, TransactionSignerService, TransactionSubmitter, UnavailableSigner,
+    UnsignedTransaction, ValidationContext,
 };
 pub use equity_catalyst_pyth::{
     DynamicStreamManager, PriceUpdateSink, PythSubscription, StreamManagerConfig, SubscriptionSet,

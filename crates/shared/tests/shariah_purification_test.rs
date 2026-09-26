@@ -21,8 +21,8 @@ use equity_catalyst_shared::shariah::purification::{
     assess_direct_impure_value, assess_dividend_purification,
     assess_per_share_dividend_purification, assess_purification_for_registered_asset,
     calculate_purification_value_minor_units, CurrencyCode, DirectValuePurificationRequest,
-    DividendPurificationRequest, PerShareDividendPurificationRequest,
-    PurificationError, PurificationRoundingRule,
+    DividendPurificationRequest, PerShareDividendPurificationRequest, PurificationError,
+    PurificationRoundingRule,
 };
 use equity_catalyst_shared::shariah::registry::register_asset_at;
 use equity_catalyst_shared::shariah::screening::{
@@ -115,10 +115,7 @@ fn test_acceptance_criteria_purification_independent_from_shariah_eligibility_de
     .expect("Purification calculation succeeds independently of screening step");
 
     // Invariant: Gross dividend is preserved
-    assert_eq!(
-        purification.gross_dividend_value_minor_units(),
-        5_000_000
-    );
+    assert_eq!(purification.gross_dividend_value_minor_units(), 5_000_000);
 
     // Invariant: Purification ratio is 140 bps
     assert_eq!(purification.impure_income_ratio_bps(), 140);
@@ -183,12 +180,9 @@ fn test_all_rounding_rules_deterministic_and_conservative_ceiling() {
     let ratio = 33u32;
 
     // Floor: discards 0.33 -> 0
-    let floor_val = calculate_purification_value_minor_units(
-        gross,
-        ratio,
-        PurificationRoundingRule::Floor,
-    )
-    .unwrap();
+    let floor_val =
+        calculate_purification_value_minor_units(gross, ratio, PurificationRoundingRule::Floor)
+            .unwrap();
     assert_eq!(floor_val, 0);
 
     // NearestHalfUp: 3,300 < 5,000 -> 0
@@ -212,15 +206,30 @@ fn test_all_rounding_rules_deterministic_and_conservative_ceiling() {
     // Half boundary test: 50 bps on 100 units = exactly 0.50
     let half_ratio = 50u32;
     assert_eq!(
-        calculate_purification_value_minor_units(gross, half_ratio, PurificationRoundingRule::Floor).unwrap(),
+        calculate_purification_value_minor_units(
+            gross,
+            half_ratio,
+            PurificationRoundingRule::Floor
+        )
+        .unwrap(),
         0
     );
     assert_eq!(
-        calculate_purification_value_minor_units(gross, half_ratio, PurificationRoundingRule::NearestHalfUp).unwrap(),
+        calculate_purification_value_minor_units(
+            gross,
+            half_ratio,
+            PurificationRoundingRule::NearestHalfUp
+        )
+        .unwrap(),
         1
     );
     assert_eq!(
-        calculate_purification_value_minor_units(gross, half_ratio, PurificationRoundingRule::ConservativeCeiling).unwrap(),
+        calculate_purification_value_minor_units(
+            gross,
+            half_ratio,
+            PurificationRoundingRule::ConservativeCeiling
+        )
+        .unwrap(),
         1
     );
 }

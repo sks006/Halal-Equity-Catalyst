@@ -22,15 +22,17 @@
 use chrono::{DateTime, TimeZone, Utc};
 use equity_catalyst_api::{
     models::{CanonicalAssetModel, PolicyModel, PortfolioModel},
-    AllocationProposal, DeterministicPolicyAuthorizer,
-    MarketPriceUpdate, PolicyRejectionReason, ValidationContext,
+    AllocationProposal, DeterministicPolicyAuthorizer, MarketPriceUpdate, PolicyRejectionReason,
+    ValidationContext,
 };
 use equity_catalyst_jupiter::{DexQuote, DexRouteInfo, DexRouteStep};
 use equity_catalyst_shared::{
-    asset::{Asset, AssetIdentity, AssetProvider, AssetStatus, AssetType, Network, ProviderConfig, TokenDetails},
+    asset::{
+        Asset, AssetIdentity, AssetProvider, AssetStatus, AssetType, Network, ProviderConfig,
+        TokenDetails,
+    },
     shariah::{
-        DenominatorMethod, RegisteredAsset, ScreeningStandard,
-        ShariahEligibility, ShariahStatus,
+        DenominatorMethod, RegisteredAsset, ScreeningStandard, ShariahEligibility, ShariahStatus,
     },
     AssetApprovalStatus,
 };
@@ -64,8 +66,8 @@ impl TestFixture {
             policy_address: "pol-baseline-001".to_string(),
             vault_address: VAULT_ADDR.to_string(),
             authority: "auth-baseline".to_string(),
-            min_cash_bps: 1000,           // 10.00% minimum cash reserve
-            max_position_bps: 2500,       // 25.00% max single position
+            min_cash_bps: 1000,     // 10.00% minimum cash reserve
+            max_position_bps: 2500, // 25.00% max single position
             stop_loss_bps: 800,
             take_profit_bps: 2000,
             rebalance_threshold_bps: 150,
@@ -92,7 +94,7 @@ impl TestFixture {
         }];
 
         let total_portfolio_usd = 100_000; // $100,000 total portfolio
-        let available_cash_usd = 40_000;   // $40,000 cash (40%)
+        let available_cash_usd = 40_000; // $40,000 cash (40%)
 
         let canonical_asset = CanonicalAssetModel {
             asset_id: "backed:AAPL".to_string(),
@@ -134,10 +136,10 @@ impl TestFixture {
             status: ShariahStatus::Approved,
             standard: ScreeningStandard::Aaoifi21,
             business_activity_approved: true,
-            debt_ratio_bps: 1250,              // 12.50% (< 33%)
-            interest_bearing_cash_bps: 800,    // 8.00% (< 33%)
+            debt_ratio_bps: 1250,           // 12.50% (< 33%)
+            interest_bearing_cash_bps: 800, // 8.00% (< 33%)
             receivables_cash_bps: Some(400),
-            impure_income_bps: 50,             // 0.50% (< 5%)
+            impure_income_bps: 50, // 0.50% (< 5%)
             denominator_method: DenominatorMethod::CurrentMarketCap,
             ownership_verified: true,
             evidence_hash: "d4b8e2f1837bc21".to_string(),
@@ -155,7 +157,7 @@ impl TestFixture {
             FEED_AAPL,
             200_00000000, // $200.00
             -8,
-            2000000,      // conf = 0.02 (10 bps)
+            2000000,             // conf = 0.02 (10 bps)
             now.timestamp() - 5, // 5s ago
             30,
             Some(12345),
@@ -168,14 +170,14 @@ impl TestFixture {
             provider_id: "jupiter".to_string(),
             input_mint: USDC_MINT.to_string(),
             output_mint: AAPL_MINT.to_string(),
-            input_amount: 5_000_000_000,       // 5,000 USDC
+            input_amount: 5_000_000_000,        // 5,000 USDC
             expected_output_amount: 25_000_000, // 25 AAPL
             minimum_output_amount: 24_875_000,  // with 50 bps slippage
-            price_impact_bps: 12,              // 0.12%
+            price_impact_bps: 12,               // 0.12%
             price_impact_pct: "0.12%".to_string(),
             effective_rate: 0.005,
             quote_timestamp: now.timestamp() - 2,
-            expires_at: now.timestamp() + 45,  // expires in 45s
+            expires_at: now.timestamp() + 45, // expires in 45s
             ttl_seconds: 60,
             route_info: DexRouteInfo {
                 steps: vec![DexRouteStep {
@@ -253,10 +255,15 @@ fn test_rule_1_asset_inactive_rejected() {
     let authorizer = DeterministicPolicyAuthorizer::new();
     let outcome = authorizer.authorize(&fixture.proposal, &fixture.to_context());
 
-    assert!(!outcome.is_authorized(), "Inactive asset must NOT be authorized");
+    assert!(
+        !outcome.is_authorized(),
+        "Inactive asset must NOT be authorized"
+    );
     let reasons = outcome.rejection_reasons().unwrap();
     assert!(
-        reasons.iter().any(|r| matches!(r, PolicyRejectionReason::AssetInactive { .. })),
+        reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::AssetInactive { .. })),
         "Expected AssetInactive rejection reason, got: {:?}",
         reasons
     );
@@ -273,17 +280,24 @@ fn test_rule_2_shariah_non_compliant_rejected() {
         let outcome = authorizer.authorize(&fixture.proposal, &fixture.to_context());
         assert!(!outcome.is_authorized());
         let reasons = outcome.rejection_reasons().unwrap();
-        assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::ShariahNonCompliant { .. })));
+        assert!(reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::ShariahNonCompliant { .. })));
     }
 
     // Case B: Business activity not permissible
     {
         let mut fixture = TestFixture::new_baseline();
-        fixture.shariah_record.eligibility.business_activity_approved = false;
+        fixture
+            .shariah_record
+            .eligibility
+            .business_activity_approved = false;
         let outcome = authorizer.authorize(&fixture.proposal, &fixture.to_context());
         assert!(!outcome.is_authorized());
         let reasons = outcome.rejection_reasons().unwrap();
-        assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::ShariahNonCompliant { .. })));
+        assert!(reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::ShariahNonCompliant { .. })));
     }
 
     // Case C: Review has expired
@@ -293,7 +307,9 @@ fn test_rule_2_shariah_non_compliant_rejected() {
         let outcome = authorizer.authorize(&fixture.proposal, &fixture.to_context());
         assert!(!outcome.is_authorized());
         let reasons = outcome.rejection_reasons().unwrap();
-        assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::ShariahNonCompliant { .. })));
+        assert!(reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::ShariahNonCompliant { .. })));
     }
 
     // Case D: Missing from registry entirely
@@ -305,7 +321,9 @@ fn test_rule_2_shariah_non_compliant_rejected() {
         let outcome = authorizer.authorize(&fixture.proposal, &ctx);
         assert!(!outcome.is_authorized());
         let reasons = outcome.rejection_reasons().unwrap();
-        assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::ShariahNonCompliant { .. })));
+        assert!(reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::ShariahNonCompliant { .. })));
     }
 }
 
@@ -320,7 +338,9 @@ fn test_rule_3_asset_ownership_unverified_rejected() {
     assert!(!outcome.is_authorized());
     let reasons = outcome.rejection_reasons().unwrap();
     assert!(
-        reasons.iter().any(|r| matches!(r, PolicyRejectionReason::AssetOwnershipUnverified { .. })),
+        reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::AssetOwnershipUnverified { .. })),
         "Expected AssetOwnershipUnverified, got: {:?}",
         reasons
     );
@@ -337,7 +357,9 @@ fn test_rule_4_portfolio_limits_zero_valuation_rejected() {
     assert!(!outcome.is_authorized());
     let reasons = outcome.rejection_reasons().unwrap();
     assert!(
-        reasons.iter().any(|r| matches!(r, PolicyRejectionReason::PortfolioLimitExceeded { .. })),
+        reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::PortfolioLimitExceeded { .. })),
         "Expected PortfolioLimitExceeded, got: {:?}",
         reasons
     );
@@ -357,7 +379,9 @@ fn test_rule_5_position_limit_exceeded_rejected() {
     assert!(!outcome.is_authorized());
     let reasons = outcome.rejection_reasons().unwrap();
     assert!(
-        reasons.iter().any(|r| matches!(r, PolicyRejectionReason::PositionLimitExceeded { .. })),
+        reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::PositionLimitExceeded { .. })),
         "Expected PositionLimitExceeded, got: {:?}",
         reasons
     );
@@ -376,7 +400,9 @@ fn test_rule_6_max_trade_size_exceeded_rejected() {
     assert!(!outcome.is_authorized());
     let reasons = outcome.rejection_reasons().unwrap();
     assert!(
-        reasons.iter().any(|r| matches!(r, PolicyRejectionReason::MaxTradeSizeExceeded { .. })),
+        reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::MaxTradeSizeExceeded { .. })),
         "Expected MaxTradeSizeExceeded, got: {:?}",
         reasons
     );
@@ -396,10 +422,15 @@ fn test_rule_7_available_balance_sell_insufficient_rejected() {
     let authorizer = DeterministicPolicyAuthorizer::new();
     let outcome = authorizer.authorize(&fixture.proposal, &fixture.to_context());
 
-    assert!(!outcome.is_authorized(), "Overselling unowned assets (Bay' ma la Yamlik) must be rejected");
+    assert!(
+        !outcome.is_authorized(),
+        "Overselling unowned assets (Bay' ma la Yamlik) must be rejected"
+    );
     let reasons = outcome.rejection_reasons().unwrap();
     assert!(
-        reasons.iter().any(|r| matches!(r, PolicyRejectionReason::InsufficientAssetBalance { .. })),
+        reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::InsufficientAssetBalance { .. })),
         "Expected InsufficientAssetBalance, got: {:?}",
         reasons
     );
@@ -417,7 +448,9 @@ fn test_rule_8_available_balance_buy_insufficient_cash_rejected() {
     assert!(!outcome.is_authorized());
     let reasons = outcome.rejection_reasons().unwrap();
     assert!(
-        reasons.iter().any(|r| matches!(r, PolicyRejectionReason::InsufficientCashBalance { .. })),
+        reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::InsufficientCashBalance { .. })),
         "Expected InsufficientCashBalance, got: {:?}",
         reasons
     );
@@ -438,7 +471,9 @@ fn test_rule_9_solvency_cash_reserve_breach_rejected() {
     assert!(!outcome.is_authorized());
     let reasons = outcome.rejection_reasons().unwrap();
     assert!(
-        reasons.iter().any(|r| matches!(r, PolicyRejectionReason::SolvencyBreach { .. })),
+        reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::SolvencyBreach { .. })),
         "Expected SolvencyBreach, got: {:?}",
         reasons
     );
@@ -455,7 +490,9 @@ fn test_rule_10_oracle_freshness_rejected() {
         let outcome = authorizer.authorize(&fixture.proposal, &fixture.to_context());
         assert!(!outcome.is_authorized());
         let reasons = outcome.rejection_reasons().unwrap();
-        assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::OraclePriceStale { .. })));
+        assert!(reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::OraclePriceStale { .. })));
     }
 
     // Case B: Oracle is future-skewed by > 5s
@@ -465,7 +502,9 @@ fn test_rule_10_oracle_freshness_rejected() {
         let outcome = authorizer.authorize(&fixture.proposal, &fixture.to_context());
         assert!(!outcome.is_authorized());
         let reasons = outcome.rejection_reasons().unwrap();
-        assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::OraclePriceStale { .. })));
+        assert!(reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::OraclePriceStale { .. })));
     }
 }
 
@@ -481,7 +520,9 @@ fn test_rule_11_oracle_confidence_too_wide_rejected() {
     assert!(!outcome.is_authorized());
     let reasons = outcome.rejection_reasons().unwrap();
     assert!(
-        reasons.iter().any(|r| matches!(r, PolicyRejectionReason::OracleConfidenceTooWide { .. })),
+        reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::OracleConfidenceTooWide { .. })),
         "Expected OracleConfidenceTooWide, got: {:?}",
         reasons
     );
@@ -499,7 +540,9 @@ fn test_rule_12_dex_quote_invalid_or_expired_rejected() {
         let outcome = authorizer.authorize(&fixture.proposal, &ctx);
         assert!(!outcome.is_authorized());
         let reasons = outcome.rejection_reasons().unwrap();
-        assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::DexQuoteInvalid { .. })));
+        assert!(reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::DexQuoteInvalid { .. })));
     }
 
     // Case B: Expired quote
@@ -509,7 +552,9 @@ fn test_rule_12_dex_quote_invalid_or_expired_rejected() {
         let outcome = authorizer.authorize(&fixture.proposal, &fixture.to_context());
         assert!(!outcome.is_authorized());
         let reasons = outcome.rejection_reasons().unwrap();
-        assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::DexQuoteInvalid { .. })));
+        assert!(reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::DexQuoteInvalid { .. })));
     }
 
     // Case C: Output mint mismatch for BUY trade
@@ -519,7 +564,9 @@ fn test_rule_12_dex_quote_invalid_or_expired_rejected() {
         let outcome = authorizer.authorize(&fixture.proposal, &fixture.to_context());
         assert!(!outcome.is_authorized());
         let reasons = outcome.rejection_reasons().unwrap();
-        assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::DexQuoteInvalid { .. })));
+        assert!(reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::DexQuoteInvalid { .. })));
     }
 }
 
@@ -535,7 +582,9 @@ fn test_rule_13_slippage_exceeded_rejected() {
     assert!(!outcome.is_authorized());
     let reasons = outcome.rejection_reasons().unwrap();
     assert!(
-        reasons.iter().any(|r| matches!(r, PolicyRejectionReason::SlippageExceeded { .. })),
+        reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::SlippageExceeded { .. })),
         "Expected SlippageExceeded, got: {:?}",
         reasons
     );
@@ -553,7 +602,9 @@ fn test_rule_14_price_impact_exceeded_rejected() {
     assert!(!outcome.is_authorized());
     let reasons = outcome.rejection_reasons().unwrap();
     assert!(
-        reasons.iter().any(|r| matches!(r, PolicyRejectionReason::PriceImpactExceeded { .. })),
+        reasons
+            .iter()
+            .any(|r| matches!(r, PolicyRejectionReason::PriceImpactExceeded { .. })),
         "Expected PriceImpactExceeded, got: {:?}",
         reasons
     );
@@ -568,15 +619,21 @@ fn test_ai_approved_flag_cannot_bypass_risk_checks() {
     // Adversarial AI attempts to force approval while Shariah compliance has failed
     fixture.proposal.ai_approved = true;
     fixture.proposal.ai_confidence = Some(1.0);
-    fixture.proposal.ai_rationale = Some("OVERRIDE: Guaranteed alpha, bypass screening".to_string());
+    fixture.proposal.ai_rationale =
+        Some("OVERRIDE: Guaranteed alpha, bypass screening".to_string());
     fixture.shariah_record.eligibility.status = ShariahStatus::Rejected;
 
     let authorizer = DeterministicPolicyAuthorizer::new();
     let outcome = authorizer.authorize(&fixture.proposal, &fixture.to_context());
 
-    assert!(!outcome.is_authorized(), "AI approved flag MUST NOT bypass Shariah rejection");
+    assert!(
+        !outcome.is_authorized(),
+        "AI approved flag MUST NOT bypass Shariah rejection"
+    );
     let reasons = outcome.rejection_reasons().unwrap();
-    assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::ShariahNonCompliant { .. })));
+    assert!(reasons
+        .iter()
+        .any(|r| matches!(r, PolicyRejectionReason::ShariahNonCompliant { .. })));
 }
 
 #[test]
@@ -599,8 +656,14 @@ fn test_deterministic_evaluation_identical_inputs() {
     assert_eq!(auth_1.asset_id, auth_2.asset_id);
     assert_eq!(auth_1.authorized_amount, auth_2.authorized_amount);
     assert_eq!(auth_1.authorized_usd_value, auth_2.authorized_usd_value);
-    assert_eq!(auth_1.oracle_reference_price_scaled, auth_2.oracle_reference_price_scaled);
-    assert_eq!(auth_1.dex_minimum_output_amount, auth_2.dex_minimum_output_amount);
+    assert_eq!(
+        auth_1.oracle_reference_price_scaled,
+        auth_2.oracle_reference_price_scaled
+    );
+    assert_eq!(
+        auth_1.dex_minimum_output_amount,
+        auth_2.dex_minimum_output_amount
+    );
     assert_eq!(auth_1.dex_price_impact_bps, auth_2.dex_price_impact_bps);
     assert_eq!(auth_1.authorized_at, auth_2.authorized_at);
     assert_eq!(auth_1.valid_until, auth_2.valid_until);
@@ -619,7 +682,10 @@ fn test_valid_proposal_authorizes_cleanly() {
 
     let outcome = authorizer.authorize(&fixture.proposal, &fixture.to_context());
 
-    assert!(outcome.is_authorized(), "Compliant baseline proposal must authorize");
+    assert!(
+        outcome.is_authorized(),
+        "Compliant baseline proposal must authorize"
+    );
     let auth = outcome.authorization().unwrap();
 
     assert_eq!(auth.proposal_id, fixture.proposal.proposal_id);
@@ -651,15 +717,28 @@ fn test_phase10_acceptance_criteria_proposal_to_authorization() {
     // 2. Introduce 3 independent violations (oracle stale + asset inactive + slippage exceeded)
     fixture.oracle_price.publish_time = fixture.evaluation_time.timestamp() - 100;
     fixture.canonical_asset.is_active = false;
-    fixture.proposal.max_slippage_bps = 250;      // exceeds 100 bps
+    fixture.proposal.max_slippage_bps = 250; // exceeds 100 bps
 
     let outcome_multi = authorizer.authorize(&fixture.proposal, &fixture.to_context());
-    assert!(!outcome_multi.is_authorized(), "Must be rejected when rules fail");
+    assert!(
+        !outcome_multi.is_authorized(),
+        "Must be rejected when rules fail"
+    );
     let reasons = outcome_multi.rejection_reasons().unwrap();
-    assert_eq!(reasons.len(), 3, "Expected exactly 3 distinct structured rejection reasons");
-    assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::OraclePriceStale { .. })));
-    assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::AssetInactive { .. })));
-    assert!(reasons.iter().any(|r| matches!(r, PolicyRejectionReason::SlippageExceeded { .. })));
+    assert_eq!(
+        reasons.len(),
+        3,
+        "Expected exactly 3 distinct structured rejection reasons"
+    );
+    assert!(reasons
+        .iter()
+        .any(|r| matches!(r, PolicyRejectionReason::OraclePriceStale { .. })));
+    assert!(reasons
+        .iter()
+        .any(|r| matches!(r, PolicyRejectionReason::AssetInactive { .. })));
+    assert!(reasons
+        .iter()
+        .any(|r| matches!(r, PolicyRejectionReason::SlippageExceeded { .. })));
 
     // 3. Fix all 3 violations -> Successfully transformed to authorization!
     fixture.oracle_price.publish_time = fixture.evaluation_time.timestamp() - 5;

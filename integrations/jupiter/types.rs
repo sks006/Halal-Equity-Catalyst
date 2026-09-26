@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Jupiter error hierarchy.
-#[derive(Debug, Error)]
+#[derive(Debug, Error, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum JupiterError {
     #[error("HTTP transport error: {0}")]
     Http(String),
@@ -23,6 +23,18 @@ pub enum JupiterError {
 
     #[error("Price impact {actual_bps} bps exceeds maximum limit of {max_bps} bps")]
     PriceImpactTooHigh { actual_bps: u16, max_bps: u16 },
+
+    #[error("Unsupported token pair: {input_mint} -> {output_mint}")]
+    UnsupportedPair {
+        input_mint: String,
+        output_mint: String,
+    },
+
+    #[error("No route found for token pair: {input_mint} -> {output_mint}")]
+    NoRoute {
+        input_mint: String,
+        output_mint: String,
+    },
 }
 
 /// Request parameters for querying a swap quote from `/v6/quote`.
@@ -98,6 +110,13 @@ pub struct QuoteResponse {
     pub time_taken: Option<f64>,
 }
 
+impl QuoteResponse {
+    /// Returns true if the quote contains at least one route step.
+    pub fn has_route(&self) -> bool {
+        !self.route_plan.is_empty()
+    }
+}
+
 /// Payload sent to the `/v6/swap` endpoint to assemble a serialized transaction.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -120,4 +139,12 @@ pub struct SwapResponse {
     pub last_valid_block_height: u64,
     #[serde(default)]
     pub prioritization_fee_lamports: Option<u64>,
+}
+
+impl SwapResponse {
+    /// Indicates whether the swap transaction matches known dummy or placeholder payloads.
+    pub fn is_dummy(&self) -> bool {
+        self.swap_transaction.trim().is_empty()
+            || self.swap_transaction == "AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAEDBg=="
+    }
 }

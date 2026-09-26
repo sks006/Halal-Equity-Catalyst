@@ -99,86 +99,9 @@ export default function NewLaunchPage() {
       } else {
         throw new Error("Backend offline or non-200 response");
       }
-    } catch {
-      // Deterministic client fallback matching the exact backend engine calculation
-      const p = Number(initialPrice) || 100;
-      const g = Number(graduationThreshold) || 750;
-      const p0 = p * 0.85;
-      const p1 = p * 1.0;
-      const p2 = p * 1.3;
-      const p3 = p * 1.5;
-
-      const fallback: ConfigResponse = {
-        asset,
-        quote_token: quoteToken,
-        quote_mint: "Gh9ZwEmdLJ8DscKNTkTqPbNwLNNBjuSzaG9Vp2KGtKJr",
-        initial_price: p,
-        curve_profile: curveProfile,
-        total_token_supply: 1_000_000,
-        segments: [
-          {
-            segment_index: 0,
-            regime_name: "Regime A: Launch / Bootstrapping",
-            start_price: p0,
-            end_price: p1,
-            sqrt_price_start: "170068593671239845110",
-            sqrt_price_end: "184467440737095516160",
-            liquidity_weight: 1,
-            estimated_liquidity: "97398939977509015658000000000000",
-            description:
-              "Controlled initial distribution window with moderate slope to mitigate predatory sniping.",
-          },
-          {
-            segment_index: 1,
-            regime_name: "Regime B: Active Price Discovery",
-            start_price: p1,
-            end_price: p2,
-            sqrt_price_start: "184467440737095516160",
-            sqrt_price_end: "210332857448209845110",
-            liquidity_weight: 4,
-            estimated_liquidity: "389595759910036062630000000000000",
-            description:
-              "4x concentrated liquidity centered around consensus fair value. Low slippage for institutional block discovery.",
-          },
-          {
-            segment_index: 2,
-            regime_name: "Regime C: Mature Market Buffer",
-            start_price: p2,
-            end_price: p3,
-            sqrt_price_start: "210332857448209845110",
-            sqrt_price_end: "225927891234198451110",
-            liquidity_weight: 8,
-            estimated_liquidity: "779191519820072125260000000000000",
-            description:
-              "8x concentrated liquidity pre-graduation stabilization. Eliminates terminal volatility before DAMM v2 migration.",
-          },
-        ],
-        fee_structure: {
-          base_fee_mode: "FeeSchedulerLinear",
-          starting_fee_bps: 250,
-          ending_fee_bps: 50,
-          dynamic_volatility_fee_enabled: true,
-          collect_fee_mode: "QuoteToken",
-          creator_fee_share_pct: 20,
-          partner_fee_share_pct: 80,
-        },
-        graduation: {
-          migration_option: "MET_DAMM_V2",
-          target_damm: "Meteora Dynamic AMM v2",
-          migration_quote_threshold: g,
-          migration_quote_threshold_lamports: g * 1_000_000,
-          fee_option: "Customizable",
-          migrated_pool_fee_bps: 100,
-          partner_lp_percentage: 100,
-        },
-        program_id: "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN",
-        summary: `Equity Discovery Curve compiled for ${asset} pegged at $${p.toFixed(
-          2
-        )} ${quoteToken}. 3 piecewise regimes (weights: 1x -> 4x -> 8x) targeting DAMM v2 migration at $${g.toFixed(
-          2
-        )} liquidity.`,
-      };
-      setConfig(fallback);
+    } catch (err: any) {
+      // Fail closed: never display synthetic curve data
+      setConfig(null);
     } finally {
       setLoading(false);
     }

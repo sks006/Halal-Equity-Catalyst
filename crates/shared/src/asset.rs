@@ -831,7 +831,9 @@ mod tests {
         assert!(asset.activate().is_err());
 
         // VALIDATED -> SHARIAH_APPROVED
-        assert!(asset.transition_to(AssetApprovalStatus::ShariahApproved).is_ok());
+        assert!(asset
+            .transition_to(AssetApprovalStatus::ShariahApproved)
+            .is_ok());
         assert_eq!(asset.approval_status, AssetApprovalStatus::ShariahApproved);
         assert!(asset.approval_status.is_shariah_approved());
         assert!(!asset.is_active);
@@ -855,31 +857,54 @@ mod tests {
     #[test]
     fn test_canonical_asset_validation_failures() {
         // Empty asset_id
-        assert!(CanonicalAssetRecord::new("", "NVDA", "mint1", "issuer", "cust", "ref", 6).is_err());
+        assert!(
+            CanonicalAssetRecord::new("", "NVDA", "mint1", "issuer", "cust", "ref", 6).is_err()
+        );
         // Empty symbol
-        assert!(CanonicalAssetRecord::new("id1", "  ", "mint1", "issuer", "cust", "ref", 6).is_err());
+        assert!(
+            CanonicalAssetRecord::new("id1", "  ", "mint1", "issuer", "cust", "ref", 6).is_err()
+        );
         // Empty mint
         assert!(CanonicalAssetRecord::new("id1", "NVDA", "", "issuer", "cust", "ref", 6).is_err());
         // Empty issuer
         assert!(CanonicalAssetRecord::new("id1", "NVDA", "mint1", "", "cust", "ref", 6).is_err());
         // Empty custodian
-        assert!(CanonicalAssetRecord::new("id1", "NVDA", "mint1", "issuer", " ", "ref", 6).is_err());
+        assert!(
+            CanonicalAssetRecord::new("id1", "NVDA", "mint1", "issuer", " ", "ref", 6).is_err()
+        );
         // Empty underlying ref
-        assert!(CanonicalAssetRecord::new("id1", "NVDA", "mint1", "issuer", "cust", "", 6).is_err());
+        assert!(
+            CanonicalAssetRecord::new("id1", "NVDA", "mint1", "issuer", "cust", "", 6).is_err()
+        );
     }
 
     #[test]
     fn test_asset_approval_status_formatting_and_parsing() {
         assert_eq!(AssetApprovalStatus::Pending.to_string(), "PENDING");
         assert_eq!(AssetApprovalStatus::Validated.to_string(), "VALIDATED");
-        assert_eq!(AssetApprovalStatus::ShariahApproved.to_string(), "SHARIAH_APPROVED");
+        assert_eq!(
+            AssetApprovalStatus::ShariahApproved.to_string(),
+            "SHARIAH_APPROVED"
+        );
         assert_eq!(AssetApprovalStatus::Active.to_string(), "ACTIVE");
         assert_eq!(AssetApprovalStatus::Deactivated.to_string(), "DEACTIVATED");
 
-        assert_eq!("pending".parse::<AssetApprovalStatus>().unwrap(), AssetApprovalStatus::Pending);
-        assert_eq!("SHARIAH_APPROVED".parse::<AssetApprovalStatus>().unwrap(), AssetApprovalStatus::ShariahApproved);
-        assert_eq!("active".parse::<AssetApprovalStatus>().unwrap(), AssetApprovalStatus::Active);
-        assert_eq!("deactivated".parse::<AssetApprovalStatus>().unwrap(), AssetApprovalStatus::Deactivated);
+        assert_eq!(
+            "pending".parse::<AssetApprovalStatus>().unwrap(),
+            AssetApprovalStatus::Pending
+        );
+        assert_eq!(
+            "SHARIAH_APPROVED".parse::<AssetApprovalStatus>().unwrap(),
+            AssetApprovalStatus::ShariahApproved
+        );
+        assert_eq!(
+            "active".parse::<AssetApprovalStatus>().unwrap(),
+            AssetApprovalStatus::Active
+        );
+        assert_eq!(
+            "deactivated".parse::<AssetApprovalStatus>().unwrap(),
+            AssetApprovalStatus::Deactivated
+        );
         assert!("unknown_status".parse::<AssetApprovalStatus>().is_err());
     }
 }

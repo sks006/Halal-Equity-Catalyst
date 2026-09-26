@@ -12,7 +12,7 @@ pub use stream::{
     parse_price_update_event, PythEventStream, PythStreamClient, PythStreamConfig, RawSseEvent,
     SseChunkParser,
 };
-pub use subscription::{normalize_feed_id, PythSubscription, SubscriptionSet};
+pub use subscription::{normalize_feed_id, EnrichedPriceUpdate, PythSubscription, SubscriptionSet};
 pub use types::{
     HermesLatestPriceResponse, NormalizedPrice, ParsedPriceFeed, PythBinaryUpdate, PythError,
     PythPriceUpdateEvent, PythRawPrice, PythStreamError,

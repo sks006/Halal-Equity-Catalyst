@@ -2,8 +2,8 @@ pub mod jupiter;
 pub mod meteora;
 pub mod mock;
 
-use anchor_lang::prelude::*;
 use crate::errors::VaultError;
+use anchor_lang::prelude::*;
 
 pub use jupiter::JUPITER_V6_PROGRAM_ID;
 pub use meteora::METEORA_DBC_PROGRAM_ID;
@@ -97,10 +97,12 @@ pub fn dispatch_dex_cpi<'info>(
     }
 
     // 4. Perform on-chain CPI with Vault PDA seeds
-    anchor_lang::solana_program::program::invoke_signed(&ix, &account_infos, signer_seeds).map_err(|e| {
-        msg!("DEX CPI invocation failed: {:?}", e);
-        VaultError::DexCpiFailed.into()
-    })
+    anchor_lang::solana_program::program::invoke_signed(&ix, &account_infos, signer_seeds).map_err(
+        |e| {
+            msg!("DEX CPI invocation failed: {:?}", e);
+            VaultError::DexCpiFailed.into()
+        },
+    )
 }
 
 #[cfg(test)]

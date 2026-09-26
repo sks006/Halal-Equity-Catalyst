@@ -177,10 +177,9 @@ impl fmt::Display for ShariahRejectionReason {
                 f,
                 "Interest-bearing cash and deposits exceed policy threshold"
             ),
-            Self::ExcessReceivablesAndCash => write!(
-                f,
-                "Accounts receivable and cash exceed policy threshold"
-            ),
+            Self::ExcessReceivablesAndCash => {
+                write!(f, "Accounts receivable and cash exceed policy threshold")
+            }
             Self::ExcessImpureIncome => {
                 write!(f, "Impermissible impure income exceeds policy threshold")
             }
@@ -198,13 +197,22 @@ impl fmt::Display for ShariahRejectionReason {
             ),
             Self::ReviewExpired => write!(f, "Periodic screening review has expired"),
             Self::BusinessClassificationUnknown => {
-                write!(f, "Business activity classification is unknown or unverified")
+                write!(
+                    f,
+                    "Business activity classification is unknown or unverified"
+                )
             }
             Self::BusinessClassificationRequiresReview => {
-                write!(f, "Business activity requires qualitative investigation or audit")
+                write!(
+                    f,
+                    "Business activity requires qualitative investigation or audit"
+                )
             }
             Self::DenominatorMethodMismatch => {
-                write!(f, "Financial metrics denominator method does not match policy requirements")
+                write!(
+                    f,
+                    "Financial metrics denominator method does not match policy requirements"
+                )
             }
             Self::Other(msg) => write!(f, "Other rejection reason: {}", msg),
         }

@@ -91,15 +91,13 @@ export function DecisionTimeline({ className }: DecisionTimelineProps) {
     (state) => state.events
   );
 
-  // Load pipeline details for the selected event (or fallback to default pipeline)
-  const pipeline =
-    pipelines[selectedEventId] ||
-    pipelines["a8b1c2d3-e4f5-4678-90ab-cdef12345678"];
+  // Load pipeline details for the selected event
+  const pipeline = selectedEventId ? pipelines[selectedEventId] : null;
 
   // Automated playback ticker
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isPlaying) {
+    if (isPlaying && pipeline) {
       timer = setInterval(() => {
         dispatch(nextStage());
       }, 1200);
@@ -107,12 +105,26 @@ export function DecisionTimeline({ className }: DecisionTimelineProps) {
     return () => {
       if (timer) clearInterval(timer);
     };
-  }, [isPlaying, dispatch]);
+  }, [isPlaying, pipeline, dispatch]);
 
   const handleStepClick = (stepNum: number) => {
     dispatch(setIsPlaying(false));
     dispatch(setActiveStage(stepNum));
   };
+
+  if (!pipeline) {
+    return (
+      <Card className={`bg-white border-slate-200 shadow-sm flex flex-col p-10 text-center ${className || ""}`}>
+        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto text-slate-400 mb-3">
+          <Clock className="w-6 h-6" />
+        </div>
+        <h3 className="text-sm font-bold text-slate-800">No Decision Pipeline Selected</h3>
+        <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+          Select an event from the feed to inspect its 6-stage autonomous decision, risk verification, and execution timeline.
+        </p>
+      </Card>
+    );
+  }
 
   return (
     <Card className={`bg-white border-slate-200 shadow-sm flex flex-col ${className || ""}`}>

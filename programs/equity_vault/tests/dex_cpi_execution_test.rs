@@ -197,13 +197,15 @@ fn test_mint_validation_rules() {
     // 1. Buy: in = USDC, out = AAPL -> Valid
     let is_valid_buy = vault_asset_mint != approved_equity_mint
         && ((vault_asset_mint == vault_asset_mint && approved_equity_mint == approved_equity_mint)
-            || (vault_asset_mint == approved_equity_mint && approved_equity_mint == vault_asset_mint));
+            || (vault_asset_mint == approved_equity_mint
+                && approved_equity_mint == vault_asset_mint));
     assert!(is_valid_buy);
 
     // 2. Sell: in = AAPL, out = USDC -> Valid
     let is_valid_sell = approved_equity_mint != vault_asset_mint
         && ((approved_equity_mint == vault_asset_mint && vault_asset_mint == approved_equity_mint)
-            || (approved_equity_mint == approved_equity_mint && vault_asset_mint == vault_asset_mint));
+            || (approved_equity_mint == approved_equity_mint
+                && vault_asset_mint == vault_asset_mint));
     assert!(is_valid_sell);
 
     // 3. Same mint (in == out) -> Rejected

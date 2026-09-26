@@ -468,6 +468,48 @@ impl AnchorClient {
         input_amount: u64,
         min_output_amount: u64,
     ) -> Result<(Instruction, Pubkey), SolanaError> {
+        self.build_execute_action_ix_full(
+            keeper,
+            vault_pda,
+            execution_id,
+            action_type,
+            input_mint,
+            output_mint,
+            vault_input_token,
+            vault_output_token,
+            compliance_pda,
+            dex_program,
+            input_amount,
+            min_output_amount,
+            &[],
+        )
+    }
+
+    /// 7c. Execute Action with explicit DEX program, custom token accounts, and DEX remaining accounts
+    #[allow(clippy::too_many_arguments)]
+    pub fn build_execute_action_ix_full(
+        &self,
+        keeper: &Pubkey,
+        vault_pda: &Pubkey,
+        execution_id: u64,
+        action_type: u8,
+        input_mint: &Pubkey,
+        output_mint: &Pubkey,
+        vault_input_token: &Pubkey,
+        vault_output_token: &Pubkey,
+        compliance_pda: &Pubkey,
+        dex_program: &Pubkey,
+        input_amount: u64,
+        min_output_amount: u64,
+        remaining_accounts: &[AccountMeta],
+    ) -> Result<(Instruction, Pubkey), SolanaError> {
+        if !crate::accounts::is_authorized_dex_program(dex_program) {
+            return Err(SolanaError::UnauthorizedDexProgram(format!(
+                "DEX program {} is not authorized. Must be Jupiter v6 or Meteora DBC.",
+                dex_program
+            )));
+        }
+
         let (execution_pda, _) = find_execution_pda(vault_pda, execution_id, &self.program_id);
         let spl_token = Pubkey::from_str(SPL_TOKEN_PROGRAM_ID).unwrap();
 
@@ -486,19 +528,20 @@ impl AnchorClient {
             .serialize(&mut data)
             .map_err(|e| SolanaError::SerializationFailed(e.to_string()))?;
 
-        let accounts = vec![
-            AccountMeta::new(*keeper, true),
-            AccountMeta::new(*vault_pda, false),
-            AccountMeta::new(execution_pda, false),
-            AccountMeta::new_readonly(*input_mint, false),
-            AccountMeta::new_readonly(*output_mint, false),
-            AccountMeta::new(*vault_input_token, false),
-            AccountMeta::new(*vault_output_token, false),
-            AccountMeta::new_readonly(*compliance_pda, false),
-            AccountMeta::new_readonly(*dex_program, false),
-            AccountMeta::new_readonly(spl_token, false),
-            AccountMeta::new_readonly(system_program::id(), false),
-        ];
+        let mut accounts = Vec::with_capacity(11 + remaining_accounts.len());
+        accounts.push(AccountMeta::new(*keeper, true));
+        accounts.push(AccountMeta::new(*vault_pda, false));
+        accounts.push(AccountMeta::new(execution_pda, false));
+        accounts.push(AccountMeta::new_readonly(*input_mint, false));
+        accounts.push(AccountMeta::new_readonly(*output_mint, false));
+        accounts.push(AccountMeta::new(*vault_input_token, false));
+        accounts.push(AccountMeta::new(*vault_output_token, false));
+        accounts.push(AccountMeta::new_readonly(*compliance_pda, false));
+        accounts.push(AccountMeta::new_readonly(*dex_program, false));
+        accounts.push(AccountMeta::new_readonly(spl_token, false));
+        accounts.push(AccountMeta::new_readonly(system_program::id(), false));
+
+        accounts.extend_from_slice(remaining_accounts);
 
         let ix = Instruction {
             program_id: self.program_id,

@@ -59,6 +59,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    // Load and verify authentic production execution signer
+    let _execution_signer = if config.environment
+        == equity_catalyst_api::config::Environment::Mainnet
+        || !config.read_only
+    {
+        info!("Loading and verifying authentic production execution signer...");
+        match equity_catalyst_api::load_production_signer(&config) {
+            Ok(signer) => {
+                info!(
+                    authority = %signer.pubkey(),
+                    signer_type = signer.signer_type(),
+                    "Authentic production execution signer loaded and verified"
+                );
+                Some(signer)
+            }
+            Err(err) => {
+                error!(
+                    error = %err,
+                    "Failed to load or verify authentic production signer; failing closed"
+                );
+                return Err(Box::new(err) as Box<dyn std::error::Error>);
+            }
+        }
+    } else {
+        None
+    };
+
     // Initialize Solana service (read-only by default)
     let solana_service = Some(
         equity_catalyst_api::services::SolanaService::new_with_fallbacks(
