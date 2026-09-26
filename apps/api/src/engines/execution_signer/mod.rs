@@ -15,8 +15,11 @@ pub mod external;
 pub mod pipeline;
 
 pub use error::SignerError;
-pub use external::{DevTestSigner, ExternalSigner, KeypairSigner, RemoteHsmSigner, UnavailableSigner};
+pub use external::{
+    load_production_signer, DevTestSigner, ExternalSigner, HsmSigner, KeypairSigner, KmsSigner,
+    RemoteHsmSigner, UnavailableSigner,
+};
 pub use pipeline::{
-    SignedTransaction, TransactionBuilder, TransactionSignerService, TransactionSubmitter,
-    UnsignedTransaction,
+    is_placeholder_instruction, SignedTransaction, SigningLifecycle, TransactionBuilder,
+    TransactionSignerService, TransactionSubmitter, UnsignedTransaction, PLACEHOLDER_PROGRAM_ID,
 };

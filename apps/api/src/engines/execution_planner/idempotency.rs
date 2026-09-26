@@ -176,7 +176,11 @@ impl IdempotencyTracker {
 
         for (key, decision_id) in &expired_keys {
             records.remove(key);
-            if decisions.get(decision_id).map(|k| k == key).unwrap_or(false) {
+            if decisions
+                .get(decision_id)
+                .map(|k| k == key)
+                .unwrap_or(false)
+            {
                 decisions.remove(decision_id);
             }
         }

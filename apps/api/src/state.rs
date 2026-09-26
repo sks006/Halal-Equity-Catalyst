@@ -6,7 +6,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::{
     config::Config,
-    services::{HealthMonitor, MarketDataStore, OracleService, QuoteExecutionService, SolanaService},
+    services::{
+        HealthMonitor, MarketDataStore, OracleService, QuoteExecutionService, SolanaService,
+    },
 };
 
 #[derive(Clone)]

@@ -16,6 +16,15 @@ pub const SPL_ASSOCIATED_TOKEN_PROGRAM_ID: &str = "ATokenGPvbdGVxr1b2hvZbsiqW5xW
 pub const JUPITER_V6_PROGRAM_ID: &str = "JUP6LkbZbjS1jKKwapdHNy74zcZ3tLUZoi5QNyVTaV4";
 pub const METEORA_DBC_PROGRAM_ID: &str = "dbcij3LWUppWqq96dh6gJWwBifmcGfLSB5D4DuSMaqN";
 
+/// Validates whether a target program ID belongs to the authorized DEX whitelist.
+/// Only explicitly whitelisted DEX programs (Jupiter V6, Meteora DBC, or configured mock DEX) are allowed.
+pub fn is_authorized_dex_program(program_id: &Pubkey) -> bool {
+    let pid_str = program_id.to_string();
+    pid_str == JUPITER_V6_PROGRAM_ID
+        || pid_str == METEORA_DBC_PROGRAM_ID
+        || pid_str == PROGRAM_ID_STR
+}
+
 // --- Anchor 8-Byte Account Discriminators ---
 pub const VAULT_ACCOUNT_DISCRIMINATOR: [u8; 8] = [211, 8, 232, 43, 2, 152, 117, 119];
 pub const POLICY_ACCOUNT_DISCRIMINATOR: [u8; 8] = [222, 135, 7, 163, 235, 177, 33, 68];

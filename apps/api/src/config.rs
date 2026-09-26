@@ -48,6 +48,13 @@ pub struct Config {
     pub jupiter_api_url: String,
     pub pyth_hermes_url: String,
     pub execution_signer_path: String,
+    pub signer_backend: String,
+    pub expected_execution_authority: Option<String>,
+    pub kms_key_id: Option<String>,
+    pub kms_endpoint: Option<String>,
+    pub hsm_slot: Option<u64>,
+    pub hsm_key_label: Option<String>,
+    pub preflight_simulation_enabled: bool,
     pub read_only: bool,
     pub max_trade_size_usd: u64,
     pub max_slippage_bps: u16,
@@ -70,9 +77,17 @@ impl Config {
             database_url: "postgres://postgres:postgres@localhost:5432/equity_catalyst_dev"
                 .to_string(),
             redis_url: "redis://127.0.0.1:6379".to_string(),
-            jupiter_api_url: "https://quote-api.jup.ag/v6".to_string(),
+            jupiter_api_url: env::var("JUPITER_API_URL")
+                .unwrap_or_else(|_| "https://quote-api.jup.ag/v6".to_string()),
             pyth_hermes_url: "https://hermes.pyth.network".to_string(),
             execution_signer_path: "~/.config/solana/id.json".to_string(),
+            signer_backend: "keypair".to_string(),
+            expected_execution_authority: None,
+            kms_key_id: None,
+            kms_endpoint: None,
+            hsm_slot: None,
+            hsm_key_label: None,
+            preflight_simulation_enabled: false,
             read_only: false,
             max_trade_size_usd: 100_000,
             max_slippage_bps: 100,
@@ -96,9 +111,17 @@ impl Config {
             solana_cluster: "devnet".to_string(),
             database_url: "postgres://postgres:postgres@localhost:5432/equity_catalyst".to_string(),
             redis_url: "redis://127.0.0.1:6379".to_string(),
-            jupiter_api_url: "https://quote-api.jup.ag/v6".to_string(),
+            jupiter_api_url: env::var("JUPITER_API_URL")
+                .unwrap_or_else(|_| "https://quote-api.jup.ag/v6".to_string()),
             pyth_hermes_url: "https://hermes.pyth.network".to_string(),
             execution_signer_path: "~/.config/solana/id.json".to_string(),
+            signer_backend: "keypair".to_string(),
+            expected_execution_authority: None,
+            kms_key_id: None,
+            kms_endpoint: None,
+            hsm_slot: None,
+            hsm_key_label: None,
+            preflight_simulation_enabled: false,
             read_only: true, // Simulation safe default
             max_trade_size_usd: 50_000,
             max_slippage_bps: 50,
@@ -143,10 +166,32 @@ impl Config {
             solana_cluster: "mainnet-beta".to_string(),
             database_url: env::var("DATABASE_URL").unwrap_or_default(),
             redis_url: env::var("REDIS_URL").unwrap_or_default(),
-            jupiter_api_url: "https://quote-api.jup.ag/v6".to_string(),
+            jupiter_api_url: env::var("JUPITER_API_URL")
+                .unwrap_or_else(|_| "https://quote-api.jup.ag/v6".to_string()),
             pyth_hermes_url: "https://hermes.pyth.network".to_string(),
             execution_signer_path: env::var("EXECUTION_SIGNER_PATH")
                 .unwrap_or_else(|_| "/etc/equity-catalyst/signer.json".to_string()),
+            signer_backend: env::var("SIGNER_BACKEND")
+                .or_else(|_| env::var("EXECUTION_SIGNER_BACKEND"))
+                .unwrap_or_default(),
+            expected_execution_authority: env::var("EXPECTED_EXECUTION_AUTHORITY")
+                .or_else(|_| env::var("EXECUTION_AUTHORITY"))
+                .ok()
+                .filter(|s| !s.trim().is_empty()),
+            kms_key_id: env::var("KMS_KEY_ID").ok().filter(|s| !s.trim().is_empty()),
+            kms_endpoint: env::var("KMS_ENDPOINT")
+                .ok()
+                .filter(|s| !s.trim().is_empty()),
+            hsm_slot: env::var("HSM_SLOT")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok()),
+            hsm_key_label: env::var("HSM_KEY_LABEL")
+                .ok()
+                .filter(|s| !s.trim().is_empty()),
+            preflight_simulation_enabled: env::var("PREFLIGHT_SIMULATION_ENABLED")
+                .ok()
+                .and_then(|v| v.parse::<bool>().ok())
+                .unwrap_or(true),
             read_only: true, // Requires explicit operational override to submit transactions
             max_trade_size_usd: 25_000, // Conservative production limit
             max_slippage_bps: 30, // Strict 30 bps maximum
@@ -201,6 +246,34 @@ impl Config {
         let pyth_hermes_url = env::var("PYTH_HERMES_URL").unwrap_or(default.pyth_hermes_url);
         let execution_signer_path =
             env::var("EXECUTION_SIGNER_PATH").unwrap_or(default.execution_signer_path);
+        let signer_backend = env::var("SIGNER_BACKEND")
+            .or_else(|_| env::var("EXECUTION_SIGNER_BACKEND"))
+            .unwrap_or(default.signer_backend);
+        let expected_execution_authority = env::var("EXPECTED_EXECUTION_AUTHORITY")
+            .or_else(|_| env::var("EXECUTION_AUTHORITY"))
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .or(default.expected_execution_authority);
+        let kms_key_id = env::var("KMS_KEY_ID")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .or(default.kms_key_id);
+        let kms_endpoint = env::var("KMS_ENDPOINT")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .or(default.kms_endpoint);
+        let hsm_slot = env::var("HSM_SLOT")
+            .ok()
+            .and_then(|v| v.parse::<u64>().ok())
+            .or(default.hsm_slot);
+        let hsm_key_label = env::var("HSM_KEY_LABEL")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .or(default.hsm_key_label);
+        let preflight_simulation_enabled = env::var("PREFLIGHT_SIMULATION_ENABLED")
+            .ok()
+            .and_then(|v| v.parse::<bool>().ok())
+            .unwrap_or(default.preflight_simulation_enabled);
         let read_only = env::var("EXECUTION_READ_ONLY")
             .ok()
             .and_then(|v| v.parse::<bool>().ok())
@@ -233,6 +306,13 @@ impl Config {
             jupiter_api_url,
             pyth_hermes_url,
             execution_signer_path,
+            signer_backend,
+            expected_execution_authority,
+            kms_key_id,
+            kms_endpoint,
+            hsm_slot,
+            hsm_key_label,
+            preflight_simulation_enabled,
             read_only,
             max_trade_size_usd,
             max_slippage_bps,
@@ -283,7 +363,52 @@ impl Config {
 
             let rpc = self.solana_rpc_url.to_lowercase();
             if rpc.contains("localhost") || rpc.contains("127.0.0.1") || rpc.contains("0.0.0.0") {
-                return Err(ConfigError::LocalhostRpcInProduction(self.solana_rpc_url.clone()));
+                return Err(ConfigError::LocalhostRpcInProduction(
+                    self.solana_rpc_url.clone(),
+                ));
+            }
+
+            if self.signer_backend.trim().is_empty() {
+                return Err(ConfigError::MissingSignerBackend(Environment::Mainnet));
+            }
+
+            match self.signer_backend.trim().to_lowercase().as_str() {
+                "keypair" | "localkeypair" | "file" => {
+                    if self.execution_signer_path.trim().is_empty() {
+                        return Err(ConfigError::MissingSignerPath(Environment::Mainnet));
+                    }
+                }
+                "kms" | "awskms" | "gcpkms" => {
+                    if self.kms_key_id.as_deref().unwrap_or("").trim().is_empty() {
+                        return Err(ConfigError::MissingKmsKeyId(Environment::Mainnet));
+                    }
+                }
+                "hsm" | "pkcs11" | "cloudhsm" => {
+                    if self
+                        .hsm_key_label
+                        .as_deref()
+                        .unwrap_or("")
+                        .trim()
+                        .is_empty()
+                    {
+                        return Err(ConfigError::MissingHsmKeyLabel(Environment::Mainnet));
+                    }
+                }
+                other => {
+                    return Err(ConfigError::InvalidSignerBackend(other.to_string()));
+                }
+            }
+
+            if self
+                .expected_execution_authority
+                .as_deref()
+                .unwrap_or("")
+                .trim()
+                .is_empty()
+            {
+                return Err(ConfigError::MissingExpectedExecutionAuthority(
+                    Environment::Mainnet,
+                ));
             }
         }
 
@@ -314,11 +439,31 @@ pub enum ConfigError {
     #[error("Missing required administrative API key in {0} environment")]
     MissingAdminApiKey(Environment),
 
-    #[error("Development/test admin secret '{0}' cannot be used in production Mainnet environment")]
+    #[error(
+        "Development/test admin secret '{0}' cannot be used in production Mainnet environment"
+    )]
     DevSecretInProduction(String),
 
     #[error("Production Mainnet cannot point to local/localhost RPC endpoint: '{0}'")]
     LocalhostRpcInProduction(String),
+
+    #[error("Missing required signer backend selection in {0} environment (fail closed)")]
+    MissingSignerBackend(Environment),
+
+    #[error("Missing execution signer path for keypair backend in {0} environment")]
+    MissingSignerPath(Environment),
+
+    #[error("Missing KMS key ID for kms backend in {0} environment")]
+    MissingKmsKeyId(Environment),
+
+    #[error("Missing HSM key label for hsm backend in {0} environment")]
+    MissingHsmKeyLabel(Environment),
+
+    #[error("Missing expected execution authority public key in {0} environment")]
+    MissingExpectedExecutionAuthority(Environment),
+
+    #[error("Invalid signer backend '{0}'. Allowed production backends: 'keypair', 'kms', 'hsm'")]
+    InvalidSignerBackend(String),
 
     #[error("Invalid slippage threshold {0} bps (must be between 1 and {1} bps)")]
     InvalidSlippageBps(u16, u16),

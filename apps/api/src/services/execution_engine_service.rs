@@ -679,14 +679,19 @@ impl ExecutionEngineService {
             .await?;
 
         // ==========================================
-        // 6. CONFIRMATION & TIMEOUT
+        // 6. CONFIRMATION & TIMEOUT (Tasks 10, 11, 12, 13)
         // ==========================================
-        let confirmation_result = self
+        let confirmation_status = self
             .solana_service
-            .confirm_signature(&tx_sig, Duration::from_secs(30))
-            .await;
+            .track_transaction_confirmation(&tx_sig, None, Duration::from_secs(30))
+            .await
+            .unwrap_or(
+                equity_catalyst_solana::rpc::TransactionConfirmationStatus::UnknownStatus {
+                    reason: "RPC tracking error".to_string(),
+                },
+            );
 
-        let confirmed = confirmation_result.is_ok();
+        let confirmed = confirmation_status.is_success();
 
         // ==========================================
         // 7. POST-EXECUTION RECONCILIATION & BALANCE DELTA RECORDING
@@ -725,16 +730,29 @@ impl ExecutionEngineService {
             false,
         );
 
-        let (amount_out_actual, slippage_drift_bps, final_status, err_msg) = match execution_record {
+        let (amount_out_actual, slippage_drift_bps, final_status, err_msg) = match execution_record
+        {
             Ok(ref rec) => {
                 let actual = rec.actual_output;
                 let drift = calculate_slippage_drift_bps(request.amount_out_expected, actual);
-                let status = if confirmed {
-                    "confirmed"
-                } else {
-                    "submitted_unconfirmed"
+                let (status, err) = match &confirmation_status {
+                    equity_catalyst_solana::rpc::TransactionConfirmationStatus::ConfirmedSuccess { .. } => {
+                        ("confirmed", None)
+                    }
+                    equity_catalyst_solana::rpc::TransactionConfirmationStatus::ConfirmedFailure { error, .. } => {
+                        ("failed", Some(format!("Transaction confirmed failure on-chain: {}", error)))
+                    }
+                    equity_catalyst_solana::rpc::TransactionConfirmationStatus::ExpiredTransaction { .. } => {
+                        ("expired", Some("Transaction expired before confirmation".to_string()))
+                    }
+                    equity_catalyst_solana::rpc::TransactionConfirmationStatus::RpcTimeout { .. } => {
+                        ("timeout", Some("Transaction confirmation timed out".to_string()))
+                    }
+                    equity_catalyst_solana::rpc::TransactionConfirmationStatus::UnknownStatus { reason } => {
+                        ("unknown", Some(format!("Transaction confirmation unknown: {}", reason)))
+                    }
                 };
-                (Some(actual), Some(drift), status, None)
+                (Some(actual), Some(drift), status, err)
             }
             Err(ref e) => {
                 let err_text = format!("Balance delta reconciliation failed: {}", e);

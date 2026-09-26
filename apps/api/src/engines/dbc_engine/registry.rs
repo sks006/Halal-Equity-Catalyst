@@ -195,6 +195,10 @@ pub fn find_verified_pool_by_address(pool_address: &str) -> Option<VerifiedPoolI
 }
 
 /// Builds an initial `PoolLiquidityState` for a verified pool with computed Q64.64 sqrt price.
+///
+/// NOTE: Strictly for test fixtures and isolated offline mocks.
+/// In production, live pool state (reserves, sqrt_price, curve progress, status)
+/// MUST be retrieved directly from Solana on-chain RPC accounts.
 pub fn build_initial_pool_liquidity_state(pool: &VerifiedPoolInfo) -> PoolLiquidityState {
     let sqrt_price_q64 = compute_sqrt_price_q64(
         pool.current_price_usd,

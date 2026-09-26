@@ -112,7 +112,10 @@ fn test_sse_chunk_parser_framing_and_chunk_splitting() {
 
     // Chunk 2: Rest of data line, but not ended with double newline
     let events2 = parser.feed_str(" \"price\": {\"price\": \"100\", \"conf\": \"1\", \"expo\": -2, \"publish_time\": 1000}}]}\n");
-    assert!(events2.is_empty(), "Incomplete block should yield no events");
+    assert!(
+        events2.is_empty(),
+        "Incomplete block should yield no events"
+    );
 
     // Chunk 3: Final newline completing the block
     let events3 = parser.feed_str("\n");
@@ -251,11 +254,13 @@ async fn test_acceptance_criteria_end_to_end_sse_stream() {
     });
 
     // 2. Client setup
-    let config = PythStreamConfig::new(base_url, dynamic_feeds)
-        .with_api_key("test_api_key");
+    let config = PythStreamConfig::new(base_url, dynamic_feeds).with_api_key("test_api_key");
 
     let client = PythStreamClient::new(config);
-    let mut stream = client.connect().await.expect("Stream connection should succeed");
+    let mut stream = client
+        .connect()
+        .await
+        .expect("Stream connection should succeed");
 
     // 3. Receive Event 1
     let event_1 = stream
@@ -281,7 +286,10 @@ async fn test_acceptance_criteria_end_to_end_sse_stream() {
 
     // 5. Stream cleanly terminates on server EOF
     let eof = stream.next_update().await;
-    assert!(eof.is_none(), "Stream must yield None on clean EOF termination");
+    assert!(
+        eof.is_none(),
+        "Stream must yield None on clean EOF termination"
+    );
 }
 
 #[tokio::test]

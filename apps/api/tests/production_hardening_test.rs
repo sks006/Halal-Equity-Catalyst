@@ -64,6 +64,9 @@ async fn test_config_validation_rejects_dev_secret_in_mainnet() {
     // 4. Valid production secret passes
     config.admin_api_key = "prod-strong-entropy-secret-key-32chars!".to_string();
     config.solana_rpc_url = "https://mainnet.helius-rpc.com/?api-key=test".to_string();
+    config.signer_backend = "keypair".to_string();
+    config.expected_execution_authority =
+        Some("AuthPubkey111111111111111111111111111111111".to_string());
     assert!(config.validate().is_ok());
 }
 
@@ -90,11 +93,17 @@ async fn test_config_validation_rejects_invalid_slippage() {
 
     // Zero slippage rejected
     config.max_slippage_bps = 0;
-    assert_eq!(config.validate().unwrap_err(), ConfigError::InvalidSlippageBps(0, 100));
+    assert_eq!(
+        config.validate().unwrap_err(),
+        ConfigError::InvalidSlippageBps(0, 100)
+    );
 
     // Excessive slippage for mainnet rejected
     config.max_slippage_bps = 150;
-    assert_eq!(config.validate().unwrap_err(), ConfigError::InvalidSlippageBps(150, 100));
+    assert_eq!(
+        config.validate().unwrap_err(),
+        ConfigError::InvalidSlippageBps(150, 100)
+    );
 }
 
 #[test]
@@ -107,7 +116,10 @@ fn test_sanitize_connection_url() {
     // Postgres with user and password
     let pg_raw = "postgres://catalyst_admin:very_secret_pwd_99@prod-db.aws.internal:5432/equity";
     let pg_clean = sanitize_connection_url(pg_raw);
-    assert_eq!(pg_clean, "postgres://catalyst_admin:***@prod-db.aws.internal:5432/equity");
+    assert_eq!(
+        pg_clean,
+        "postgres://catalyst_admin:***@prod-db.aws.internal:5432/equity"
+    );
 
     // URL without credentials remains unchanged
     let clean_raw = "redis://127.0.0.1:6379";

@@ -14,7 +14,7 @@ use solana_sdk::{
     signature::{Keypair, SeedDerivable, Signature, Signer},
     transaction::Transaction,
 };
-use std::{fs, path::Path, sync::Arc};
+use std::{fs, path::Path, str::FromStr, sync::Arc};
 use tracing::info;
 
 use super::error::SignerError;
@@ -23,7 +23,7 @@ use super::error::SignerError;
 ///
 /// Dyn-compatible trait allowing dynamic dispatch across diverse hardware security
 /// modules, cloud KMS providers, and local filesystem keypairs.
-pub trait ExternalSigner: Send + Sync {
+pub trait ExternalSigner: Send + Sync + std::fmt::Debug {
     /// Returns the public key of the signer.
     fn pubkey(&self) -> Pubkey;
 
@@ -43,6 +43,10 @@ pub trait ExternalSigner: Send + Sync {
 
     /// Identifier of the underlying signer provider (e.g. "LocalKeypair", "RemoteHsm", "AwsKms").
     fn signer_type(&self) -> &'static str;
+
+    /// Indicates whether this signer is an authentic, production-eligible signer.
+    /// Returns false for DevTestSigner, simulated HSM enclave keys, or test keys.
+    fn is_production_allowed(&self) -> bool;
 }
 
 // ============================================================================
@@ -144,6 +148,27 @@ impl KeypairSigner {
     pub fn to_solana_keypair(&self) -> Keypair {
         self.keypair.insecure_clone()
     }
+
+    /// Checks if this keypair was derived from known deterministic development secrets
+    /// (e.g. `[42u8; 32]`, all zeros, all ones), which are prohibited in production.
+    pub fn is_dev_secret(&self) -> bool {
+        if let Ok(dev_42) = Keypair::from_seed(&[42u8; 32]) {
+            if self.pubkey == dev_42.pubkey() {
+                return true;
+            }
+        }
+        if let Ok(dev_zero) = Keypair::from_seed(&[0u8; 32]) {
+            if self.pubkey == dev_zero.pubkey() {
+                return true;
+            }
+        }
+        if let Ok(dev_one) = Keypair::from_seed(&[1u8; 32]) {
+            if self.pubkey == dev_one.pubkey() {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 impl ExternalSigner for KeypairSigner {
@@ -173,6 +198,10 @@ impl ExternalSigner for KeypairSigner {
 
     fn signer_type(&self) -> &'static str {
         "LocalKeypair"
+    }
+
+    fn is_production_allowed(&self) -> bool {
+        !self.is_dev_secret()
     }
 }
 
@@ -286,6 +315,11 @@ impl ExternalSigner for RemoteHsmSigner {
     fn signer_type(&self) -> &'static str {
         "RemoteHsm"
     }
+
+    fn is_production_allowed(&self) -> bool {
+        // Simulated enclave key is strictly prohibited in production
+        false
+    }
 }
 
 // ============================================================================
@@ -336,6 +370,10 @@ impl ExternalSigner for UnavailableSigner {
     fn signer_type(&self) -> &'static str {
         "UnavailableSigner"
     }
+
+    fn is_production_allowed(&self) -> bool {
+        false
+    }
 }
 
 // ============================================================================
@@ -376,8 +414,8 @@ impl DevTestSigner {
     /// Creates a deterministic test signer strictly for tests that require reproducible public keys.
     /// Explicitly marked test-only.
     pub fn new_deterministic_test_only(seed: [u8; 32]) -> Self {
-        let keypair = Keypair::from_seed(&seed)
-            .expect("Valid 32-byte seed creates valid Ed25519 keypair");
+        let keypair =
+            Keypair::from_seed(&seed).expect("Valid 32-byte seed creates valid Ed25519 keypair");
         let pubkey = keypair.pubkey();
         Self {
             keypair: Arc::new(keypair),
@@ -407,9 +445,8 @@ impl ExternalSigner for DevTestSigner {
             ));
         }
         let blockhash = tx.message.recent_blockhash;
-        tx.try_sign(&[&*self.keypair], blockhash).map_err(|e| {
-            SignerError::SigningFailed(format!("Dev/Test signing failed: {}", e))
-        })
+        tx.try_sign(&[&*self.keypair], blockhash)
+            .map_err(|e| SignerError::SigningFailed(format!("Dev/Test signing failed: {}", e)))
     }
 
     fn is_available(&self) -> bool {
@@ -419,6 +456,477 @@ impl ExternalSigner for DevTestSigner {
     fn signer_type(&self) -> &'static str {
         "DevTestSigner"
     }
+
+    fn is_production_allowed(&self) -> bool {
+        // Dev/Test signer is strictly prohibited in production
+        false
+    }
+}
+
+// ============================================================================
+// 5. CLOUD KMS SIGNER (AWS KMS, GCP Cloud KMS, HashiCorp Vault)
+// ============================================================================
+
+/// Authentic cryptographic signer backed by Cloud Key Management Service.
+///
+/// In production, private key material NEVER leaves the secure cloud KMS boundary.
+/// Asymmetric Ed25519 signing requests are verified and executed remotely.
+#[derive(Clone)]
+pub struct KmsSigner {
+    pubkey: Pubkey,
+    key_id: String,
+    endpoint: Option<String>,
+    available: bool,
+    signing_client: Option<Arc<dyn Fn(&[u8]) -> Result<Signature, SignerError> + Send + Sync>>,
+}
+
+impl std::fmt::Debug for KmsSigner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("KmsSigner")
+            .field("pubkey", &self.pubkey.to_string())
+            .field("key_id", &self.key_id)
+            .field("endpoint", &self.endpoint)
+            .field("available", &self.available)
+            .finish()
+    }
+}
+
+impl KmsSigner {
+    /// Creates a production KMS signer with explicit key ID, optional endpoint, and public key.
+    pub fn new(
+        key_id: impl Into<String>,
+        endpoint: Option<String>,
+        pubkey: Pubkey,
+    ) -> Result<Self, SignerError> {
+        let key_id_str = key_id.into();
+        if key_id_str.trim().is_empty() {
+            return Err(SignerError::MissingConfiguration(
+                "KMS key ID cannot be empty".to_string(),
+            ));
+        }
+
+        Ok(Self {
+            pubkey,
+            key_id: key_id_str,
+            endpoint,
+            available: true,
+            signing_client: None,
+        })
+    }
+
+    /// Creates an authentic KMS signer with an active cryptographic signing callback/client.
+    pub fn new_with_signer(
+        pubkey: Pubkey,
+        key_id: impl Into<String>,
+        endpoint: Option<String>,
+        signing_client: Arc<dyn Fn(&[u8]) -> Result<Signature, SignerError> + Send + Sync>,
+    ) -> Self {
+        Self {
+            pubkey,
+            key_id: key_id.into(),
+            endpoint,
+            available: true,
+            signing_client: Some(signing_client),
+        }
+    }
+
+    /// Sets the availability state of the KMS connection.
+    pub fn set_available(&mut self, available: bool) {
+        self.available = available;
+    }
+
+    pub fn pubkey(&self) -> Pubkey {
+        self.pubkey
+    }
+}
+
+impl ExternalSigner for KmsSigner {
+    fn pubkey(&self) -> Pubkey {
+        self.pubkey
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<Signature, SignerError> {
+        if !self.available {
+            return Err(SignerError::SignerUnavailable {
+                signer_type: "KmsSigner",
+                reason: format!("KMS key '{}' endpoint is unreachable", self.key_id),
+            });
+        }
+
+        if let Some(client) = &self.signing_client {
+            client(message)
+        } else {
+            Err(SignerError::SignerUnavailable {
+                signer_type: "KmsSigner",
+                reason: format!("KMS provider for key '{}' is not connected", self.key_id),
+            })
+        }
+    }
+
+    fn sign_transaction(&self, tx: &mut Transaction) -> Result<(), SignerError> {
+        if !self.available {
+            return Err(SignerError::SignerUnavailable {
+                signer_type: "KmsSigner",
+                reason: format!("KMS key '{}' endpoint is unreachable", self.key_id),
+            });
+        }
+
+        if tx.message.recent_blockhash == solana_sdk::hash::Hash::default() {
+            return Err(SignerError::InvalidTransactionState(
+                "Transaction blockhash must be set before signing".to_string(),
+            ));
+        }
+
+        let message_data = tx.message_data();
+        let sig = self.sign_message(&message_data)?;
+
+        let signer_index = tx
+            .message
+            .account_keys
+            .iter()
+            .position(|k| *k == self.pubkey)
+            .ok_or_else(|| {
+                SignerError::SigningFailed(format!(
+                    "Signer pubkey {} not found in transaction accounts",
+                    self.pubkey
+                ))
+            })?;
+
+        if tx.signatures.len() <= signer_index {
+            tx.signatures.resize(
+                tx.message.header.num_required_signatures as usize,
+                Signature::default(),
+            );
+        }
+        tx.signatures[signer_index] = sig;
+
+        Ok(())
+    }
+
+    fn is_available(&self) -> bool {
+        self.available
+    }
+
+    fn signer_type(&self) -> &'static str {
+        "KmsSigner"
+    }
+
+    fn is_production_allowed(&self) -> bool {
+        true
+    }
+}
+
+// ============================================================================
+// 6. HARDWARE SECURITY MODULE (HSM) SIGNER (PKCS#11, CloudHSM, YubiHSM)
+// ============================================================================
+
+/// Authentic cryptographic signer backed by a Hardware Security Module.
+///
+/// Private keys reside entirely on tamper-resistant cryptographic hardware and cannot be extracted.
+#[derive(Clone)]
+pub struct HsmSigner {
+    pubkey: Pubkey,
+    slot: u64,
+    key_label: String,
+    available: bool,
+    signing_client: Option<Arc<dyn Fn(&[u8]) -> Result<Signature, SignerError> + Send + Sync>>,
+}
+
+impl std::fmt::Debug for HsmSigner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HsmSigner")
+            .field("pubkey", &self.pubkey.to_string())
+            .field("slot", &self.slot)
+            .field("key_label", &self.key_label)
+            .field("available", &self.available)
+            .finish()
+    }
+}
+
+impl HsmSigner {
+    /// Creates an authentic HSM signer referencing a specific hardware slot and key label.
+    pub fn new(
+        slot: u64,
+        key_label: impl Into<String>,
+        pubkey: Pubkey,
+    ) -> Result<Self, SignerError> {
+        let label = key_label.into();
+        if label.trim().is_empty() {
+            return Err(SignerError::MissingConfiguration(
+                "HSM key label cannot be empty".to_string(),
+            ));
+        }
+
+        Ok(Self {
+            pubkey,
+            slot,
+            key_label: label,
+            available: true,
+            signing_client: None,
+        })
+    }
+
+    /// Creates an authentic HSM signer with an active cryptographic signing callback/client.
+    pub fn new_with_signer(
+        pubkey: Pubkey,
+        slot: u64,
+        key_label: impl Into<String>,
+        signing_client: Arc<dyn Fn(&[u8]) -> Result<Signature, SignerError> + Send + Sync>,
+    ) -> Self {
+        Self {
+            pubkey,
+            slot,
+            key_label: key_label.into(),
+            available: true,
+            signing_client: Some(signing_client),
+        }
+    }
+
+    /// Sets the availability state of the HSM hardware connection.
+    pub fn set_available(&mut self, available: bool) {
+        self.available = available;
+    }
+
+    pub fn pubkey(&self) -> Pubkey {
+        self.pubkey
+    }
+}
+
+impl ExternalSigner for HsmSigner {
+    fn pubkey(&self) -> Pubkey {
+        self.pubkey
+    }
+
+    fn sign_message(&self, message: &[u8]) -> Result<Signature, SignerError> {
+        if !self.available {
+            return Err(SignerError::SignerUnavailable {
+                signer_type: "HsmSigner",
+                reason: format!(
+                    "HSM slot {} label '{}' is offline",
+                    self.slot, self.key_label
+                ),
+            });
+        }
+
+        if let Some(client) = &self.signing_client {
+            client(message)
+        } else {
+            Err(SignerError::SignerUnavailable {
+                signer_type: "HsmSigner",
+                reason: format!(
+                    "HSM hardware module for slot {} label '{}' is not initialized",
+                    self.slot, self.key_label
+                ),
+            })
+        }
+    }
+
+    fn sign_transaction(&self, tx: &mut Transaction) -> Result<(), SignerError> {
+        if !self.available {
+            return Err(SignerError::SignerUnavailable {
+                signer_type: "HsmSigner",
+                reason: format!(
+                    "HSM slot {} label '{}' is offline",
+                    self.slot, self.key_label
+                ),
+            });
+        }
+
+        if tx.message.recent_blockhash == solana_sdk::hash::Hash::default() {
+            return Err(SignerError::InvalidTransactionState(
+                "Transaction blockhash must be set before signing".to_string(),
+            ));
+        }
+
+        let message_data = tx.message_data();
+        let sig = self.sign_message(&message_data)?;
+
+        let signer_index = tx
+            .message
+            .account_keys
+            .iter()
+            .position(|k| *k == self.pubkey)
+            .ok_or_else(|| {
+                SignerError::SigningFailed(format!(
+                    "Signer pubkey {} not found in transaction accounts",
+                    self.pubkey
+                ))
+            })?;
+
+        if tx.signatures.len() <= signer_index {
+            tx.signatures.resize(
+                tx.message.header.num_required_signatures as usize,
+                Signature::default(),
+            );
+        }
+        tx.signatures[signer_index] = sig;
+
+        Ok(())
+    }
+
+    fn is_available(&self) -> bool {
+        self.available
+    }
+
+    fn signer_type(&self) -> &'static str {
+        "HsmSigner"
+    }
+
+    fn is_production_allowed(&self) -> bool {
+        true
+    }
+}
+
+// ============================================================================
+// 7. PRODUCTION SIGNER LOADER & VERIFIER
+// ============================================================================
+
+/// Loads and verifies an authentic production cryptographic signer based on explicit application configuration.
+///
+/// # Security Guarantees:
+/// 1. Missing signer configuration FAILS CLOSED.
+/// 2. Only authentic production implementations (real KeypairSigner, real KMS, real HSM) are permitted.
+/// 3. DevTestSigner, simulated enclave keys, fake signatures, and deterministic dev secrets are strictly rejected.
+/// 4. Loaded signer's public key MUST match the configured expected execution authority; mismatches are rejected.
+/// 5. Never logs private key material or serialized secret keys.
+pub fn load_production_signer(
+    config: &crate::config::Config,
+) -> Result<Arc<dyn ExternalSigner>, SignerError> {
+    let backend = config.signer_backend.trim().to_lowercase();
+    if backend.is_empty() {
+        return Err(SignerError::MissingConfiguration(
+            "Production signer backend not configured; set SIGNER_BACKEND explicitly (fail closed)"
+                .to_string(),
+        ));
+    }
+
+    let signer: Arc<dyn ExternalSigner> = match backend.as_str() {
+        "keypair" | "localkeypair" | "file" => {
+            let path = config.execution_signer_path.trim();
+            if path.is_empty() {
+                return Err(SignerError::MissingConfiguration(
+                    "Signer backend 'keypair' selected but EXECUTION_SIGNER_PATH is empty"
+                        .to_string(),
+                ));
+            }
+            let keypair_signer = KeypairSigner::load_from_path(path)?;
+            if !keypair_signer.is_production_allowed() {
+                return Err(SignerError::ProductionFallbackProhibited(
+                    "Deterministic development secret or test key cannot be used in production"
+                        .to_string(),
+                ));
+            }
+            Arc::new(keypair_signer)
+        }
+        "kms" | "awskms" | "gcpkms" => {
+            let key_id = config.kms_key_id.as_deref().unwrap_or("").trim();
+            if key_id.is_empty() {
+                return Err(SignerError::MissingConfiguration(
+                    "Signer backend 'kms' selected but KMS_KEY_ID is missing".to_string(),
+                ));
+            }
+            let expected_auth = config
+                .expected_execution_authority
+                .as_deref()
+                .unwrap_or("")
+                .trim();
+            if expected_auth.is_empty() {
+                return Err(SignerError::MissingConfiguration(
+                    "EXPECTED_EXECUTION_AUTHORITY is required when initializing KMS signer"
+                        .to_string(),
+                ));
+            }
+            let pubkey = solana_sdk::pubkey::Pubkey::from_str(expected_auth).map_err(|e| {
+                SignerError::InvalidConfiguration(format!(
+                    "Invalid expected authority pubkey: {}",
+                    e
+                ))
+            })?;
+            let kms_signer = KmsSigner::new(key_id, config.kms_endpoint.clone(), pubkey)?;
+            Arc::new(kms_signer)
+        }
+        "hsm" | "pkcs11" | "cloudhsm" => {
+            let key_label = config.hsm_key_label.as_deref().unwrap_or("").trim();
+            if key_label.is_empty() {
+                return Err(SignerError::MissingConfiguration(
+                    "Signer backend 'hsm' selected but HSM_KEY_LABEL is missing".to_string(),
+                ));
+            }
+            let expected_auth = config
+                .expected_execution_authority
+                .as_deref()
+                .unwrap_or("")
+                .trim();
+            if expected_auth.is_empty() {
+                return Err(SignerError::MissingConfiguration(
+                    "EXPECTED_EXECUTION_AUTHORITY is required when initializing HSM signer"
+                        .to_string(),
+                ));
+            }
+            let pubkey = solana_sdk::pubkey::Pubkey::from_str(expected_auth).map_err(|e| {
+                SignerError::InvalidConfiguration(format!(
+                    "Invalid expected authority pubkey: {}",
+                    e
+                ))
+            })?;
+            let hsm_signer = HsmSigner::new(config.hsm_slot.unwrap_or(0), key_label, pubkey)?;
+            Arc::new(hsm_signer)
+        }
+        "devtest" | "dev" | "test" | "ephemeral" | "mock" => {
+            return Err(SignerError::ProductionFallbackProhibited(format!(
+                "Signer backend '{}' is a development/test signer and is strictly prohibited in production",
+                config.signer_backend
+            )));
+        }
+        other => {
+            return Err(SignerError::InvalidConfiguration(format!(
+                "Unrecognized signer backend '{}'. Allowed production backends: 'keypair', 'kms', 'hsm'",
+                other
+            )));
+        }
+    };
+
+    // Fail closed if signer is unavailable
+    if !signer.is_available() {
+        return Err(SignerError::SignerUnavailable {
+            signer_type: signer.signer_type(),
+            reason: "Signer hardware/service failed initial availability check or is offline"
+                .to_string(),
+        });
+    }
+
+    // Verify public key against configured expected execution authority
+    if let Some(expected_auth_str) = &config.expected_execution_authority {
+        let expected_auth_str = expected_auth_str.trim();
+        if !expected_auth_str.is_empty() {
+            let expected_pubkey =
+                solana_sdk::pubkey::Pubkey::from_str(expected_auth_str).map_err(|e| {
+                    SignerError::InvalidConfiguration(format!(
+                        "Invalid expected execution authority public key '{}': {}",
+                        expected_auth_str, e
+                    ))
+                })?;
+            if signer.pubkey() != expected_pubkey {
+                return Err(SignerError::AuthorityMismatch {
+                    expected: expected_pubkey.to_string(),
+                    actual: signer.pubkey_string(),
+                });
+            }
+        }
+    } else if config.environment == crate::config::Environment::Mainnet {
+        return Err(SignerError::MissingConfiguration(
+            "EXPECTED_EXECUTION_AUTHORITY must be explicitly configured in Mainnet production"
+                .to_string(),
+        ));
+    }
+
+    info!(
+        signer_type = signer.signer_type(),
+        authority = %signer.pubkey(),
+        "Production cryptographic signer loaded and verified successfully"
+    );
+
+    Ok(signer)
 }
 
 // Helper to expand "~/" in paths

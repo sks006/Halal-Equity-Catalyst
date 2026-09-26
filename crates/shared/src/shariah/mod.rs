@@ -429,7 +429,7 @@ mod tests {
             debt_ratio_bps: 1_500,            // 15% < 30%
             interest_bearing_cash_bps: 1_200, // 12% < 30%
             receivables_cash_bps: None,
-            impure_income_bps: 200,           // 2% < 5%
+            impure_income_bps: 200, // 2% < 5%
             denominator_method: DenominatorMethod::AverageMarketCapMonths(12),
             ownership_verified: true,
             evidence_hash:
@@ -844,13 +844,7 @@ mod tests {
 
         // 3. One unit above limit: Debt failure (3,001 bps)
         let debt_fail = ShariahFinancialMetrics::from_market_cap_ratios(3_001, 1_000, 100);
-        let res_debt = screen_asset(
-            &reviewed_tech,
-            &debt_fail,
-            &valid_ownership,
-            &policy,
-            now,
-        );
+        let res_debt = screen_asset(&reviewed_tech, &debt_fail, &valid_ownership, &policy, now);
         assert_eq!(
             res_debt,
             ScreeningResult::Rejected {
@@ -876,13 +870,7 @@ mod tests {
 
         // 5. One unit above limit: Impure income failure (501 bps)
         let impure_fail = ShariahFinancialMetrics::from_market_cap_ratios(1_000, 1_000, 501);
-        let res_impure = screen_asset(
-            &reviewed_tech,
-            &impure_fail,
-            &valid_ownership,
-            &policy,
-            now,
-        );
+        let res_impure = screen_asset(&reviewed_tech, &impure_fail, &valid_ownership, &policy, now);
         assert_eq!(
             res_impure,
             ScreeningResult::Rejected {
@@ -1437,21 +1425,17 @@ mod tests {
         );
 
         // Screening approves the asset
-        let screening_result = screen_asset(
-            &reviewed_business,
-            &metrics,
-            &valid_ownership,
-            &policy,
-            now,
-        );
+        let screening_result =
+            screen_asset(&reviewed_business, &metrics, &valid_ownership, &policy, now);
         assert_eq!(screening_result, ScreeningResult::Approved);
 
         // Purification is calculated separately:
         // For a gross dividend of $10,000.00 (1,000,000 cents):
         // 120 bps = 1.2% -> 12,000 cents ($120.00) must be purified
         let gross_dividend_cents = 1_000_000u64;
-        let purification = assess_purification(gross_dividend_cents, metrics.impure_income_ratio_bps)
-            .expect("Purification calculation succeeds");
+        let purification =
+            assess_purification(gross_dividend_cents, metrics.impure_income_ratio_bps)
+                .expect("Purification calculation succeeds");
 
         assert_eq!(purification.gross_dividend_value_minor_units, 1_000_000);
         assert_eq!(purification.impure_income_ratio_bps, 120);
@@ -1466,7 +1450,10 @@ mod tests {
         // Clean company with 0 bps impure income
         let pure_purification = assess_purification(1_000_000, 0).unwrap();
         assert_eq!(pure_purification.purification_value_minor_units, 0);
-        assert_eq!(pure_purification.net_permissible_value_minor_units, 1_000_000);
+        assert_eq!(
+            pure_purification.net_permissible_value_minor_units,
+            1_000_000
+        );
         assert_eq!(pure_purification.purification_amount_minor(), 0);
         assert_eq!(pure_purification.net_permissible_amount_minor(), 1_000_000);
         assert!(pure_purification.is_pure());

@@ -13,27 +13,41 @@ use tokio::sync::{broadcast, mpsc, watch};
 use tracing::{debug, error, info, warn};
 
 use crate::stream::{PythStreamClient, PythStreamConfig};
-use crate::subscription::SubscriptionSet;
+use crate::subscription::{EnrichedPriceUpdate, SubscriptionSet};
 use crate::types::PythPriceUpdateEvent;
 
-/// Sink for receiving parsed Pyth price update events.
+/// Sink for receiving parsed or enriched Pyth price update events.
 #[derive(Clone)]
 pub enum PriceUpdateSink {
-    /// Dispatches events to an asynchronous `mpsc::Sender`.
+    /// Dispatches raw events to an asynchronous `mpsc::Sender`.
     Channel(mpsc::Sender<PythPriceUpdateEvent>),
-    /// Invokes a thread-safe callback closure for each event.
+    /// Dispatches enriched events preserving asset identity and Pyth data.
+    EnrichedChannel(mpsc::Sender<EnrichedPriceUpdate>),
+    /// Invokes a thread-safe callback closure for each raw event.
     Callback(Arc<dyn Fn(PythPriceUpdateEvent) + Send + Sync>),
+    /// Invokes a thread-safe callback closure for each enriched update.
+    EnrichedCallback(Arc<dyn Fn(EnrichedPriceUpdate) + Send + Sync>),
 }
 
 impl PriceUpdateSink {
-    /// Forwards a price update event into the sink.
-    pub async fn send(&self, event: PythPriceUpdateEvent) {
+    /// Forwards a price update event into the sink, enriching with canonical metadata if required.
+    pub async fn send(&self, event: PythPriceUpdateEvent, sub_set: &SubscriptionSet) {
         match self {
             Self::Channel(tx) => {
                 let _ = tx.send(event).await;
             }
+            Self::EnrichedChannel(tx) => {
+                for enriched in sub_set.enrich_event(&event) {
+                    let _ = tx.send(enriched).await;
+                }
+            }
             Self::Callback(cb) => {
                 cb(event);
+            }
+            Self::EnrichedCallback(cb) => {
+                for enriched in sub_set.enrich_event(&event) {
+                    cb(enriched);
+                }
             }
         }
     }
@@ -52,6 +66,8 @@ pub struct StreamManagerConfig {
     pub max_backoff: Duration,
     /// Multiplier applied to backoff after each consecutive failure.
     pub backoff_multiplier: f64,
+    /// Maximum stream duration before clean rotation (handles documented 24-hour stream termination).
+    pub max_stream_duration: Duration,
 }
 
 impl Default for StreamManagerConfig {
@@ -62,6 +78,7 @@ impl Default for StreamManagerConfig {
             initial_backoff: Duration::from_millis(250),
             max_backoff: Duration::from_secs(10),
             backoff_multiplier: 2.0,
+            max_stream_duration: Duration::from_secs(24 * 60 * 60), // Documented 24-hour termination
         }
     }
 }
@@ -88,6 +105,12 @@ impl StreamManagerConfig {
         self.backoff_multiplier = multiplier;
         self
     }
+
+    /// Customizes maximum stream duration before proactive clean rotation (default: 24h).
+    pub fn with_max_stream_duration(mut self, duration: Duration) -> Self {
+        self.max_stream_duration = duration;
+        self
+    }
 }
 
 /// Dynamic manager coordinating runtime subscription sets and Pyth SSE streams.
@@ -109,13 +132,11 @@ impl DynamicStreamManager {
             config,
             subscription_rx,
             sink,
-            http_client: reqwest::Client::builder()
-                .build()
-                .unwrap_or_default(),
+            http_client: reqwest::Client::builder().build().unwrap_or_default(),
         }
     }
 
-    /// Convenience constructor routing updates to an `mpsc::Sender`.
+    /// Convenience constructor routing raw updates to an `mpsc::Sender`.
     pub fn with_channel(
         config: StreamManagerConfig,
         subscription_rx: watch::Receiver<SubscriptionSet>,
@@ -124,7 +145,20 @@ impl DynamicStreamManager {
         Self::new(config, subscription_rx, PriceUpdateSink::Channel(tx))
     }
 
-    /// Convenience constructor routing updates to a callback closure.
+    /// Convenience constructor routing enriched updates preserving asset identity and Pyth data.
+    pub fn with_enriched_channel(
+        config: StreamManagerConfig,
+        subscription_rx: watch::Receiver<SubscriptionSet>,
+        tx: mpsc::Sender<EnrichedPriceUpdate>,
+    ) -> Self {
+        Self::new(
+            config,
+            subscription_rx,
+            PriceUpdateSink::EnrichedChannel(tx),
+        )
+    }
+
+    /// Convenience constructor routing raw updates to a callback closure.
     pub fn with_callback<F>(
         config: StreamManagerConfig,
         subscription_rx: watch::Receiver<SubscriptionSet>,
@@ -137,6 +171,22 @@ impl DynamicStreamManager {
             config,
             subscription_rx,
             PriceUpdateSink::Callback(Arc::new(cb)),
+        )
+    }
+
+    /// Convenience constructor routing enriched updates to a callback closure.
+    pub fn with_enriched_callback<F>(
+        config: StreamManagerConfig,
+        subscription_rx: watch::Receiver<SubscriptionSet>,
+        cb: F,
+    ) -> Self
+    where
+        F: Fn(EnrichedPriceUpdate) + Send + Sync + 'static,
+    {
+        Self::new(
+            config,
+            subscription_rx,
+            PriceUpdateSink::EnrichedCallback(Arc::new(cb)),
         )
     }
 
@@ -164,7 +214,19 @@ impl DynamicStreamManager {
         let mut current_backoff = self.config.initial_backoff;
 
         loop {
-            // Task 5: If the subscription is empty, do not open a Pyth stream. Wait for next update.
+            // Task 7: Never reconnect with a stale subscription list.
+            let latest_set = self.subscription_rx.borrow().clone();
+            if latest_set != current_set {
+                debug!(
+                    prev = current_set.len(),
+                    latest = latest_set.len(),
+                    "DynamicStreamManager refreshed to latest SubscriptionSet before connect"
+                );
+                current_set = latest_set;
+                current_backoff = self.config.initial_backoff;
+            }
+
+            // Task 6: If the subscription is empty, do not open a Pyth stream. Wait for next update.
             if current_set.is_empty() {
                 debug!("DynamicStreamManager: SubscriptionSet is empty; idling until subscriptions are added");
                 tokio::select! {
@@ -188,7 +250,7 @@ impl DynamicStreamManager {
                 }
             }
 
-            // Task 8 & 9: Deduplicate and sort feed IDs strictly from approved subscription set
+            // Task 8 & 10: Deduplicate and sort feed IDs strictly from approved subscription set
             let mut feed_ids = current_set.feed_ids();
             feed_ids.sort();
             feed_ids.dedup();
@@ -211,6 +273,15 @@ impl DynamicStreamManager {
                 PythStreamClient::new_with_http_client(stream_config, self.http_client.clone());
             let connect_res = stream_client.connect().await;
 
+            // Task 7 check: Did subscription change during connect handshake?
+            let post_connect_set = self.subscription_rx.borrow().clone();
+            if post_connect_set != current_set {
+                info!("Subscription changed during connect handshake; discarding stream to reconnect with fresh set");
+                current_set = post_connect_set;
+                current_backoff = self.config.initial_backoff;
+                continue;
+            }
+
             let mut active_stream = match connect_res {
                 Ok(stream) => {
                     info!("Connected to Pyth SSE stream successfully");
@@ -224,8 +295,7 @@ impl DynamicStreamManager {
                         "Failed to connect to Pyth SSE stream; backing off"
                     );
 
-                    // Task 6: Bounded retry/backoff. Do not create a busy loop.
-                    // Interruptible if subscription changes or shutdown is received.
+                    // Task 4: Exponential backoff delay upon failure
                     tokio::select! {
                         _ = shutdown.recv() => {
                             info!("DynamicStreamManager received shutdown signal during backoff");
@@ -253,8 +323,12 @@ impl DynamicStreamManager {
                 }
             };
 
-            // Task 3: Use tokio::select! to wait for:
-            // A. Pyth stream events/termination OR B. subscription changes
+            // Stream lifetime tracker for Task 5: 24-hour stream termination handling
+            let max_duration = self.config.max_stream_duration;
+            let stream_timeout = tokio::time::sleep(max_duration);
+            tokio::pin!(stream_timeout);
+
+            // Task 3: Stream event and subscription change loop
             loop {
                 tokio::select! {
                     _ = shutdown.recv() => {
@@ -262,7 +336,14 @@ impl DynamicStreamManager {
                         return;
                     }
 
-                    // Task 3B & 4: When subscription changes, drop current stream, construct new stream, reconnect
+                    // Task 5: Handle documented 24-hour stream termination (clean proactive rotation)
+                    _ = &mut stream_timeout => {
+                        info!("Pyth SSE stream reached maximum connection lifetime (24 hours); rotating stream cleanly");
+                        current_backoff = self.config.initial_backoff;
+                        break;
+                    }
+
+                    // Task 3: When subscription changes, drop current stream, construct new stream, reconnect
                     res = self.subscription_rx.changed() => {
                         if res.is_err() {
                             info!("Subscription watch channel closed; exiting DynamicStreamManager");
@@ -284,11 +365,12 @@ impl DynamicStreamManager {
                         }
                     }
 
-                    // Task 3A & 7: Pyth stream events/termination
+                    // Task 3A & 4: Pyth stream events/termination
                     maybe_update = active_stream.next_update() => {
                         match maybe_update {
                             Some(Ok(event)) => {
-                                self.sink.send(event).await;
+                                // Task 9: Dispatches event, preserving feed ID, asset ID, mint, price, conf, publish time
+                                self.sink.send(event, &current_set).await;
                             }
                             Some(Err(err)) => {
                                 error!(error = %err, "Pyth SSE stream error encountered; reconnecting with backoff");
@@ -296,8 +378,9 @@ impl DynamicStreamManager {
                                 break;
                             }
                             None => {
-                                warn!("Pyth SSE stream terminated by server (EOF); reconnecting using current SubscriptionSet");
-                                // Break to outer loop to drop stream and reconnect (Task 7)
+                                // Task 5: Handle server-closed stream (clean EOF / 24-hour disconnect)
+                                warn!("Pyth SSE stream terminated by server (clean EOF / 24-hour stream termination); reconnecting");
+                                current_backoff = self.config.initial_backoff;
                                 break;
                             }
                         }

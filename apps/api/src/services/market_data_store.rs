@@ -180,10 +180,16 @@ impl MarketPriceUpdate {
         max_staleness_secs: i64,
     ) -> Result<Self, MarketDataError> {
         let raw_price: i64 = feed.price.price.parse().map_err(|e| {
-            MarketDataError::InvalidFormat(format!("Failed to parse raw price '{}': {}", feed.price.price, e))
+            MarketDataError::InvalidFormat(format!(
+                "Failed to parse raw price '{}': {}",
+                feed.price.price, e
+            ))
         })?;
         let raw_conf: u64 = feed.price.conf.parse().map_err(|e| {
-            MarketDataError::InvalidFormat(format!("Failed to parse raw conf '{}': {}", feed.price.conf, e))
+            MarketDataError::InvalidFormat(format!(
+                "Failed to parse raw conf '{}': {}",
+                feed.price.conf, e
+            ))
         })?;
 
         Self::from_raw(
@@ -241,20 +247,21 @@ pub fn calculate_scaled_int(raw: u64, expo: i32) -> Result<u64, MarketDataError>
     let target_expo = expo + 6;
 
     if target_expo >= 0 {
-        let factor = 10u64
-            .checked_pow(target_expo as u32)
-            .ok_or_else(|| MarketDataError::MathOverflow("Scaling factor exponent overflow".to_string()))?;
-        raw.checked_mul(factor)
-            .ok_or_else(|| MarketDataError::MathOverflow("Scaled price multiplication overflow".to_string()))
+        let factor = 10u64.checked_pow(target_expo as u32).ok_or_else(|| {
+            MarketDataError::MathOverflow("Scaling factor exponent overflow".to_string())
+        })?;
+        raw.checked_mul(factor).ok_or_else(|| {
+            MarketDataError::MathOverflow("Scaled price multiplication overflow".to_string())
+        })
     } else {
-        let divisor = 10u64
-            .checked_pow((-target_expo) as u32)
-            .ok_or_else(|| MarketDataError::MathOverflow("Scaling divisor exponent overflow".to_string()))?;
+        let divisor = 10u64.checked_pow((-target_expo) as u32).ok_or_else(|| {
+            MarketDataError::MathOverflow("Scaling divisor exponent overflow".to_string())
+        })?;
         // Half-up rounding: (raw + divisor / 2) / divisor
         let half = divisor / 2;
-        let rounded = raw
-            .checked_add(half)
-            .ok_or_else(|| MarketDataError::MathOverflow("Rounding addition overflow".to_string()))?;
+        let rounded = raw.checked_add(half).ok_or_else(|| {
+            MarketDataError::MathOverflow("Rounding addition overflow".to_string())
+        })?;
         Ok(rounded / divisor)
     }
 }

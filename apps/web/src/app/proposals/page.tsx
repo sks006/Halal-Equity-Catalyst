@@ -58,128 +58,6 @@ export interface TradeProposal {
   computeUnits?: number;
 }
 
-const DEMO_PROPOSALS: TradeProposal[] = [
-  {
-    id: "prop_9a1f4b2c-8801-4d1a-bc33-01e4a5d89001",
-    vaultAddress: "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
-    vaultName: "Solana Liquid Growth Alpha",
-    state: "Executed",
-    action: "REBALANCE_BUY",
-    symbol: "NVDA",
-    inputMintSymbol: "USDC",
-    outputMintSymbol: "NVDA",
-    amountIn: "50,000 USDC",
-    amountOutExpected: "389.10 NVDA",
-    minAmountOut: "387.15 NVDA",
-    slippageBps: 50,
-    reason: "Datacenter revenue guidance outperformance; rebalancing allocation from cash reserves to target 32%.",
-    txSignature: "5KtPn4Z8dY3aL6jK9m2Q1v8w7e6r5t4y3u2i1o0p9a8s7d6f5g4h3j2k1l0z9x8c7v6b5n4m3",
-    timestamp: "12 mins ago",
-    computeUnits: 42150,
-  },
-  {
-    id: "prop_7b2c9d1a-4402-4a9b-bc22-02f5b6e90112",
-    vaultAddress: "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
-    vaultName: "Solana Liquid Growth Alpha",
-    state: "Simulated",
-    action: "REBALANCE_BUY",
-    symbol: "AAPL",
-    inputMintSymbol: "USDC",
-    outputMintSymbol: "AAPL",
-    amountIn: "25,000 USDC",
-    amountOutExpected: "107.68 AAPL",
-    minAmountOut: "107.14 AAPL",
-    slippageBps: 50,
-    reason: "Narrow confidence band on Pyth oracle; increasing weight towards 25.0% target allocation.",
-    timestamp: "28 mins ago",
-    computeUnits: 38920,
-  },
-  {
-    id: "prop_3c8e1a5d-1103-4f8c-ba11-03a6c7d01223",
-    vaultAddress: "JUP99X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6",
-    vaultName: "Jupiter Delta Neutral Yield",
-    state: "Approved",
-    action: "REDUCE_RISK",
-    symbol: "TSLA",
-    inputMintSymbol: "TSLA",
-    outputMintSymbol: "USDC",
-    amountIn: "60.00 TSLA",
-    amountOutExpected: "14,748 USDC",
-    minAmountOut: "14,674 USDC",
-    slippageBps: 50,
-    reason: "Volatility expansion trigger hit; de-risking 200 bps back to collateral cash.",
-    timestamp: "1 hour ago",
-  },
-  {
-    id: "prop_5d4a2e9f-7704-4c7b-bc44-04b7d8e12334",
-    vaultAddress: "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
-    vaultName: "Solana Liquid Growth Alpha",
-    state: "Validated",
-    action: "REBALANCE_BUY",
-    symbol: "SPYx",
-    inputMintSymbol: "USDC",
-    outputMintSymbol: "SPYx",
-    amountIn: "15,000 USDC",
-    amountOutExpected: "26.58 SPYx",
-    minAmountOut: "26.45 SPYx",
-    slippageBps: 50,
-    reason: "Quarterly reweighting signal triggered by index rebalancing schedule.",
-    timestamp: "2 hours ago",
-  },
-  {
-    id: "prop_2e6b8c1a-5505-4b6a-ba55-05c8e9f23445",
-    vaultAddress: "FKsxhTr6QYPc6RQFBR9XL8CsXPBhxKwEdurFwwg7zR6V",
-    vaultName: "Catalyst Alpha",
-    state: "Proposed",
-    action: "REBALANCE_BUY",
-    symbol: "MSFT",
-    inputMintSymbol: "USDC",
-    outputMintSymbol: "MSFT",
-    amountIn: "10,000 USDC",
-    amountOutExpected: "23.31 MSFT",
-    minAmountOut: "23.19 MSFT",
-    slippageBps: 50,
-    reason: "New cash deposit detected; allocating to core tech basket benchmark.",
-    timestamp: "3 hours ago",
-  },
-  {
-    id: "prop_1f9d3b7e-9906-4e5c-ba66-06d9f0a34556",
-    vaultAddress: "EQTYv7cK89Wq3yK9u4J2b8j9Q1M6z9Y7w9X8c1V2b3N4",
-    vaultName: "Solana Liquid Growth Alpha",
-    state: "Failed",
-    action: "REBALANCE_BUY",
-    symbol: "TSLA",
-    inputMintSymbol: "USDC",
-    outputMintSymbol: "TSLA",
-    amountIn: "120,000 USDC",
-    amountOutExpected: "488.20 TSLA",
-    minAmountOut: "485.75 TSLA",
-    slippageBps: 50,
-    reason: "Agent proposed large rebalance trade following earnings announcement.",
-    failureReason: "Risk limit violation: Projected position exposure (44.5%) exceeds maximum vault policy limit (40.0%). Deterministically blocked at Approval stage.",
-    failedAtStage: "Approval",
-    timestamp: "5 hours ago",
-  },
-  {
-    id: "prop_8a5c2f4e-3307-4d4b-ba77-07e0a1b45667",
-    vaultAddress: "JUP99X8c1V2b3N4EQTYv7cK89Wq3yK9u4J2b8j9Q1M6",
-    vaultName: "Jupiter Delta Neutral Yield",
-    state: "Failed",
-    action: "SWAP",
-    symbol: "NVDA",
-    inputMintSymbol: "USDC",
-    outputMintSymbol: "NVDA",
-    amountIn: "40,000 USDC",
-    amountOutExpected: "311.28 NVDA",
-    minAmountOut: "309.72 NVDA",
-    slippageBps: 50,
-    reason: "Arbitrage opportunity detected between Meteora pool and external DEX.",
-    failureReason: "Simulation gate failed: Insufficient liquidity on Meteora bonding curve; price impact 142 bps exceeded max tolerance (50 bps).",
-    failedAtStage: "Simulation",
-    timestamp: "7 hours ago",
-  },
-];
-
 const STAGES: ProposalLifecycleState[] = [
   "Proposed",
   "Validated",
@@ -189,10 +67,10 @@ const STAGES: ProposalLifecycleState[] = [
 ];
 
 export default function ProposalsPage() {
-  const [proposals, setProposals] = useState<TradeProposal[]>(DEMO_PROPOSALS);
+  const [proposals, setProposals] = useState<TradeProposal[]>([]);
   const [selectedState, setSelectedState] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [inspectingProposal, setInspectingProposal] = useState<TradeProposal | null>(DEMO_PROPOSALS[0]);
+  const [inspectingProposal, setInspectingProposal] = useState<TradeProposal | null>(null);
 
   const filterStates: Array<"All" | ProposalLifecycleState> = [
     "All",
@@ -262,7 +140,7 @@ export default function ProposalsPage() {
             </h1>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Deterministic state progression: Proposed $\rightarrow$ Validated $\rightarrow$ Approved $\rightarrow$ Simulated $\rightarrow$ Executed
+            Deterministic state progression: Proposed &rarr; Validated &rarr; Approved &rarr; Simulated &rarr; Executed
           </p>
         </div>
 
@@ -319,92 +197,98 @@ export default function ProposalsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Proposals List */}
         <div className="lg:col-span-2 space-y-3">
-          {filteredProposals.map((prop) => {
-            const isSelected = inspectingProposal?.id === prop.id;
-            const currentStageIdx = getStageIndex(prop.state);
+          {filteredProposals.length > 0 ? (
+            filteredProposals.map((prop) => {
+              const isSelected = inspectingProposal?.id === prop.id;
+              const currentStageIdx = getStageIndex(prop.state);
 
-            return (
-              <Card
-                key={prop.id}
-                onClick={() => setInspectingProposal(prop)}
-                className={`bg-white border transition-all cursor-pointer overflow-hidden ${
-                  isSelected
-                    ? "border-emerald-500 shadow-md ring-1 ring-emerald-500/20"
-                    : "border-slate-200 hover:border-slate-300 shadow-sm"
-                }`}
-              >
-                <CardContent className="p-5 space-y-4">
-                  {/* Top line: State, Action, ID, Time */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {getStateBadge(prop.state)}
-                      <span className="font-bold text-xs font-mono text-slate-900">
-                        {prop.action} {prop.symbol}
-                      </span>
-                      <span className="text-slate-400 text-xs">•</span>
-                      <span className="text-xs text-slate-500 font-medium">{prop.vaultName}</span>
+              return (
+                <Card
+                  key={prop.id}
+                  onClick={() => setInspectingProposal(prop)}
+                  className={`bg-white border transition-all cursor-pointer overflow-hidden ${
+                    isSelected
+                      ? "border-emerald-500 shadow-md ring-1 ring-emerald-500/20"
+                      : "border-slate-200 hover:border-slate-300 shadow-sm"
+                  }`}
+                >
+                  <CardContent className="p-5 space-y-4">
+                    {/* Top line: State, Action, ID, Time */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {getStateBadge(prop.state)}
+                        <span className="font-bold text-xs font-mono text-slate-900">
+                          {prop.action} {prop.symbol}
+                        </span>
+                        <span className="text-slate-400 text-xs">•</span>
+                        <span className="text-xs text-slate-500 font-medium">{prop.vaultName}</span>
+                      </div>
+
+                      <span className="text-[10px] text-slate-400 font-mono">{prop.timestamp}</span>
                     </div>
 
-                    <span className="text-[10px] text-slate-400 font-mono">{prop.timestamp}</span>
-                  </div>
-
-                  {/* Mid line: Quantities & Reason */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 font-mono">
-                    <div>
-                      <span className="text-slate-400 text-[10px] block">Input Amount</span>
-                      <span className="font-bold text-slate-900">{prop.amountIn}</span>
+                    {/* Mid line: Quantities & Reason */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs bg-slate-50 p-3 rounded-lg border border-slate-100 font-mono">
+                      <div>
+                        <span className="text-slate-400 text-[10px] block">Input Amount</span>
+                        <span className="font-bold text-slate-900">{prop.amountIn}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block">Expected Output</span>
+                        <span className="font-bold text-slate-900">{prop.amountOutExpected}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 text-[10px] block">Min Out (Max Slippage)</span>
+                        <span className="font-bold text-slate-900">{prop.minAmountOut} ({prop.slippageBps} bps)</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-slate-400 text-[10px] block">Expected Output</span>
-                      <span className="font-bold text-slate-900">{prop.amountOutExpected}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 text-[10px] block">Min Out (Max Slippage)</span>
-                      <span className="font-bold text-slate-900">{prop.minAmountOut} ({prop.slippageBps} bps)</span>
-                    </div>
-                  </div>
 
-                  <p className="text-xs text-slate-600 line-clamp-1 leading-relaxed">
-                    {prop.reason}
-                  </p>
+                    <p className="text-xs text-slate-600 line-clamp-1 leading-relaxed">
+                      {prop.reason}
+                    </p>
 
-                  {/* Stepper Pipeline Bar */}
-                  <div className="pt-2 border-t border-slate-100">
-                    {prop.state === "Failed" ? (
-                      <div className="flex items-center justify-between bg-rose-50 text-rose-700 px-3 py-1.5 rounded text-xs font-mono border border-rose-200">
-                        <div className="flex items-center gap-1.5">
-                          <XCircle className="w-3.5 h-3.5 text-rose-600" />
-                          <span className="font-bold">Rejected at {prop.failedAtStage || "Execution"} Gate</span>
+                    {/* Stepper Pipeline Bar */}
+                    <div className="pt-2 border-t border-slate-100">
+                      {prop.state === "Failed" ? (
+                        <div className="flex items-center justify-between bg-rose-50 text-rose-700 px-3 py-1.5 rounded text-xs font-mono border border-rose-200">
+                          <div className="flex items-center gap-1.5">
+                            <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                            <span className="font-bold">Rejected at {prop.failedAtStage || "Execution"} Gate</span>
+                          </div>
+                          <span className="text-[11px] truncate max-w-[280px]">{prop.failureReason}</span>
                         </div>
-                        <span className="text-[11px] truncate max-w-[280px]">{prop.failureReason}</span>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-5 gap-1.5 text-center text-[10px] font-mono">
-                        {STAGES.map((stage, idx) => {
-                          const isDone = idx <= currentStageIdx;
-                          const isCurrent = idx === currentStageIdx;
-                          return (
-                            <div
-                              key={stage}
-                              className={`py-1 rounded font-semibold transition-colors ${
-                                isDone
-                                  ? isCurrent && stage === "Executed"
-                                    ? "bg-emerald-600 text-white font-bold"
-                                    : "bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold"
-                                  : "bg-slate-100 text-slate-400"
-                              }`}
-                            >
-                              {stage}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                      ) : (
+                        <div className="grid grid-cols-5 gap-1.5 text-center text-[10px] font-mono">
+                          {STAGES.map((stage, idx) => {
+                            const isDone = idx <= currentStageIdx;
+                            const isCurrent = idx === currentStageIdx;
+                            return (
+                              <div
+                                key={stage}
+                                className={`py-1 rounded font-semibold transition-colors ${
+                                  isDone
+                                    ? isCurrent && stage === "Executed"
+                                      ? "bg-emerald-600 text-white font-bold"
+                                      : "bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold"
+                                    : "bg-slate-100 text-slate-400"
+                                }`}
+                              >
+                                {stage}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })
+          ) : (
+            <Card className="bg-white p-12 text-center text-slate-400 text-xs">
+              No trade proposals in pipeline. Keeper policy engines generate proposals on market signal drift.
+            </Card>
+          )}
         </div>
 
         {/* Right Column: Detailed Proposal Inspector Drawer */}

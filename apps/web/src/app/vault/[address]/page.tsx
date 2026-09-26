@@ -29,7 +29,7 @@ import { PositionTable } from "../../../features/portfolio/PositionTable";
 import { PolicyBuilder } from "../../../features/policy/PolicyBuilder";
 import { EventFeed } from "../../../features/events/EventFeed";
 import { DecisionTimeline } from "../../../features/events/DecisionTimeline";
-import { DEMO_VAULTS, getSdkClient } from "../../../lib/sdk";
+import { getSdkClient } from "../../../lib/sdk";
 import { useAppDispatch, useAppSelector } from "../../../store/hooks";
 import {
   fetchVaultByAddress,
@@ -50,7 +50,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../../../components/ui
 export default function VaultDetailPage() {
   const params = useParams();
   const rawAddress = params?.address as string;
-  const vaultAddress = rawAddress || DEMO_VAULTS[0].vault_address;
+  const vaultAddress = rawAddress || "";
 
   const dispatch = useAppDispatch();
   const { publicKey, connected } = useWallet();
@@ -204,12 +204,30 @@ export default function VaultDetailPage() {
     dispatch(syncPortfolioPrices(vaultAddress));
   };
 
-  if (isLoading || !vault) {
+  if (isLoading) {
     return (
       <Card className="bg-white p-16 text-center space-y-4">
         <RefreshCw className="w-8 h-8 animate-spin text-emerald-600 mx-auto" />
         <h2 className="text-base font-bold text-slate-800">Loading Vault from Redux Store & Solana...</h2>
         <p className="text-xs text-slate-500">Querying on-chain account state and risk guardrails.</p>
+      </Card>
+    );
+  }
+
+  if (!vault) {
+    return (
+      <Card className="bg-white p-16 text-center space-y-4 border-rose-200">
+        <AlertTriangle className="w-8 h-8 text-rose-600 mx-auto" />
+        <h2 className="text-base font-bold text-slate-900">Vault Not Found or Unreachable</h2>
+        <p className="text-xs text-slate-500 max-w-sm mx-auto">
+          The requested vault address ({vaultAddress || "empty"}) does not exist on-chain or the API service is offline.
+        </p>
+        <Link href="/dashboard">
+          <Button variant="outline" size="sm" className="mt-4">
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            <span>Return to Dashboard</span>
+          </Button>
+        </Link>
       </Card>
     );
   }

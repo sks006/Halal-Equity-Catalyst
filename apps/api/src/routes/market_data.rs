@@ -138,8 +138,10 @@ pub async fn market_data_ws_handler(
     let store = match state.market_data_store.as_ref() {
         Some(s) => Arc::clone(s),
         None => {
-            return ApiError::InternalServerError("Market data store is not initialized".to_string())
-                .into_response();
+            return ApiError::InternalServerError(
+                "Market data store is not initialized".to_string(),
+            )
+            .into_response();
         }
     };
 

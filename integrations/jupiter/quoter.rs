@@ -11,7 +11,9 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use solana_sdk::pubkey::Pubkey;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use thiserror::Error;
 use tracing::{debug, warn};
@@ -28,6 +30,15 @@ pub enum DexQuoteError {
 
     #[error("Unsupported token pair: {input_mint} -> {output_mint}")]
     UnsupportedPair {
+        input_mint: String,
+        output_mint: String,
+    },
+
+    #[error("Invalid mint address: {0}")]
+    InvalidMint(String),
+
+    #[error("No route found for token pair: {input_mint} -> {output_mint}")]
+    NoRoute {
         input_mint: String,
         output_mint: String,
     },
@@ -52,19 +63,42 @@ pub enum DexQuoteError {
 impl From<JupiterError> for DexQuoteError {
     fn from(err: JupiterError) -> Self {
         match err {
-            JupiterError::PriceImpactTooHigh { actual_bps, max_bps } => {
-                DexQuoteError::ExcessivePriceImpact { actual_bps, max_bps }
-            }
+            JupiterError::PriceImpactTooHigh {
+                actual_bps,
+                max_bps,
+            } => DexQuoteError::ExcessivePriceImpact {
+                actual_bps,
+                max_bps,
+            },
+            JupiterError::UnsupportedPair {
+                input_mint,
+                output_mint,
+            } => DexQuoteError::UnsupportedPair {
+                input_mint,
+                output_mint,
+            },
+            JupiterError::NoRoute {
+                input_mint,
+                output_mint,
+            } => DexQuoteError::NoRoute {
+                input_mint,
+                output_mint,
+            },
             JupiterError::InvalidQuote(msg) => {
-                if msg.to_lowercase().contains("unsupported") || msg.to_lowercase().contains("no mock quote") {
+                if msg.to_lowercase().contains("unsupported")
+                    || msg.to_lowercase().contains("no mock quote")
+                {
                     DexQuoteError::UnsupportedPair {
                         input_mint: "unknown".to_string(),
                         output_mint: "unknown".to_string(),
                     }
+                } else if msg.to_lowercase().contains("mint") {
+                    DexQuoteError::InvalidMint(msg)
                 } else {
                     DexQuoteError::InvalidAmount(msg)
                 }
             }
+            JupiterError::InvalidTransaction(msg) => DexQuoteError::Internal(msg),
             other => DexQuoteError::Transport(other.to_string()),
         }
     }
@@ -89,7 +123,11 @@ pub struct DexQuoteRequest {
 
 impl DexQuoteRequest {
     /// Constructs a standard executable quote request with default 50 bps slippage and 15s TTL.
-    pub fn new(input_mint: impl Into<String>, output_mint: impl Into<String>, amount_in: u64) -> Self {
+    pub fn new(
+        input_mint: impl Into<String>,
+        output_mint: impl Into<String>,
+        amount_in: u64,
+    ) -> Self {
         Self {
             input_mint: input_mint.into(),
             output_mint: output_mint.into(),
@@ -176,6 +214,51 @@ pub struct DexQuote {
 }
 
 impl DexQuote {
+    /// Returns the input mint address.
+    pub fn input_mint(&self) -> &str {
+        &self.input_mint
+    }
+
+    /// Returns the output mint address.
+    pub fn output_mint(&self) -> &str {
+        &self.output_mint
+    }
+
+    /// Returns the input amount.
+    pub fn input_amount(&self) -> u64 {
+        self.input_amount
+    }
+
+    /// Returns the expected output amount.
+    pub fn expected_output(&self) -> u64 {
+        self.expected_output_amount
+    }
+
+    /// Returns the minimum guaranteed output amount under slippage tolerance.
+    pub fn minimum_output(&self) -> u64 {
+        self.minimum_output_amount
+    }
+
+    /// Returns the routing breakdown and AMM hops.
+    pub fn route(&self) -> &DexRouteInfo {
+        &self.route_info
+    }
+
+    /// Returns the price impact in basis points.
+    pub fn price_impact(&self) -> u16 {
+        self.price_impact_bps
+    }
+
+    /// Returns the quote creation Unix timestamp.
+    pub fn quote_timestamp(&self) -> i64 {
+        self.quote_timestamp
+    }
+
+    /// Returns the Unix expiration timestamp of the quote.
+    pub fn expiration(&self) -> i64 {
+        self.expires_at
+    }
+
     /// Evaluates whether the quote is expired relative to the given timestamp.
     pub fn is_expired(&self, current_timestamp: i64) -> bool {
         current_timestamp >= self.expires_at
@@ -203,6 +286,59 @@ impl DexQuote {
         }
         Ok(())
     }
+
+    /// Validates all safety invariants on this quote:
+    /// - input amount > 0
+    /// - expected output > 0
+    /// - minimum output > 0
+    /// - supported valid mints (valid base58, distinct)
+    /// - route exists
+    /// - quote not expired
+    /// - price impact within policy
+    pub fn validate(
+        &self,
+        max_price_impact_bps: Option<u16>,
+        current_time: i64,
+    ) -> Result<(), DexQuoteError> {
+        if self.input_amount == 0 {
+            return Err(DexQuoteError::InvalidAmount(
+                "Input amount must be greater than zero".to_string(),
+            ));
+        }
+        if self.expected_output_amount == 0 {
+            return Err(DexQuoteError::InvalidAmount(
+                "Expected output amount must be greater than zero".to_string(),
+            ));
+        }
+        if self.minimum_output_amount == 0 {
+            return Err(DexQuoteError::InvalidAmount(
+                "Minimum output amount must be greater than zero".to_string(),
+            ));
+        }
+        Pubkey::from_str(&self.input_mint).map_err(|e| {
+            DexQuoteError::InvalidMint(format!("Invalid input mint '{}': {}", self.input_mint, e))
+        })?;
+        Pubkey::from_str(&self.output_mint).map_err(|e| {
+            DexQuoteError::InvalidMint(format!("Invalid output mint '{}': {}", self.output_mint, e))
+        })?;
+        if self.input_mint == self.output_mint {
+            return Err(DexQuoteError::UnsupportedPair {
+                input_mint: self.input_mint.clone(),
+                output_mint: self.output_mint.clone(),
+            });
+        }
+        if self.route_info.steps.is_empty() {
+            return Err(DexQuoteError::NoRoute {
+                input_mint: self.input_mint.clone(),
+                output_mint: self.output_mint.clone(),
+            });
+        }
+        self.validate_freshness(current_time)?;
+        if let Some(max_bps) = max_price_impact_bps {
+            self.validate_price_impact(max_bps)?;
+        }
+        Ok(())
+    }
 }
 
 /// Abstract DEX quote provider.
@@ -220,7 +356,10 @@ pub trait DexQuoter: Send + Sync {
     /// - Reject amounts <= 0.
     /// - Reject unsupported asset pairs.
     /// - Enforce quote expiration and reject excessive price impact.
-    async fn get_executable_quote(&self, request: &DexQuoteRequest) -> Result<DexQuote, DexQuoteError>;
+    async fn get_executable_quote(
+        &self,
+        request: &DexQuoteRequest,
+    ) -> Result<DexQuote, DexQuoteError>;
 }
 
 /// Configurable mock implementation of `DexQuoter` for deterministic unit and integration testing.
@@ -254,7 +393,10 @@ impl MockDexQuoter {
         price_impact_bps: u16,
     ) {
         let mut guard = self.pairs.write().unwrap();
-        guard.insert((input_mint.into(), output_mint.into()), (rate, price_impact_bps));
+        guard.insert(
+            (input_mint.into(), output_mint.into()),
+            (rate, price_impact_bps),
+        );
     }
 
     /// Sets whether returned quotes should be marked as immediately expired.
@@ -279,7 +421,10 @@ impl DexQuoter for MockDexQuoter {
         &self.provider_id
     }
 
-    async fn get_executable_quote(&self, request: &DexQuoteRequest) -> Result<DexQuote, DexQuoteError> {
+    async fn get_executable_quote(
+        &self,
+        request: &DexQuoteRequest,
+    ) -> Result<DexQuote, DexQuoteError> {
         // 1. Validate amount
         if request.amount_in == 0 {
             return Err(DexQuoteError::InvalidAmount(
@@ -291,10 +436,12 @@ impl DexQuoter for MockDexQuoter {
         let pair_key = (request.input_mint.clone(), request.output_mint.clone());
         let (rate, price_impact_bps) = {
             let guard = self.pairs.read().unwrap();
-            *guard.get(&pair_key).ok_or_else(|| DexQuoteError::UnsupportedPair {
-                input_mint: request.input_mint.clone(),
-                output_mint: request.output_mint.clone(),
-            })?
+            *guard
+                .get(&pair_key)
+                .ok_or_else(|| DexQuoteError::UnsupportedPair {
+                    input_mint: request.input_mint.clone(),
+                    output_mint: request.output_mint.clone(),
+                })?
         };
 
         // 3. Validate price impact policy
@@ -312,6 +459,17 @@ impl DexQuoter for MockDexQuoter {
         let slippage = request.slippage_bps.unwrap_or(50);
         let slippage_factor = 1.0 - (slippage as f64 / 10_000.0);
         let minimum_output = (expected_output as f64 * slippage_factor).round() as u64;
+
+        if expected_output == 0 {
+            return Err(DexQuoteError::InvalidAmount(
+                "Expected output amount must be greater than zero".to_string(),
+            ));
+        }
+        if minimum_output == 0 {
+            return Err(DexQuoteError::InvalidAmount(
+                "Minimum output amount must be greater than zero".to_string(),
+            ));
+        }
 
         // 5. Timestamps and expiration
         let now = self
@@ -382,20 +540,50 @@ impl DexQuoter for JupiterClient {
         "jupiter"
     }
 
-    async fn get_executable_quote(&self, request: &DexQuoteRequest) -> Result<DexQuote, DexQuoteError> {
-        // 1. Validate input amount
+    async fn get_executable_quote(
+        &self,
+        request: &DexQuoteRequest,
+    ) -> Result<DexQuote, DexQuoteError> {
+        // 1. Validate input amount > 0
         if request.amount_in == 0 {
             return Err(DexQuoteError::InvalidAmount(
                 "Input amount must be greater than zero".to_string(),
             ));
         }
 
-        // 2. Build Jupiter request
-        let mut jup_req = QuoteRequest::new(
-            &request.input_mint,
-            &request.output_mint,
-            request.amount_in,
-        );
+        // 2. Validate mint addresses and support
+        Pubkey::from_str(&request.input_mint).map_err(|e| {
+            DexQuoteError::InvalidMint(format!(
+                "Invalid input mint '{}': {}",
+                request.input_mint, e
+            ))
+        })?;
+        Pubkey::from_str(&request.output_mint).map_err(|e| {
+            DexQuoteError::InvalidMint(format!(
+                "Invalid output mint '{}': {}",
+                request.output_mint, e
+            ))
+        })?;
+
+        if request.input_mint == request.output_mint {
+            return Err(DexQuoteError::UnsupportedPair {
+                input_mint: request.input_mint.clone(),
+                output_mint: request.output_mint.clone(),
+            });
+        }
+
+        if !self.is_mint_supported(&request.input_mint)
+            || !self.is_mint_supported(&request.output_mint)
+        {
+            return Err(DexQuoteError::UnsupportedPair {
+                input_mint: request.input_mint.clone(),
+                output_mint: request.output_mint.clone(),
+            });
+        }
+
+        // 3. Build Jupiter request
+        let mut jup_req =
+            QuoteRequest::new(&request.input_mint, &request.output_mint, request.amount_in);
 
         if let Some(slippage) = request.slippage_bps {
             jup_req = jup_req.with_slippage_bps(slippage);
@@ -405,27 +593,49 @@ impl DexQuoter for JupiterClient {
             input_mint = %request.input_mint,
             output_mint = %request.output_mint,
             amount = request.amount_in,
-            "Requesting executable DEX quote from Jupiter"
+            "Requesting executable DEX quote from Jupiter provider"
         );
 
-        // 3. Query Jupiter API
+        // 4. Query Jupiter API (real provider or mock)
         let resp: QuoteResponse = self.get_quote(&jup_req).await?;
 
-        // 4. Parse response values
-        let in_amount: u64 = resp.in_amount.parse().map_err(|e| {
-            DexQuoteError::Internal(format!("Failed to parse in_amount: {}", e))
-        })?;
-        let out_amount: u64 = resp.out_amount.parse().map_err(|e| {
-            DexQuoteError::Internal(format!("Failed to parse out_amount: {}", e))
-        })?;
+        // 5. Parse response values
+        let in_amount: u64 = resp
+            .in_amount
+            .parse()
+            .map_err(|e| DexQuoteError::Internal(format!("Failed to parse in_amount: {}", e)))?;
+        let out_amount: u64 = resp
+            .out_amount
+            .parse()
+            .map_err(|e| DexQuoteError::Internal(format!("Failed to parse out_amount: {}", e)))?;
         let min_amount: u64 = resp.other_amount_threshold.parse().map_err(|e| {
             DexQuoteError::Internal(format!("Failed to parse other_amount_threshold: {}", e))
         })?;
 
+        // 6. Validate expected output > 0 and minimum output > 0
+        if out_amount == 0 {
+            return Err(DexQuoteError::InvalidAmount(
+                "Expected output amount must be greater than zero".to_string(),
+            ));
+        }
+        if min_amount == 0 {
+            return Err(DexQuoteError::InvalidAmount(
+                "Minimum output amount must be greater than zero".to_string(),
+            ));
+        }
+
+        // 7. Validate route exists
+        if resp.route_plan.is_empty() {
+            return Err(DexQuoteError::NoRoute {
+                input_mint: request.input_mint.clone(),
+                output_mint: request.output_mint.clone(),
+            });
+        }
+
         let price_impact_bps = parse_price_impact_bps(&resp.price_impact_pct)
             .map_err(|e| DexQuoteError::Internal(e.to_string()))?;
 
-        // 5. Enforce price impact limits
+        // 8. Enforce price impact limits
         if let Some(max_impact) = request.max_price_impact_bps {
             if price_impact_bps > max_impact {
                 warn!(
@@ -440,7 +650,7 @@ impl DexQuoter for JupiterClient {
             }
         }
 
-        // 6. Assemble routing steps
+        // 9. Assemble routing steps
         let mut steps = Vec::new();
         let mut primary_dex = "Jupiter".to_string();
 
@@ -468,16 +678,26 @@ impl DexQuoter for JupiterClient {
             });
         }
 
-        let num_hops = steps.len().max(1);
+        let num_hops = steps.len();
         let route_info = DexRouteInfo {
             steps,
             num_hops,
             primary_dex,
         };
 
+        // 10. Timestamps and expiration validation
         let now = Utc::now().timestamp();
         let ttl = request.ttl_seconds.unwrap_or(15);
         let expires_at = now + ttl as i64;
+
+        if now >= expires_at {
+            return Err(DexQuoteError::ExpiredQuote {
+                quote_timestamp: now,
+                expires_at,
+                current_time: now,
+            });
+        }
+
         let effective_rate = if in_amount > 0 {
             out_amount as f64 / in_amount as f64
         } else {
@@ -486,7 +706,7 @@ impl DexQuoter for JupiterClient {
 
         let raw_payload = serde_json::to_value(&resp).ok();
 
-        Ok(DexQuote {
+        let quote = DexQuote {
             quote_id: format!("jup-{}-{}", in_amount, now),
             provider_id: "jupiter".to_string(),
             input_mint: resp.input_mint,
@@ -502,6 +722,8 @@ impl DexQuoter for JupiterClient {
             ttl_seconds: ttl,
             route_info,
             raw_payload,
-        })
+        };
+
+        Ok(quote)
     }
 }

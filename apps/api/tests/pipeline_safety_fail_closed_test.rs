@@ -365,7 +365,10 @@ fn test_06_asset_deactivated_fails_closed_and_recovers() {
     ctx.is_asset_active = false;
     ctx.asset_status = "Suspended";
     let result = guard.evaluate_pipeline_safety(&ctx);
-    assert!(result.is_err(), "Must fail closed when asset is deactivated");
+    assert!(
+        result.is_err(),
+        "Must fail closed when asset is deactivated"
+    );
     let failure = result.unwrap_err();
     assert_eq!(failure.error_code(), "ASSET_DEACTIVATED");
 
@@ -443,7 +446,10 @@ fn test_08_dex_quote_expired_fails_closed_and_recovers() {
     // 1. Failure: Quote expired 5 seconds ago
     ctx.quote_expires_at = now - 5;
     let result = guard.evaluate_pipeline_safety(&ctx);
-    assert!(result.is_err(), "Must fail closed when DEX quote is expired");
+    assert!(
+        result.is_err(),
+        "Must fail closed when DEX quote is expired"
+    );
     let failure = result.unwrap_err();
     assert_eq!(failure.error_code(), "DEX_QUOTE_EXPIRED");
 
@@ -571,8 +577,7 @@ fn test_11_transaction_submission_failure_fails_closed_and_recovers() {
     assert_eq!(failure.http_status_code(), 503);
 
     // 2. Recovery: RPC connection restored, transaction broadcast succeeds
-    let sub_ok: Result<String, String> =
-        Ok("5KzYmQhN7vL3...confirmed_tx_sig".to_string());
+    let sub_ok: Result<String, String> = Ok("5KzYmQhN7vL3...confirmed_tx_sig".to_string());
     ctx.submission_result = &sub_ok;
     assert!(guard.evaluate_pipeline_safety(&ctx).is_ok());
 }

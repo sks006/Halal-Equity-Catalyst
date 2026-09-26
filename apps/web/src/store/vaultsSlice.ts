@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { VaultModel } from "@equity-catalyst/sdk";
-import { DEMO_VAULTS, getSdkClient } from "../lib/sdk";
+import { getSdkClient } from "../lib/sdk";
 
 export interface VaultsState {
   items: VaultModel[];
@@ -10,35 +10,36 @@ export interface VaultsState {
 }
 
 const initialState: VaultsState = {
-  items: DEMO_VAULTS,
+  items: [],
   selectedVault: null,
   isLoading: false,
   error: null,
 };
 
 /**
- * Asynchronous thunk to fetch all vaults from API backend with fallback
+ * Asynchronous thunk to fetch all vaults from API backend (fail-closed on error)
  */
 export const fetchVaults = createAsyncThunk(
   "vaults/fetchVaults",
   async (_, { rejectWithValue }) => {
     try {
       const sdk = getSdkClient();
-      if (sdk.apiUrl) {
-        const res = await fetch(`${sdk.apiUrl}/vaults`, {
-          signal: AbortSignal.timeout(3000),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data) && data.length > 0) {
-            return data as VaultModel[];
-          }
-        }
+      if (!sdk.apiUrl) {
+        return rejectWithValue("API URL not configured");
       }
-      return DEMO_VAULTS;
+      const res = await fetch(`${sdk.apiUrl}/vaults`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (!res.ok) {
+        return rejectWithValue(`Failed to fetch vaults: HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        return data as VaultModel[];
+      }
+      return rejectWithValue("Invalid response format: expected array of vaults");
     } catch (err: any) {
-      console.warn("Redux fetchVaults falling back to demo fixtures:", err);
-      return DEMO_VAULTS;
+      return rejectWithValue(err?.message || "Failed to fetch vaults");
     }
   }
 );
@@ -51,23 +52,14 @@ export const fetchVaultByAddress = createAsyncThunk(
   async (vaultAddress: string, { rejectWithValue }) => {
     try {
       const sdk = getSdkClient();
-      if (sdk.apiUrl) {
-        const vault = await sdk.vaults.getVaultFromApi(vaultAddress);
-        if (vault) return vault;
+      if (!sdk.apiUrl) {
+        return rejectWithValue("API URL not configured");
       }
-      const match = DEMO_VAULTS.find((v) => v.vault_address === vaultAddress);
-      return match || {
-        ...DEMO_VAULTS[0],
-        vault_address: vaultAddress,
-        name: "Custom Strategy Vault",
-      };
+      const vault = await sdk.vaults.getVaultFromApi(vaultAddress);
+      if (vault) return vault;
+      return rejectWithValue(`Vault ${vaultAddress} not found`);
     } catch (err: any) {
-      const match = DEMO_VAULTS.find((v) => v.vault_address === vaultAddress);
-      return match || {
-        ...DEMO_VAULTS[0],
-        vault_address: vaultAddress,
-        name: "Custom Strategy Vault",
-      };
+      return rejectWithValue(err?.message || "Failed to fetch vault");
     }
   }
 );
@@ -126,7 +118,7 @@ export const vaultsSlice = createSlice({
       })
       .addCase(fetchVaults.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.error.message || "Failed to fetch vaults";
+        state.error = (action.payload as string) || action.error.message || "Failed to fetch vaults";
       })
       .addCase(fetchVaultByAddress.pending, (state) => {
         state.isLoading = true;
@@ -138,7 +130,7 @@ export const vaultsSlice = createSlice({
       })
       .addCase(fetchVaultByAddress.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.error.message || "Failed to fetch vault";
+        state.error = (action.payload as string) || action.error.message || "Failed to fetch vault";
       });
   },
 });

@@ -35,10 +35,9 @@ impl BusinessCategory {
             | Self::Tobacco
             | Self::Weapons
             | Self::AdultEntertainment => BusinessClassification::Prohibited,
-            Self::Technology
-            | Self::Healthcare
-            | Self::Manufacturing
-            | Self::Other(_) => BusinessClassification::RequiresReview,
+            Self::Technology | Self::Healthcare | Self::Manufacturing | Self::Other(_) => {
+                BusinessClassification::RequiresReview
+            }
         }
     }
 
@@ -336,10 +335,10 @@ pub fn screen_financial_metrics(
     policy: &ScreeningPolicy,
 ) -> Result<(), ShariahRejectionReason> {
     // 1. Debt ratio benchmark
-    if !policy
-        .comparison
-        .is_compliant(metrics.debt_ratio_bps, policy.debt_limit_bps.as_bps() as u32)
-    {
+    if !policy.comparison.is_compliant(
+        metrics.debt_ratio_bps,
+        policy.debt_limit_bps.as_bps() as u32,
+    ) {
         return Err(ShariahRejectionReason::ExcessDebt);
     }
 
@@ -355,10 +354,7 @@ pub fn screen_financial_metrics(
     if let Some(limit) = policy.receivables_cash_limit_bps {
         match metrics.receivables_cash_ratio_bps {
             Some(ratio) => {
-                if !policy
-                    .comparison
-                    .is_compliant(ratio, limit.as_bps() as u32)
-                {
+                if !policy.comparison.is_compliant(ratio, limit.as_bps() as u32) {
                     return Err(ShariahRejectionReason::ExcessReceivablesAndCash);
                 }
             }

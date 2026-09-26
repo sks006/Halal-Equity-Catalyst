@@ -161,32 +161,34 @@ impl PolicyWorker {
                 (vault.deposit_mint.clone(), vault.deposit_mint.clone(), 0, 0)
             };
 
-        let execution_record = ExecutionModel {
-            execution_id: decision.decision_id,
-            vault_address: vault.vault_address.clone(),
-            event_id: Some(event.event_id),
-            action: decision.action.clone(),
-            input_mint,
-            output_mint,
-            amount_in,
-            amount_out_expected: amount_out,
-            amount_out_actual: None,
-            slippage_bps: 100,            // Default 1%
-            tx_signature: None,           // Suppressed in dry-run mode
-            status: "LOGGED".to_string(), // Explicitly recorded as LOGGED, not broadcast
-            error_message: if decision.approved {
-                None
-            } else {
-                Some(decision.rationale.clone())
-            },
-            executed_at: Utc::now(),
-            confirmed_at: None,
-            quote_id: None,
-            policy_decision_id: Some(decision.decision_id),
-            amount_out_min: None,
-        };
+        if amount_in > 0 {
+            let execution_record = ExecutionModel {
+                execution_id: decision.decision_id,
+                vault_address: vault.vault_address.clone(),
+                event_id: Some(event.event_id),
+                action: decision.action.clone(),
+                input_mint,
+                output_mint,
+                amount_in,
+                amount_out_expected: amount_out,
+                amount_out_actual: None,
+                slippage_bps: 100,            // Default 1%
+                tx_signature: None,           // Suppressed in dry-run mode
+                status: "LOGGED".to_string(), // Explicitly recorded as LOGGED, not broadcast
+                error_message: if decision.approved {
+                    None
+                } else {
+                    Some(decision.rationale.clone())
+                },
+                executed_at: Utc::now(),
+                confirmed_at: None,
+                quote_id: None,
+                policy_decision_id: Some(decision.decision_id),
+                amount_out_min: None,
+            };
 
-        let _ = self.execution_repo.create(&execution_record).await;
+            let _ = self.execution_repo.create(&execution_record).await;
+        }
 
         // 7. Mark event status as PROCESSED
         self.event_repo

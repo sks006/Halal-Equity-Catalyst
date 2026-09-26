@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { PortfolioModel } from "@equity-catalyst/sdk";
-import { DEMO_POSITIONS, getSdkClient } from "../lib/sdk";
+import { getSdkClient } from "../lib/sdk";
 
 export interface PortfolioState {
   positions: PortfolioModel[];
@@ -10,30 +10,30 @@ export interface PortfolioState {
 }
 
 const initialState: PortfolioState = {
-  positions: DEMO_POSITIONS,
+  positions: [],
   isLoading: false,
   isSyncingPrices: false,
   error: null,
 };
 
 /**
- * Asynchronous thunk to fetch portfolio allocations for a vault
+ * Asynchronous thunk to fetch portfolio allocations for a vault (fail-closed on error)
  */
 export const fetchPortfolioByVault = createAsyncThunk(
   "portfolio/fetchPortfolioByVault",
   async (vaultAddress: string, { rejectWithValue }) => {
     try {
       const sdk = getSdkClient();
-      if (sdk.apiUrl) {
-        const positions = await sdk.portfolio.getPortfolioByVault(vaultAddress);
-        if (Array.isArray(positions) && positions.length > 0) {
-          return positions;
-        }
+      if (!sdk.apiUrl) {
+        return rejectWithValue("API URL not configured");
       }
-      return DEMO_POSITIONS.map((p) => ({ ...p, vault_address: vaultAddress }));
+      const positions = await sdk.portfolio.getPortfolioByVault(vaultAddress);
+      if (Array.isArray(positions)) {
+        return positions;
+      }
+      return rejectWithValue("Invalid portfolio response");
     } catch (err: any) {
-      console.warn("Portfolio fetch falling back to fixtures:", err);
-      return DEMO_POSITIONS.map((p) => ({ ...p, vault_address: vaultAddress }));
+      return rejectWithValue(err?.message || "Failed to fetch portfolio");
     }
   }
 );
@@ -49,7 +49,7 @@ export const syncPortfolioPrices = createAsyncThunk(
       const state = getState() as { portfolio: PortfolioState };
       const currentPositions = state.portfolio.positions;
 
-      if (sdk.apiUrl) {
+      if (sdk.apiUrl && currentPositions.length > 0) {
         const updated = await Promise.all(
           currentPositions.map(async (pos) => {
             try {
@@ -93,7 +93,7 @@ export const portfolioSlice = createSlice({
       })
       .addCase(fetchPortfolioByVault.rejected, (state, action) => {
         state.isLoading = false;
-        state.error = action.error.message || "Failed to fetch portfolio";
+        state.error = (action.payload as string) || action.error.message || "Failed to fetch portfolio";
       })
       .addCase(syncPortfolioPrices.pending, (state) => {
         state.isSyncingPrices = true;

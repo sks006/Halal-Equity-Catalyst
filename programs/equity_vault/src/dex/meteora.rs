@@ -76,7 +76,16 @@ mod tests {
         let out_tok = Pubkey::new_unique();
         let tok_prog = Pubkey::new_unique();
 
-        let ix = build_cpi_instruction(&meteora, &vault, &in_tok, &out_tok, &tok_prog, &[], 50_000, 48_000);
+        let ix = build_cpi_instruction(
+            &meteora,
+            &vault,
+            &in_tok,
+            &out_tok,
+            &tok_prog,
+            &[],
+            50_000,
+            48_000,
+        );
         assert_eq!(ix.program_id, meteora);
         assert_eq!(ix.accounts.len(), 4);
         assert!(ix.accounts[2].is_signer); // Vault authority must sign

@@ -63,9 +63,7 @@ use equity_catalyst_api::{
     },
     ValidationContext,
 };
-use equity_catalyst_jupiter::{
-    DexQuote, DexQuoteRequest, DexQuoter, DexRouteInfo, MockDexQuoter,
-};
+use equity_catalyst_jupiter::{DexQuote, DexQuoteRequest, DexQuoter, DexRouteInfo, MockDexQuoter};
 use equity_catalyst_shared::{
     asset::{
         Asset, AssetIdentity, AssetProvider, AssetStatus, AssetType, Network, ProviderConfig,
@@ -80,10 +78,7 @@ use equity_catalyst_solana::{
     accounts::{find_compliance_pda, program_id},
     anchor_client::AnchorClient,
 };
-use solana_sdk::{
-    hash::Hash,
-    pubkey::Pubkey,
-};
+use solana_sdk::{hash::Hash, pubkey::Pubkey};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -196,18 +191,12 @@ async fn test_end_to_end_full_pipeline_success() {
     // STEP 2: Approve asset
     // -------------------------------------------------------------------------
     asset_repo
-        .update_approval_status(
-            AAPL_ASSET_ID,
-            AssetApprovalStatus::Validated,
-        )
+        .update_approval_status(AAPL_ASSET_ID, AssetApprovalStatus::Validated)
         .await
         .expect("Step 2a: Failed to transition asset to Validated");
 
     let approved_asset = asset_repo
-        .update_approval_status(
-            AAPL_ASSET_ID,
-            AssetApprovalStatus::ShariahApproved,
-        )
+        .update_approval_status(AAPL_ASSET_ID, AssetApprovalStatus::ShariahApproved)
         .await
         .expect("Step 2b: Failed to transition asset to ShariahApproved");
     assert_eq!(
@@ -705,7 +694,10 @@ async fn test_failure_case_asset_deactivated_before_execution() {
 
     let authorizer = DeterministicPolicyAuthorizer::new();
     let outcome = authorizer.authorize(&proposal, &context);
-    assert!(!outcome.is_authorized(), "Deactivated asset MUST be rejected");
+    assert!(
+        !outcome.is_authorized(),
+        "Deactivated asset MUST be rejected"
+    );
     let reasons = outcome
         .rejection_reasons()
         .expect("Rejection reasons must exist");
@@ -784,10 +776,7 @@ async fn test_failure_case_stale_oracle() {
     .unwrap();
 
     assert!(stale_price.is_stale);
-    assert_eq!(
-        stale_price.freshness_status(30),
-        PriceFreshness::Stale
-    );
+    assert_eq!(stale_price.freshness_status(30), PriceFreshness::Stale);
 
     // Policy authorizer evaluation
     let policy = create_test_policy(now);

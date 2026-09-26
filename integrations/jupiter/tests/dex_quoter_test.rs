@@ -43,7 +43,7 @@ async fn test_dex_quoter_valid_quote() {
     assert_eq!(quote.output_mint, USDC_MINT);
     assert_eq!(quote.input_amount, 1_000_000_000);
     assert_eq!(quote.expected_output_amount, 145_000_000); // 145 USDC
-    // Minimum output with 50 bps (0.5%) slippage: 145_000_000 * 0.995 = 144_275_000
+                                                           // Minimum output with 50 bps (0.5%) slippage: 145_000_000 * 0.995 = 144_275_000
     assert_eq!(quote.minimum_output_amount, 144_275_000);
     assert_eq!(quote.price_impact_bps, 8);
     assert_eq!(quote.price_impact_pct, "0.08%");
@@ -265,8 +265,8 @@ async fn test_phase9_acceptance_criteria_independent_dex_quote_vs_pyth_oracle() 
 
     // B. Executable quote contains execution mechanics (NOT provided by Pyth)
     assert_eq!(executable_quote.expected_output_amount, 149_800_000); // $149.80 executable
-    assert_eq!(executable_quote.minimum_output_amount, 149_051_000);  // $149.051 minimum
-    assert_eq!(executable_quote.price_impact_bps, 12);               // 0.12% impact
+    assert_eq!(executable_quote.minimum_output_amount, 149_051_000); // $149.051 minimum
+    assert_eq!(executable_quote.price_impact_bps, 12); // 0.12% impact
     assert_eq!(executable_quote.route_info.primary_dex, "orca-whirlpool");
     assert_eq!(executable_quote.expires_at, now + 15);
 
@@ -278,4 +278,168 @@ async fn test_phase9_acceptance_criteria_independent_dex_quote_vs_pyth_oracle() 
     // D. Valid freshness check enforces execution window
     assert!(executable_quote.validate_freshness(now).is_ok());
     assert!(executable_quote.validate_freshness(now + 20).is_err());
+}
+
+#[tokio::test]
+async fn test_phase_p5_quote_contains_all_9_fields_and_accessors() {
+    let client = JupiterClient::new_mock();
+
+    let jup_quote = QuoteResponse {
+        input_mint: SOL_MINT.to_string(),
+        in_amount: "2000000000".to_string(),
+        output_mint: USDC_MINT.to_string(),
+        out_amount: "290000000".to_string(),
+        other_amount_threshold: "288550000".to_string(),
+        swap_mode: "ExactIn".to_string(),
+        slippage_bps: 50,
+        price_impact_pct: "0.03".to_string(),
+        route_plan: vec![RoutePlanStep {
+            swap_info: SwapInfo {
+                amm_key: "WhirlpoolPool111111111111111111111111111111".to_string(),
+                label: Some("Orca".to_string()),
+                input_mint: SOL_MINT.to_string(),
+                output_mint: USDC_MINT.to_string(),
+                in_amount: "2000000000".to_string(),
+                out_amount: "290000000".to_string(),
+                fee_amount: Some("1000".to_string()),
+                fee_mint: Some(SOL_MINT.to_string()),
+            },
+            percent: 100,
+        }],
+        context_slot: Some(300_000_000),
+        time_taken: Some(0.010),
+    };
+
+    client.set_mock_quote(SOL_MINT, USDC_MINT, jup_quote);
+
+    let req = DexQuoteRequest::new(SOL_MINT, USDC_MINT, 2_000_000_000)
+        .with_slippage_bps(50)
+        .with_max_price_impact_bps(50)
+        .with_ttl_seconds(30);
+
+    let quote = client.get_executable_quote(&req).await.unwrap();
+
+    // Verify all 9 required fields via accessors (Task 3)
+    assert_eq!(quote.input_mint(), SOL_MINT);
+    assert_eq!(quote.output_mint(), USDC_MINT);
+    assert_eq!(quote.input_amount(), 2_000_000_000);
+    assert_eq!(quote.expected_output(), 290_000_000);
+    assert_eq!(quote.minimum_output(), 288_550_000);
+    assert_eq!(quote.route().steps.len(), 1);
+    assert_eq!(quote.route().primary_dex, "Orca");
+    assert_eq!(quote.price_impact(), 3); // 3 bps
+    assert!(quote.quote_timestamp() <= Utc::now().timestamp());
+    assert_eq!(quote.expiration(), quote.quote_timestamp() + 30);
+
+    // Validate all invariants pass
+    assert!(quote.validate(Some(50), quote.quote_timestamp()).is_ok());
+}
+
+#[tokio::test]
+async fn test_phase_p5_quote_rejects_missing_route() {
+    let client = JupiterClient::new_mock();
+
+    let no_route_quote = QuoteResponse {
+        input_mint: SOL_MINT.to_string(),
+        in_amount: "1000000000".to_string(),
+        output_mint: USDC_MINT.to_string(),
+        out_amount: "145000000".to_string(),
+        other_amount_threshold: "144000000".to_string(),
+        swap_mode: "ExactIn".to_string(),
+        slippage_bps: 50,
+        price_impact_pct: "0.01".to_string(),
+        route_plan: vec![], // Empty route plan
+        context_slot: None,
+        time_taken: None,
+    };
+
+    client.set_mock_quote(SOL_MINT, USDC_MINT, no_route_quote);
+
+    let req = DexQuoteRequest::new(SOL_MINT, USDC_MINT, 1_000_000_000);
+    let result = client.get_executable_quote(&req).await;
+
+    assert!(result.is_err());
+    match result.unwrap_err() {
+        DexQuoteError::NoRoute {
+            input_mint,
+            output_mint,
+        } => {
+            assert_eq!(input_mint, SOL_MINT);
+            assert_eq!(output_mint, USDC_MINT);
+        }
+        other => panic!("Expected NoRoute error, got {:?}", other),
+    }
+}
+
+#[tokio::test]
+async fn test_phase_p5_quote_rejects_zero_output_amounts() {
+    let client = JupiterClient::new_mock();
+
+    let zero_out_quote = QuoteResponse {
+        input_mint: SOL_MINT.to_string(),
+        in_amount: "1000000000".to_string(),
+        output_mint: USDC_MINT.to_string(),
+        out_amount: "0".to_string(), // Zero out amount
+        other_amount_threshold: "0".to_string(),
+        swap_mode: "ExactIn".to_string(),
+        slippage_bps: 50,
+        price_impact_pct: "0.01".to_string(),
+        route_plan: vec![RoutePlanStep {
+            swap_info: SwapInfo {
+                amm_key: "WhirlpoolPool111111111111111111111111111111".to_string(),
+                label: Some("Orca".to_string()),
+                input_mint: SOL_MINT.to_string(),
+                output_mint: USDC_MINT.to_string(),
+                in_amount: "1000000000".to_string(),
+                out_amount: "0".to_string(),
+                fee_amount: None,
+                fee_mint: None,
+            },
+            percent: 100,
+        }],
+        context_slot: None,
+        time_taken: None,
+    };
+
+    client.set_mock_quote(SOL_MINT, USDC_MINT, zero_out_quote);
+
+    let req = DexQuoteRequest::new(SOL_MINT, USDC_MINT, 1_000_000_000);
+    let result = client.get_executable_quote(&req).await;
+
+    assert!(result.is_err());
+    assert!(matches!(
+        result.unwrap_err(),
+        DexQuoteError::InvalidAmount(_)
+    ));
+}
+
+#[tokio::test]
+async fn test_phase_p5_quote_validates_mints() {
+    let client = JupiterClient::new_mock();
+
+    // 1. Identical input and output mint
+    let req_same = DexQuoteRequest::new(SOL_MINT, SOL_MINT, 1_000_000_000);
+    let res_same = client.get_executable_quote(&req_same).await;
+    assert!(matches!(
+        res_same,
+        Err(DexQuoteError::UnsupportedPair { .. })
+    ));
+
+    // 2. Invalid base58 pubkey
+    let req_invalid = DexQuoteRequest::new("invalid_pubkey", USDC_MINT, 1_000_000_000);
+    let res_invalid = client.get_executable_quote(&req_invalid).await;
+    assert!(matches!(res_invalid, Err(DexQuoteError::InvalidMint(_))));
+
+    // 3. Supported mints whitelist filtering
+    client.set_supported_mints(vec![SOL_MINT.to_string()]); // USDC not in whitelist
+    let req_unsupported = DexQuoteRequest::new(SOL_MINT, USDC_MINT, 1_000_000_000);
+    let res_unsupported = client.get_executable_quote(&req_unsupported).await;
+    assert!(matches!(
+        res_unsupported,
+        Err(DexQuoteError::UnsupportedPair { .. })
+    ));
+
+    // Clear supported mints whitelist -> allows any valid pubkey
+    client.clear_supported_mints();
+    assert!(client.is_mint_supported(USDC_MINT));
 }

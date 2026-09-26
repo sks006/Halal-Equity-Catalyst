@@ -111,7 +111,9 @@ impl SseChunkParser {
         let mut events = Vec::new();
 
         while let Some(newline_pos) = self.buffer.find('\n') {
-            let raw_line = self.buffer[..newline_pos].trim_end_matches('\r').to_string();
+            let raw_line = self.buffer[..newline_pos]
+                .trim_end_matches('\r')
+                .to_string();
             self.buffer.drain(..=newline_pos);
 
             if raw_line.is_empty() {
@@ -201,9 +203,7 @@ impl PythStreamClient {
     pub fn new(config: PythStreamConfig) -> Self {
         Self::new_with_http_client(
             config,
-            reqwest::Client::builder()
-                .build()
-                .unwrap_or_default(),
+            reqwest::Client::builder().build().unwrap_or_default(),
         )
     }
 
@@ -324,7 +324,8 @@ impl Stream for PythEventStream {
                                         match parse_price_update_event(raw) {
                                             Ok(event) => {
                                                 // Filter out empty heartbeat events from returning to caller
-                                                if event.parsed.is_some() || event.binary.is_some() {
+                                                if event.parsed.is_some() || event.binary.is_some()
+                                                {
                                                     self.pending_items.push_back(Ok(event));
                                                 }
                                             }
@@ -341,9 +342,10 @@ impl Stream for PythEventStream {
                         }
                         Err(utf8_err) => {
                             error!(error = %utf8_err, "Encountered invalid UTF-8 in SSE stream chunk");
-                            return Poll::Ready(Some(Err(PythStreamError::MalformedSse(
-                                format!("Invalid UTF-8 chunk: {}", utf8_err),
-                            ))));
+                            return Poll::Ready(Some(Err(PythStreamError::MalformedSse(format!(
+                                "Invalid UTF-8 chunk: {}",
+                                utf8_err
+                            )))));
                         }
                     }
                 }

@@ -24,15 +24,17 @@ use equity_catalyst_api::{
         OracleReferenceInfo, PlannerError,
     },
     models::{CanonicalAssetModel, PolicyModel, PortfolioModel},
-    AllocationProposal, DeterministicPolicyAuthorizer, ExecutionAuthorization,
-    MarketPriceUpdate, ValidationContext,
+    AllocationProposal, DeterministicPolicyAuthorizer, ExecutionAuthorization, MarketPriceUpdate,
+    ValidationContext,
 };
 use equity_catalyst_jupiter::{DexQuote, DexRouteInfo, DexRouteStep};
 use equity_catalyst_shared::{
-    asset::{Asset, AssetIdentity, AssetProvider, AssetStatus, AssetType, Network, ProviderConfig, TokenDetails},
+    asset::{
+        Asset, AssetIdentity, AssetProvider, AssetStatus, AssetType, Network, ProviderConfig,
+        TokenDetails,
+    },
     shariah::{
-        DenominatorMethod, RegisteredAsset, ScreeningStandard,
-        ShariahEligibility, ShariahStatus,
+        DenominatorMethod, RegisteredAsset, ScreeningStandard, ShariahEligibility, ShariahStatus,
     },
     AssetApprovalStatus,
 };
@@ -45,7 +47,10 @@ const USDC_MINT: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 const FEED_AAPL: &str = "feed1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
 
 /// Test helper building an authorized decision from Phase 10 engine
-fn build_authorized_decision(is_buy: bool, eval_time: DateTime<Utc>) -> (ExecutionAuthorization, DexQuote) {
+fn build_authorized_decision(
+    is_buy: bool,
+    eval_time: DateTime<Utc>,
+) -> (ExecutionAuthorization, DexQuote) {
     let now = eval_time;
 
     let policy = PolicyModel {
@@ -153,7 +158,7 @@ fn build_authorized_decision(is_buy: bool, eval_time: DateTime<Utc>) -> (Executi
             provider_id: "jupiter".to_string(),
             input_mint: USDC_MINT.to_string(),
             output_mint: AAPL_MINT.to_string(),
-            input_amount: 5_000_000_000,       // 5,000 USDC
+            input_amount: 5_000_000_000,        // 5,000 USDC
             expected_output_amount: 25_000_000, // 25 AAPL
             minimum_output_amount: 24_875_000,  // 50 bps slippage
             price_impact_bps: 10,
@@ -183,7 +188,7 @@ fn build_authorized_decision(is_buy: bool, eval_time: DateTime<Utc>) -> (Executi
             provider_id: "jupiter".to_string(),
             input_mint: AAPL_MINT.to_string(),
             output_mint: USDC_MINT.to_string(),
-            input_amount: 25_000_000,          // 25 AAPL
+            input_amount: 25_000_000,              // 25 AAPL
             expected_output_amount: 5_000_000_000, // 5,000 USDC
             minimum_output_amount: 4_975_000_000,  // 50 bps slippage
             price_impact_bps: 10,
@@ -245,7 +250,10 @@ fn build_authorized_decision(is_buy: bool, eval_time: DateTime<Utc>) -> (Executi
 
     let authorizer = DeterministicPolicyAuthorizer::new();
     let outcome = authorizer.authorize(&proposal, &context);
-    let authorization = outcome.authorization().expect("Must authorize baseline proposal").clone();
+    let authorization = outcome
+        .authorization()
+        .expect("Must authorize baseline proposal")
+        .clone();
 
     (authorization, dex_quote)
 }
@@ -420,7 +428,10 @@ async fn test_planner_converts_authorized_decision_cleanly() {
     assert_eq!(plan.minimum_output_amount, quote.minimum_output_amount);
     assert_eq!(plan.slippage_bps, auth.max_slippage_bps);
     assert_eq!(plan.quote_id, quote.quote_id);
-    assert_eq!(plan.oracle_reference.price_scaled, auth.oracle_reference_price_scaled);
+    assert_eq!(
+        plan.oracle_reference.price_scaled,
+        auth.oracle_reference_price_scaled
+    );
     assert_eq!(plan.oracle_reference.feed_id, FEED_AAPL);
     assert_eq!(plan.expires_at, quote.expires_at);
 
@@ -509,7 +520,10 @@ async fn test_planner_refuses_expired_authorization() {
         .plan_execution(&auth, &quote, FEED_AAPL, 10, None, late_time)
         .await;
 
-    assert!(matches!(result, Err(PlannerError::AuthorizationExpired { .. })));
+    assert!(matches!(
+        result,
+        Err(PlannerError::AuthorizationExpired { .. })
+    ));
 }
 
 #[tokio::test]
@@ -696,14 +710,20 @@ async fn test_idempotency_lifecycle_status_updates() {
     assert_eq!(record.status, IdempotencyStatus::Planned);
 
     // Update to Executing
-    tracker.update_status(&key, IdempotencyStatus::Executing).await.unwrap();
+    tracker
+        .update_status(&key, IdempotencyStatus::Executing)
+        .await
+        .unwrap();
     assert_eq!(
         tracker.get_record(&key).await.unwrap().status,
         IdempotencyStatus::Executing
     );
 
     // Update to Completed
-    tracker.update_status(&key, IdempotencyStatus::Completed).await.unwrap();
+    tracker
+        .update_status(&key, IdempotencyStatus::Completed)
+        .await
+        .unwrap();
     assert_eq!(
         tracker.get_record(&key).await.unwrap().status,
         IdempotencyStatus::Completed
@@ -715,7 +735,8 @@ fn test_plan_json_serialization_roundtrip() {
     let plan = sample_execution_plan();
 
     let json = serde_json::to_string(&plan).expect("Must serialize to JSON");
-    let deserialized: ExecutionPlan = serde_json::from_str(&json).expect("Must deserialize from JSON");
+    let deserialized: ExecutionPlan =
+        serde_json::from_str(&json).expect("Must deserialize from JSON");
 
     assert_eq!(plan, deserialized);
     assert_eq!(plan.to_canonical_bytes(), deserialized.to_canonical_bytes());

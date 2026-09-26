@@ -17,8 +17,7 @@ use tokio::sync::{broadcast, watch};
 use tracing::{debug, error, info};
 
 use crate::{
-    error::ApiError,
-    models::asset_market_data::subscription_set_from_mappings,
+    error::ApiError, models::asset_market_data::subscription_set_from_mappings,
     repositories::AssetMarketDataRepository,
 };
 
@@ -142,7 +141,10 @@ impl AssetSubscriptionWatcher {
     ///
     /// The returned `JoinHandle` can be used to monitor the task, and will exit
     /// gracefully when a signal is received on the `shutdown` broadcast channel.
-    pub fn start(self: Arc<Self>, mut shutdown: broadcast::Receiver<()>) -> tokio::task::JoinHandle<()> {
+    pub fn start(
+        self: Arc<Self>,
+        mut shutdown: broadcast::Receiver<()>,
+    ) -> tokio::task::JoinHandle<()> {
         tokio::spawn(async move {
             info!(
                 interval_ms = self.config.poll_interval.as_millis(),

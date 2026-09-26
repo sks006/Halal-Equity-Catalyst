@@ -158,9 +158,106 @@ impl SubscriptionSet {
     /// Finds a subscription by Pyth feed ID.
     pub fn get_by_feed(&self, feed_id: &str) -> Option<&PythSubscription> {
         let clean = normalize_feed_id(feed_id);
-        self.subscriptions
+        self.subscriptions.iter().find(|s| s.pyth_feed_id == clean)
+    }
+
+    /// Enriches a `ParsedPriceFeed` by matching its Pyth feed ID against active approved subscriptions.
+    ///
+    /// Preserves:
+    /// - Pyth feed ID
+    /// - Asset ID
+    /// - Mint address
+    /// - Publish time
+    /// - Confidence
+    /// - Price
+    ///
+    /// Does NOT use symbols to infer feed identity.
+    /// Returns `None` if the feed ID is NOT present in this approved subscription set.
+    pub fn enrich_feed(&self, feed: &crate::types::ParsedPriceFeed) -> Option<EnrichedPriceUpdate> {
+        let sub = self.get_by_feed(&feed.id)?;
+        Some(EnrichedPriceUpdate {
+            pyth_feed_id: sub.pyth_feed_id.clone(),
+            asset_id: sub.asset_id.clone(),
+            mint_address: sub.mint_address.clone(),
+            symbol: sub.symbol.clone(),
+            publish_time: feed.price.publish_time,
+            confidence: feed.price.conf.clone(),
+            price: feed.price.price.clone(),
+            expo: feed.price.expo,
+            ema_price: feed.ema_price.as_ref().map(|p| p.price.clone()),
+            ema_conf: feed.ema_price.as_ref().map(|p| p.conf.clone()),
+        })
+    }
+
+    /// Enriches all matching feeds from a `PythPriceUpdateEvent`.
+    ///
+    /// Silently filters out feeds not present in this approved subscription set.
+    pub fn enrich_event(
+        &self,
+        event: &crate::types::PythPriceUpdateEvent,
+    ) -> Vec<EnrichedPriceUpdate> {
+        event
+            .feeds()
             .iter()
-            .find(|s| s.pyth_feed_id == clean)
+            .filter_map(|feed| self.enrich_feed(feed))
+            .collect()
+    }
+}
+
+/// Fully enriched price update preserving canonical asset identity and Pyth market data.
+///
+/// Preserves:
+/// - Pyth feed ID
+/// - Asset ID
+/// - Mint address
+/// - Publish time
+/// - Confidence interval
+/// - Price mantissa & exponent
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EnrichedPriceUpdate {
+    /// Pyth feed identifier (normalized hex, no 0x prefix)
+    pub pyth_feed_id: String,
+    /// Canonical asset identifier (e.g. "backed:AAPLx")
+    pub asset_id: String,
+    /// Underlying SPL token mint address on Solana
+    pub mint_address: String,
+    /// Ticker symbol for display (e.g. "AAPL")
+    pub symbol: String,
+    /// Unix publication timestamp reported by Pyth oracle
+    pub publish_time: i64,
+    /// Raw confidence interval as reported by Pyth
+    pub confidence: String,
+    /// Raw price mantissa as reported by Pyth
+    pub price: String,
+    /// Pyth price exponent (e.g. -8)
+    pub expo: i32,
+    /// Optional EMA price mantissa
+    pub ema_price: Option<String>,
+    /// Optional EMA confidence interval
+    pub ema_conf: Option<String>,
+}
+
+impl EnrichedPriceUpdate {
+    /// Returns raw price parsed as integer mantissa.
+    pub fn parse_price_raw(&self) -> Result<i64, std::num::ParseIntError> {
+        self.price.parse()
+    }
+
+    /// Returns confidence interval parsed as integer.
+    pub fn parse_conf_raw(&self) -> Result<u64, std::num::ParseIntError> {
+        self.confidence.parse()
+    }
+
+    /// Calculates dollar price as f64 (for display/legacy).
+    pub fn price_usd(&self) -> Result<f64, std::num::ParseIntError> {
+        let raw = self.parse_price_raw()?;
+        Ok((raw as f64) * 10f64.powi(self.expo))
+    }
+
+    /// Calculates dollar confidence interval as f64.
+    pub fn conf_usd(&self) -> Result<f64, std::num::ParseIntError> {
+        let raw = self.parse_conf_raw()?;
+        Ok((raw as f64) * 10f64.powi(self.expo))
     }
 }
 

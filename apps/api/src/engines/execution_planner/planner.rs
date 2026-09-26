@@ -58,7 +58,9 @@ pub enum PlannerError {
         new_digest: String,
     },
 
-    #[error("Decision {decision_id} already has an active execution plan under key '{existing_key}'")]
+    #[error(
+        "Decision {decision_id} already has an active execution plan under key '{existing_key}'"
+    )]
     DuplicateExecutionPlan {
         decision_id: Uuid,
         existing_key: String,
@@ -160,7 +162,8 @@ impl ExecutionPlanner {
                 return Err(PlannerError::QuantityMismatch {
                     expected: authorization.authorized_amount,
                     got: quote.input_amount,
-                    reason: "Sell trade input amount must exactly equal authorized asset amount".to_string(),
+                    reason: "Sell trade input amount must exactly equal authorized asset amount"
+                        .to_string(),
                 });
             }
             // Guaranteed minimum output must honor or exceed the authorized minimum output
@@ -168,7 +171,8 @@ impl ExecutionPlanner {
                 return Err(PlannerError::QuantityMismatch {
                     expected: authorization.dex_minimum_output_amount,
                     got: quote.minimum_output_amount,
-                    reason: "Quote minimum output is lower than authorized minimum output".to_string(),
+                    reason: "Quote minimum output is lower than authorized minimum output"
+                        .to_string(),
                 });
             }
         } else {
@@ -177,7 +181,8 @@ impl ExecutionPlanner {
                 return Err(PlannerError::QuantityMismatch {
                     expected: authorization.dex_minimum_output_amount,
                     got: quote.minimum_output_amount,
-                    reason: "Quote minimum output is lower than authorized minimum output".to_string(),
+                    reason: "Quote minimum output is lower than authorized minimum output"
+                        .to_string(),
                 });
             }
         }
@@ -198,7 +203,10 @@ impl ExecutionPlanner {
             Some(n) if !n.trim().is_empty() => {
                 IdempotencyTracker::generate_key(&authorization.authorization_id, n)
             }
-            _ => format!("idemp:{}:{}", authorization.authorization_id, quote.quote_id),
+            _ => format!(
+                "idemp:{}:{}",
+                authorization.authorization_id, quote.quote_id
+            ),
         };
 
         // Deterministic plan_id derived from decision ID and idempotency key
@@ -249,7 +257,9 @@ impl ExecutionPlanner {
             expires_at: plan_expiry,
         };
 
-        self.tracker.check_and_register(record, current_time).await?;
+        self.tracker
+            .check_and_register(record, current_time)
+            .await?;
 
         Ok(plan)
     }

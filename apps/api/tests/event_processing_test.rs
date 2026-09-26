@@ -235,18 +235,18 @@ async fn test_step30_policy_worker_evaluation_and_dry_run_logging() {
         .await
         .expect("Failed to upsert policy");
 
-    // 3. Seed Portfolio position in Postgres
+    // 3. Seed Portfolio positions with drift exceeding threshold in Postgres
     let pos_model = PortfolioModel {
         portfolio_id: Uuid::new_v4(),
         vault_address: vault_address.clone(),
-        asset_symbol: "SOL".to_string(),
+        asset_symbol: "NVDA".to_string(),
         asset_mint: deposit_mint.clone(),
-        amount: 100_000,
+        amount: 80_000,
         entry_price_usd: 150.0,
         current_price_usd: 155.0,
-        current_value_usd: 15_500_000.0,
-        target_weight_bps: 10000,
-        current_weight_bps: 10000,
+        current_value_usd: 12_400_000.0,
+        target_weight_bps: 7000,
+        current_weight_bps: 8500,
         last_rebalanced_at: None,
         updated_at: Utc::now(),
     };
@@ -254,6 +254,25 @@ async fn test_step30_policy_worker_evaluation_and_dry_run_logging() {
         .upsert_position(&pos_model)
         .await
         .expect("Failed to seed position");
+
+    let usdc_pos = PortfolioModel {
+        portfolio_id: Uuid::new_v4(),
+        vault_address: vault_address.clone(),
+        asset_symbol: "USDC".to_string(),
+        asset_mint: Keypair::new().pubkey().to_string(),
+        amount: 3_100_000,
+        entry_price_usd: 1.0,
+        current_price_usd: 1.0,
+        current_value_usd: 3_100_000.0,
+        target_weight_bps: 3000,
+        current_weight_bps: 1500,
+        last_rebalanced_at: None,
+        updated_at: Utc::now(),
+    };
+    portfolio_repo
+        .upsert_position(&usdc_pos)
+        .await
+        .expect("Failed to seed USDC position");
 
     // 4. Create an incoming market/oracle event for this vault
     let event = EventModel {
@@ -264,7 +283,8 @@ async fn test_step30_policy_worker_evaluation_and_dry_run_logging() {
         sentiment_score: Some(0.65),
         payload: json!({
             "trigger": "scheduled_drift_check",
-            "volatility": "moderate"
+            "volatility": "moderate",
+            "symbol": "NVDA"
         }),
         status: "PENDING".to_string(),
         detected_at: Utc::now(),
@@ -364,18 +384,18 @@ async fn test_end_to_end_event_queue_to_policy_worker_flow() {
         .await
         .expect("Failed to seed policy");
 
-    // 3. Seed Portfolio
+    // 3. Seed Portfolio with dollar values reflecting drift exceeding threshold
     let pos_model = PortfolioModel {
         portfolio_id: Uuid::new_v4(),
         vault_address: vault_address.clone(),
-        asset_symbol: "SOL".to_string(),
+        asset_symbol: "NVDA".to_string(),
         asset_mint: deposit_mint.clone(),
-        amount: 50_000,
-        entry_price_usd: 140.0,
-        current_price_usd: 145.0,
-        current_value_usd: 7_250_000.0,
-        target_weight_bps: 10000,
-        current_weight_bps: 10000,
+        amount: 20_000,
+        entry_price_usd: 150.0,
+        current_price_usd: 150.0,
+        current_value_usd: 3_000_000.0,
+        target_weight_bps: 2000,
+        current_weight_bps: 3000,
         last_rebalanced_at: None,
         updated_at: Utc::now(),
     };
@@ -383,6 +403,25 @@ async fn test_end_to_end_event_queue_to_policy_worker_flow() {
         .upsert_position(&pos_model)
         .await
         .expect("Failed to seed portfolio");
+
+    let usdc_pos = PortfolioModel {
+        portfolio_id: Uuid::new_v4(),
+        vault_address: vault_address.clone(),
+        asset_symbol: "USDC".to_string(),
+        asset_mint: Keypair::new().pubkey().to_string(),
+        amount: 7_000_000,
+        entry_price_usd: 1.0,
+        current_price_usd: 1.0,
+        current_value_usd: 7_000_000.0,
+        target_weight_bps: 8000,
+        current_weight_bps: 7000,
+        last_rebalanced_at: None,
+        updated_at: Utc::now(),
+    };
+    portfolio_repo
+        .upsert_position(&usdc_pos)
+        .await
+        .expect("Failed to seed USDC portfolio");
 
     // 4. Initialize EventListener with shared queue
     let solana_service = SolanaService::new(

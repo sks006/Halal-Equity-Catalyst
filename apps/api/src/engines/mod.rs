@@ -12,16 +12,15 @@ pub mod risk_engine;
 pub use dbc_engine::DbcEngine;
 pub use decision_engine::{CanonicalExecutionPayload, DecisionEngine, ExecutionSigner};
 pub use execution_planner::{
-    ExecutionPlan, ExecutionPlanner, IdempotencyRecord, IdempotencyStatus, IdempotencyTracker,
-    OracleReferenceInfo, PlannerError,
+    AnchorExecutionConnector, AnchorExecutionError, ExecutionPlan, ExecutionPlanner,
+    IdempotencyRecord, IdempotencyStatus, IdempotencyTracker, OracleReferenceInfo, PlannerError,
+    PreconditionParameters,
 };
-pub use execution_recorder::{
-    ExecutionBalanceTracker, ExecutionRecord, ExecutionRecorderError,
-};
+pub use execution_recorder::{ExecutionBalanceTracker, ExecutionRecord, ExecutionRecorderError};
 pub use execution_signer::{
-    DevTestSigner, ExternalSigner, KeypairSigner, RemoteHsmSigner, SignedTransaction, SignerError,
-    TransactionBuilder, TransactionSignerService, TransactionSubmitter, UnavailableSigner,
-    UnsignedTransaction,
+    load_production_signer, DevTestSigner, ExternalSigner, HsmSigner, KeypairSigner, KmsSigner,
+    RemoteHsmSigner, SignedTransaction, SignerError, SigningLifecycle, TransactionBuilder,
+    TransactionSignerService, TransactionSubmitter, UnavailableSigner, UnsignedTransaction,
 };
 pub use pipeline_safety::{
     PipelineExecutionAudit, PipelineExecutionContext, PipelineFailure, PipelineState,

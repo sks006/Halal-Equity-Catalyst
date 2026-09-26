@@ -4,7 +4,7 @@
 use deadpool_postgres::Pool;
 use equity_catalyst_solana::{
     accounts::*,
-    rpc::{SignatureStatus, SolanaRpcClient},
+    rpc::{SignatureStatus, SolanaRpcClient, TransactionConfirmationStatus},
     websocket::{LogsNotification, SolanaWebSocketClient},
     AnchorClient, SolanaError,
 };
@@ -317,6 +317,38 @@ impl SolanaService {
             .map_err(|e| ApiError::InternalServerError(format!("Confirmation failed: {}", e)))
     }
 
+    #[instrument(skip(self))]
+    pub async fn get_block_height(&self) -> Result<u64, ApiError> {
+        self.rpc
+            .get_block_height()
+            .await
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))
+    }
+
+    #[instrument(skip(self), fields(sig = %sig))]
+    pub async fn get_transaction(
+        &self,
+        sig: &Signature,
+    ) -> Result<Option<serde_json::Value>, ApiError> {
+        self.rpc
+            .get_transaction(sig)
+            .await
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))
+    }
+
+    #[instrument(skip(self), fields(sig = %sig))]
+    pub async fn track_transaction_confirmation(
+        &self,
+        sig: &Signature,
+        last_valid_block_height: Option<u64>,
+        timeout: Duration,
+    ) -> Result<TransactionConfirmationStatus, ApiError> {
+        self.rpc
+            .track_transaction_confirmation(sig, last_valid_block_height, timeout)
+            .await
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))
+    }
+
     // High-Level Anchor Instruction Dispatchers
 
     pub async fn initialize_vault(
@@ -472,6 +504,48 @@ impl SolanaService {
                 compliance_pda,
                 input_amount,
                 min_output_amount,
+            )
+            .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
+
+        let sig = self
+            .submit_transaction(&[ix], &keeper.pubkey(), &[keeper])
+            .await?;
+        Ok((sig, execution_pda))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn execute_action_with_dex(
+        &self,
+        keeper: &Keypair,
+        vault_pda: &Pubkey,
+        execution_id: u64,
+        action_type: u8,
+        input_mint: &Pubkey,
+        output_mint: &Pubkey,
+        vault_input_token: &Pubkey,
+        vault_output_token: &Pubkey,
+        compliance_pda: &Pubkey,
+        dex_program: &Pubkey,
+        input_amount: u64,
+        min_output_amount: u64,
+        remaining_accounts: &[solana_sdk::instruction::AccountMeta],
+    ) -> Result<(Signature, Pubkey), ApiError> {
+        let (ix, execution_pda) = self
+            .anchor_client
+            .build_execute_action_ix_full(
+                &keeper.pubkey(),
+                vault_pda,
+                execution_id,
+                action_type,
+                input_mint,
+                output_mint,
+                vault_input_token,
+                vault_output_token,
+                compliance_pda,
+                dex_program,
+                input_amount,
+                min_output_amount,
+                remaining_accounts,
             )
             .map_err(|e| ApiError::InternalServerError(e.to_string()))?;
 

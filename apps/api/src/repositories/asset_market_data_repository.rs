@@ -12,9 +12,15 @@ use uuid::Uuid;
 
 use crate::{
     error::ApiError,
-    models::asset_market_data::{AssetMarketDataMapping, AssetMarketDataModel},
+    models::{
+        asset_market_data::{
+            subscription_set_from_mappings, AssetMarketDataMapping, AssetMarketDataModel,
+        },
+        canonical_asset::CanonicalAssetModel,
+    },
     repositories::CanonicalAssetRepository,
 };
+use equity_catalyst_pyth::SubscriptionSet;
 
 #[derive(Clone, Debug)]
 enum Backend {
@@ -50,7 +56,9 @@ impl AssetMarketDataRepository {
     fn normalize_feed_id(feed_id: &str) -> Result<String, ApiError> {
         let clean = feed_id.trim_start_matches("0x").trim().to_lowercase();
         if clean.is_empty() {
-            return Err(ApiError::BadRequest("Pyth feed ID cannot be empty".to_string()));
+            return Err(ApiError::BadRequest(
+                "Pyth feed ID cannot be empty".to_string(),
+            ));
         }
         Ok(clean)
     }
@@ -141,7 +149,10 @@ impl AssetMarketDataRepository {
                 })?;
 
                 // Check active mapping per asset
-                if guard.values().any(|m| m.asset_id == asset_id && m.is_active) {
+                if guard
+                    .values()
+                    .any(|m| m.asset_id == asset_id && m.is_active)
+                {
                     return Err(ApiError::BadRequest(format!(
                         "Active mapping already exists for asset '{}'",
                         asset_id
@@ -149,7 +160,10 @@ impl AssetMarketDataRepository {
                 }
 
                 // Check active mapping per feed
-                if guard.values().any(|m| m.pyth_feed_id == clean_feed_id && m.is_active) {
+                if guard
+                    .values()
+                    .any(|m| m.pyth_feed_id == clean_feed_id && m.is_active)
+                {
                     return Err(ApiError::BadRequest(format!(
                         "Pyth feed '{}' is already mapped to an active asset",
                         clean_feed_id
@@ -252,7 +266,16 @@ impl AssetMarketDataRepository {
         }
     }
 
+    /// Alias for `get_mapping_for_asset`.
+    pub async fn get_pyth_mapping(
+        &self,
+        asset_id: &str,
+    ) -> Result<Option<AssetMarketDataMapping>, ApiError> {
+        self.get_mapping_for_asset(asset_id).await
+    }
+
     /// Answers the core acceptance criterion:
+
     /// "For every currently active approved asset, which Pyth feed should provide its reference price?"
     ///
     /// Excludes:
@@ -330,10 +353,43 @@ impl AssetMarketDataRepository {
         }
     }
 
+    /// Alias for `get_active_mappings`.
+    pub async fn list_active_pyth_mappings(&self) -> Result<Vec<AssetMarketDataMapping>, ApiError> {
+        self.get_active_mappings().await
+    }
+
+    /// Delegates to underlying `CanonicalAssetRepository` to list active approved assets.
+    pub async fn list_active_approved_assets(&self) -> Result<Vec<CanonicalAssetModel>, ApiError> {
+        self.asset_repo.list_active_approved_assets().await
+    }
+
+    /// Delegates to underlying `CanonicalAssetRepository` to get an asset by its ID.
+    pub async fn get_asset(&self, asset_id: &str) -> Result<Option<CanonicalAssetModel>, ApiError> {
+        self.asset_repo.get_asset(asset_id).await
+    }
+
+    /// Delegates to underlying `CanonicalAssetRepository` to get an asset by its mint.
+    pub async fn get_by_mint(
+        &self,
+        mint_address: &str,
+    ) -> Result<Option<CanonicalAssetModel>, ApiError> {
+        self.asset_repo.get_by_mint(mint_address).await
+    }
+
+    /// Builds a deterministic `SubscriptionSet` directly from the database's active approved mappings.
+    pub async fn build_subscription_set(&self) -> Result<SubscriptionSet, ApiError> {
+        let mappings = self.list_active_pyth_mappings().await?;
+        Ok(subscription_set_from_mappings(&mappings))
+    }
+
     /// Deactivates a market data feed mapping for an asset.
+
     ///
     /// Immediately prevents the feed from being included in live subscriptions.
-    pub async fn deactivate_mapping(&self, asset_id: &str) -> Result<AssetMarketDataMapping, ApiError> {
+    pub async fn deactivate_mapping(
+        &self,
+        asset_id: &str,
+    ) -> Result<AssetMarketDataMapping, ApiError> {
         let asset = self
             .asset_repo
             .get_asset_by_id(asset_id)
@@ -381,9 +437,9 @@ impl AssetMarketDataRepository {
                     ApiError::InternalServerError(format!("Lock acquisition failed: {}", e))
                 })?;
 
-                let mapping = guard
-                    .get_mut(asset_id)
-                    .ok_or_else(|| ApiError::NotFound(format!("No mapping found for asset '{}'", asset_id)))?;
+                let mapping = guard.get_mut(asset_id).ok_or_else(|| {
+                    ApiError::NotFound(format!("No mapping found for asset '{}'", asset_id))
+                })?;
 
                 mapping.is_active = false;
                 mapping.updated_at = Utc::now();
@@ -466,19 +522,18 @@ impl AssetMarketDataRepository {
                 })?;
 
                 // Check if another active asset already uses clean_feed_id
-                if guard
-                    .values()
-                    .any(|m| m.asset_id != asset_id && m.pyth_feed_id == clean_feed_id && m.is_active)
-                {
+                if guard.values().any(|m| {
+                    m.asset_id != asset_id && m.pyth_feed_id == clean_feed_id && m.is_active
+                }) {
                     return Err(ApiError::BadRequest(format!(
                         "Pyth feed '{}' is already mapped to another active asset",
                         clean_feed_id
                     )));
                 }
 
-                let mapping = guard
-                    .get_mut(asset_id)
-                    .ok_or_else(|| ApiError::NotFound(format!("No mapping found for asset '{}'", asset_id)))?;
+                let mapping = guard.get_mut(asset_id).ok_or_else(|| {
+                    ApiError::NotFound(format!("No mapping found for asset '{}'", asset_id))
+                })?;
 
                 mapping.pyth_feed_id = clean_feed_id.clone();
                 mapping.updated_at = Utc::now();
