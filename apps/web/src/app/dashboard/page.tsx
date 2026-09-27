@@ -71,7 +71,9 @@ export default function DashboardPage() {
         client.listExecutions(),
       ]);
 
-      const healthOk = healthRes.status === "fulfilled" && healthRes.value?.status === "healthy";
+      const healthOk =
+        healthRes.status === "fulfilled" &&
+        (healthRes.value?.status === "ok" || healthRes.value?.status === "healthy");
       setIsConnected(healthOk);
 
       if (pricesRes.status === "fulfilled" && Object.keys(pricesRes.value).length > 0) {

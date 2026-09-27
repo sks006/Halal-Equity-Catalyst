@@ -11,6 +11,7 @@ use crate::{
 #[derive(Clone)]
 pub struct PythClient {
     base_url: String,
+    api_key: Option<String>,
     http_client: reqwest::Client,
     registry: Arc<PythFeedRegistry>,
     mock_mode: Arc<RwLock<bool>>,
@@ -20,8 +21,14 @@ pub struct PythClient {
 impl PythClient {
     /// Creates a new PythClient with the specified Hermes endpoint.
     pub fn new(base_url: &str) -> Self {
+        Self::with_api_key(base_url, None)
+    }
+
+    /// Creates a new PythClient with Hermes endpoint and optional API key.
+    pub fn with_api_key(base_url: &str, api_key: Option<String>) -> Self {
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
+            api_key,
             http_client: reqwest::Client::builder()
                 .timeout(std::time::Duration::from_secs(10))
                 .build()
@@ -132,9 +139,12 @@ impl PythClient {
 
         debug!(url = %url, "Fetching Pyth Hermes price feeds");
 
-        let resp = self
-            .http_client
-            .get(&url)
+        let mut req = self.http_client.get(&url);
+        if let Some(ref key) = self.api_key {
+            req = req.header("Authorization", format!("Bearer {}", key));
+        }
+
+        let resp = req
             .send()
             .await
             .map_err(|e| PythError::Http(e.to_string()))?;
