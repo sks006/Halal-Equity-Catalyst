@@ -9,7 +9,12 @@ import { Input } from "@/components/ui/input";
 
 export default function SettingsPage() {
   const [rpcUrl, setRpcUrl] = useState<string>("https://api.devnet.solana.com");
-  const [apiUrl, setApiUrl] = useState<string>("http://127.0.0.1:4000");
+  const [apiUrl, setApiUrl] = useState<string>(
+    process.env.NEXT_PUBLIC_API_URL ??
+      (process.env.NODE_ENV === "production"
+        ? "https://halal-equity-catalyst.onrender.com"
+        : "http://127.0.0.1:4000")
+  );
   const [defaultSlippageBps, setDefaultSlippageBps] = useState<number>(50);
   const [isSaved, setIsSaved] = useState<boolean>(false);
 
