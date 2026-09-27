@@ -62,8 +62,9 @@ pub fn build_app(config: Config, pool: Pool, redis_client: Option<redis::Client>
         std::time::Duration::from_millis(config.solana_rpc_timeout_ms),
     ));
 
-    let pyth_client = Arc::new(equity_catalyst_pyth::PythClient::new(
+    let pyth_client = Arc::new(equity_catalyst_pyth::PythClient::with_api_key(
         &config.pyth_hermes_url,
+        config.pyth_api_key.clone(),
     ));
     let portfolio_repo = repositories::PortfolioRepository::new(pool.clone());
     let oracle_service = Arc::new(services::OracleService::new(

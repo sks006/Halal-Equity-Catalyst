@@ -47,6 +47,7 @@ pub struct Config {
     pub redis_url: String,
     pub jupiter_api_url: String,
     pub pyth_hermes_url: String,
+    pub pyth_api_key: Option<String>,
     pub execution_signer_path: String,
     pub signer_backend: String,
     pub expected_execution_authority: Option<String>,
@@ -80,6 +81,7 @@ impl Config {
             jupiter_api_url: env::var("JUPITER_API_URL")
                 .unwrap_or_else(|_| "https://quote-api.jup.ag/v6".to_string()),
             pyth_hermes_url: "https://hermes.pyth.network".to_string(),
+            pyth_api_key: env::var("PYTH_API_KEY").ok().filter(|s| !s.trim().is_empty()),
             execution_signer_path: "~/.config/solana/id.json".to_string(),
             signer_backend: "keypair".to_string(),
             expected_execution_authority: None,
@@ -114,6 +116,7 @@ impl Config {
             jupiter_api_url: env::var("JUPITER_API_URL")
                 .unwrap_or_else(|_| "https://quote-api.jup.ag/v6".to_string()),
             pyth_hermes_url: "https://hermes.pyth.network".to_string(),
+            pyth_api_key: env::var("PYTH_API_KEY").ok().filter(|s| !s.trim().is_empty()),
             execution_signer_path: "~/.config/solana/id.json".to_string(),
             signer_backend: "keypair".to_string(),
             expected_execution_authority: None,
@@ -169,6 +172,7 @@ impl Config {
             jupiter_api_url: env::var("JUPITER_API_URL")
                 .unwrap_or_else(|_| "https://quote-api.jup.ag/v6".to_string()),
             pyth_hermes_url: "https://hermes.pyth.network".to_string(),
+            pyth_api_key: env::var("PYTH_API_KEY").ok().filter(|s| !s.trim().is_empty()),
             execution_signer_path: env::var("EXECUTION_SIGNER_PATH")
                 .unwrap_or_else(|_| "/etc/equity-catalyst/signer.json".to_string()),
             signer_backend: env::var("SIGNER_BACKEND")
@@ -245,6 +249,10 @@ impl Config {
         let redis_url = env::var("REDIS_URL").unwrap_or(default.redis_url);
         let jupiter_api_url = env::var("JUPITER_API_URL").unwrap_or(default.jupiter_api_url);
         let pyth_hermes_url = env::var("PYTH_HERMES_URL").unwrap_or(default.pyth_hermes_url);
+        let pyth_api_key = env::var("PYTH_API_KEY")
+            .ok()
+            .filter(|s| !s.trim().is_empty())
+            .or(default.pyth_api_key);
         let execution_signer_path =
             env::var("EXECUTION_SIGNER_PATH").unwrap_or(default.execution_signer_path);
         let signer_backend = env::var("SIGNER_BACKEND")
@@ -306,6 +314,7 @@ impl Config {
             redis_url,
             jupiter_api_url,
             pyth_hermes_url,
+            pyth_api_key,
             execution_signer_path,
             signer_backend,
             expected_execution_authority,

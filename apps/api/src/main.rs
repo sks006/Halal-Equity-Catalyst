@@ -99,8 +99,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Initialize Pyth client and Oracle service
-    let pyth_client = Arc::new(equity_catalyst_pyth::PythClient::new(
+    let pyth_client = Arc::new(equity_catalyst_pyth::PythClient::with_api_key(
         &config.pyth_hermes_url,
+        config.pyth_api_key.clone(),
     ));
     let portfolio_repo =
         equity_catalyst_api::repositories::PortfolioRepository::new(db_pool.clone());
