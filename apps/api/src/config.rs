@@ -251,7 +251,8 @@ impl Config {
         let pyth_hermes_url = env::var("PYTH_HERMES_URL").unwrap_or(default.pyth_hermes_url);
         let pyth_api_key = env::var("PYTH_API_KEY")
             .ok()
-            .filter(|s| !s.trim().is_empty())
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
             .or(default.pyth_api_key);
         let execution_signer_path =
             env::var("EXECUTION_SIGNER_PATH").unwrap_or(default.execution_signer_path);
