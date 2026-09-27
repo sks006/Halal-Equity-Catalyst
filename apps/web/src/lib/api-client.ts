@@ -207,7 +207,12 @@ export class ApiClient {
   private readonly baseUrl: string;
 
   constructor(baseUrl?: string) {
-    this.baseUrl = (baseUrl || process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:4000").replace(
+    const defaultUrl =
+      process.env.NEXT_PUBLIC_API_URL ??
+      (process.env.NODE_ENV === "production"
+        ? "https://halal-equity-catalyst.onrender.com"
+        : "http://127.0.0.1:4000");
+    this.baseUrl = (baseUrl || defaultUrl).replace(
       /\/+$/,
       ""
     );

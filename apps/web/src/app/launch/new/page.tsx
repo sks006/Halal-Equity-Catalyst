@@ -80,8 +80,13 @@ export default function NewLaunchPage() {
   // Compute or fetch preview from backend /dbc/configure
   const fetchConfiguration = async () => {
     setLoading(true);
+    const apiUrl =
+      process.env.NEXT_PUBLIC_API_URL ??
+      (process.env.NODE_ENV === "production"
+        ? "https://halal-equity-catalyst.onrender.com"
+        : "http://127.0.0.1:4000");
     try {
-      const res = await fetch("http://127.0.0.1:4000/dbc/configure", {
+      const res = await fetch(`${apiUrl}/dbc/configure`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
