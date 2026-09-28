@@ -67,6 +67,7 @@ async fn test_config_validation_rejects_dev_secret_in_mainnet() {
     config.signer_backend = "keypair".to_string();
     config.expected_execution_authority =
         Some("AuthPubkey111111111111111111111111111111111".to_string());
+    config.pyth.api_key = Some("test-pyth-api-key-mainnet".to_string());
     assert!(config.validate().is_ok());
 }
 

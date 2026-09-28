@@ -6,7 +6,7 @@ pub mod subscription;
 pub mod types;
 
 pub use client::PythClient;
-pub use feeds::{known_feeds, PythFeedRegistry};
+pub use feeds::{known_feeds, FeedEntry, FeedSource, PythFeedRegistry};
 pub use manager::{DynamicStreamManager, PriceUpdateSink, StreamManagerConfig};
 pub use stream::{
     parse_price_update_event, PythEventStream, PythStreamClient, PythStreamConfig, RawSseEvent,

@@ -23,10 +23,10 @@ fn sample_asset_request(
     }
 }
 
-const NVDA_FEED_ID: &str = "3155e714652285e6834d8ef0b3558163f4585c5b9679f222956cf57fb3645391";
-const AAPL_FEED_ID: &str = "49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175ec697df854ab";
-const TSLA_FEED_ID: &str = "167776b6f68449c25605d8f6356499711202e0766e4a2d829910d54a165a22d7";
-const MSFT_FEED_ID: &str = "4a985d8868f7004fdb85427d11129994c502b74fa6a2bc3053ba491a98059fa2";
+const NVDA_FEED_ID: &str = "b1073854ed24cbc755dc527418f52b7d271f6cc967bbf8d8129112b18860a593";
+const AAPL_FEED_ID: &str = "49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688";
+const TSLA_FEED_ID: &str = "16dad506d7db8da01c87581c87ca897a012a153557d4d578c3b9c9e1bc0632f1";
+const MSFT_FEED_ID: &str = "d0ca23c1cc005e004ccf1db5bf76aeb6a49218f43dac3d4b275e92de12ded4d1";
 
 #[tokio::test]
 async fn test_valid_mapping_creation_and_retrieval() {

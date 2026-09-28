@@ -16,7 +16,7 @@ const HERMES_FIXTURE_JSON: &str = r#"{
   },
   "parsed": [
     {
-      "id": "49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175ec697df854ab",
+      "id": "49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688",
       "price": {
         "price": "22450000000",
         "conf": "15000000",

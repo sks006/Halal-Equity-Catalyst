@@ -33,7 +33,26 @@ impl PythClient {
                 .timeout(std::time::Duration::from_secs(10))
                 .build()
                 .unwrap_or_default(),
-            registry: Arc::new(PythFeedRegistry::new()),
+            registry: Arc::new(PythFeedRegistry::default()),
+            mock_mode: Arc::new(RwLock::new(false)),
+            mock_prices: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Creates a new PythClient with Hermes endpoint, optional API key, and custom registry.
+    pub fn with_registry(
+        base_url: &str,
+        api_key: Option<String>,
+        registry: Arc<PythFeedRegistry>,
+    ) -> Self {
+        Self {
+            base_url: base_url.trim_end_matches('/').to_string(),
+            api_key,
+            http_client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .unwrap_or_default(),
+            registry,
             mock_mode: Arc::new(RwLock::new(false)),
             mock_prices: Arc::new(RwLock::new(HashMap::new())),
         }
