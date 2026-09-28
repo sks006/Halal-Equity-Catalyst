@@ -78,7 +78,7 @@ fn test_staleness_detection() {
 
 #[test]
 fn test_feed_registry_lookups_and_custom_registration() {
-    let registry = PythFeedRegistry::new();
+    let registry = PythFeedRegistry::default();
 
     // Check defaults
     assert_eq!(registry.get_feed_id("SOL").unwrap(), known_feeds::SOL_USD);
@@ -121,7 +121,7 @@ async fn test_mock_client_price_fetching() {
 
 #[test]
 fn test_verify_actual_production_pyth_feeds() {
-    let registry = PythFeedRegistry::new();
+    let registry = PythFeedRegistry::default();
 
     let expected_feeds = [
         ("SOL", known_feeds::SOL_USD),

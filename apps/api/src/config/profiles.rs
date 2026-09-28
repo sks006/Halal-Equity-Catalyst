@@ -1,0 +1,97 @@
+use super::{Config, Environment, PythConfig};
+
+pub fn development() -> Config {
+    Config {
+        environment: Environment::Development,
+        api_host: "127.0.0.1".into(),
+        api_port: 4000,
+        solana_rpc_url: "http://127.0.0.1:8899".into(),
+        solana_fallback_rpc_urls: Vec::new(),
+        solana_rpc_timeout_ms: 10_000,
+        solana_ws_url: "ws://127.0.0.1:8900".into(),
+        solana_cluster: "localnet".into(),
+        database_url: "postgres://postgres:postgres@localhost:5432/equity_catalyst_dev".into(),
+        redis_url: "redis://127.0.0.1:6379".into(),
+        jupiter_api_url: "https://quote-api.jup.ag/v6".into(),
+        pyth: PythConfig::default(),
+        execution_signer_path: "~/.config/solana/id.json".into(),
+        signer_backend: "keypair".into(),
+        expected_execution_authority: None,
+        kms_key_id: None,
+        kms_endpoint: None,
+        hsm_slot: None,
+        hsm_key_label: None,
+        preflight_simulation_enabled: false,
+        read_only: false,
+        max_trade_size_usd: 100_000,
+        max_slippage_bps: 100,
+        admin_api_key: "catalyst-admin-secret-dev".into(),
+        rate_limit_requests_per_minute: 120,
+    }
+}
+
+pub fn testnet() -> Config {
+    Config {
+        environment: Environment::Testnet,
+        api_host: "0.0.0.0".into(),
+        api_port: 4000,
+        solana_rpc_url: "https://api.devnet.solana.com".into(),
+        solana_fallback_rpc_urls: vec![
+            "https://devnet.helius-rpc.com/?api-key=public".into(),
+        ],
+        solana_rpc_timeout_ms: 15_000,
+        solana_ws_url: "wss://api.devnet.solana.com".into(),
+        solana_cluster: "devnet".into(),
+        database_url: "postgres://postgres:postgres@localhost:5432/equity_catalyst".into(),
+        redis_url: "redis://127.0.0.1:6379".into(),
+        jupiter_api_url: "https://quote-api.jup.ag/v6".into(),
+        pyth: PythConfig::default(),
+        execution_signer_path: "~/.config/solana/id.json".into(),
+        signer_backend: "keypair".into(),
+        expected_execution_authority: None,
+        kms_key_id: None,
+        kms_endpoint: None,
+        hsm_slot: None,
+        hsm_key_label: None,
+        preflight_simulation_enabled: false,
+        read_only: true,
+        max_trade_size_usd: 50_000,
+        max_slippage_bps: 50,
+        admin_api_key: "catalyst-admin-secret-dev".into(),
+        rate_limit_requests_per_minute: 120,
+    }
+}
+
+pub fn mainnet() -> Config {
+    Config {
+        environment: Environment::Mainnet,
+        api_host: "0.0.0.0".into(),
+        api_port: 4000,
+        solana_rpc_url: "https://api.mainnet-beta.solana.com".into(),
+        solana_fallback_rpc_urls: vec![
+            "https://solana-mainnet.g.alchemy.com/v2/demo".into(),
+            "https://rpc.ankr.com/solana".into(),
+            "https://api.mainnet-beta.solana.com".into(),
+        ],
+        solana_rpc_timeout_ms: 15_000,
+        solana_ws_url: "wss://api.mainnet-beta.solana.com".into(),
+        solana_cluster: "mainnet-beta".into(),
+        database_url: String::new(),
+        redis_url: String::new(),
+        jupiter_api_url: "https://quote-api.jup.ag/v6".into(),
+        pyth: PythConfig::default(),
+        execution_signer_path: "/etc/equity-catalyst/signer.json".into(),
+        signer_backend: String::new(),
+        expected_execution_authority: None,
+        kms_key_id: None,
+        kms_endpoint: None,
+        hsm_slot: None,
+        hsm_key_label: None,
+        preflight_simulation_enabled: true,
+        read_only: true,
+        max_trade_size_usd: 25_000,
+        max_slippage_bps: 30,
+        admin_api_key: String::new(),
+        rate_limit_requests_per_minute: 60,
+    }
+}

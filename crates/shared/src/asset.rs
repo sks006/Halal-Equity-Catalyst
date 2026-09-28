@@ -315,7 +315,7 @@ pub fn verified_mainnet_assets() -> Vec<Asset> {
             },
             ProviderConfig {
                 provider: AssetProvider::PreStocks,
-                price_feed_id: "3155e714652285e6834d8ef0b3558163f4585c5b9679f222956cf57fb3645391"
+                price_feed_id: "b1073854ed24cbc755dc527418f52b7d271f6cc967bbf8d8129112b18860a593"
                     .to_string(),
                 meteora_pool: Some(METEORA_NVDA_USDC_POOL.to_string()),
                 secondary_reference: Some("tessera:NVDA".to_string()),
@@ -338,7 +338,7 @@ pub fn verified_mainnet_assets() -> Vec<Asset> {
             },
             ProviderConfig {
                 provider: AssetProvider::PreStocks,
-                price_feed_id: "49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175ec697df854ab"
+                price_feed_id: "49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688"
                     .to_string(),
                 meteora_pool: Some(METEORA_AAPL_USDC_POOL.to_string()),
                 secondary_reference: Some("tessera:AAPL".to_string()),
@@ -361,7 +361,7 @@ pub fn verified_mainnet_assets() -> Vec<Asset> {
             },
             ProviderConfig {
                 provider: AssetProvider::PreStocks,
-                price_feed_id: "2b89b9dc8fdf9f34709a5b106b472f0f39bb6ca9ce04b0fd7f2e971688e2e53b"
+                price_feed_id: "19e09bb805456ada3979a7d1cbb4b6d63babc3a0f8e8a9509f68afa5c4c11cd5"
                     .to_string(),
                 meteora_pool: Some(METEORA_SPYX_USDC_POOL.to_string()),
                 secondary_reference: None,
@@ -645,7 +645,7 @@ mod tests {
             },
             ProviderConfig {
                 provider: AssetProvider::PreStocks,
-                price_feed_id: "3155e714652285e6834d8ef0b3558163f4585c5b9679f222956cf57fb3645391"
+                price_feed_id: "b1073854ed24cbc755dc527418f52b7d271f6cc967bbf8d8129112b18860a593"
                     .to_string(),
                 meteora_pool: Some("MeteoraNvdaPool1111111111111111111111111111".to_string()),
                 secondary_reference: Some("tessera:NVDA".to_string()),
@@ -681,7 +681,7 @@ mod tests {
         };
         let provider = ProviderConfig {
             provider: AssetProvider::PreStocks,
-            price_feed_id: "49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175ec697df854ab"
+            price_feed_id: "49f6b65cb1de6b10eaf75e7c03ca029c306d0357e91b5311b175084a5ad55688"
                 .to_string(),
             meteora_pool: None,
             secondary_reference: None,
