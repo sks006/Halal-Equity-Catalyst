@@ -1,30 +1,69 @@
-//! Oracle domain service managing Pyth price feeds and portfolio valuations.
-
+use async_trait::async_trait;
 use chrono::Utc;
 use equity_catalyst_pyth::{NormalizedPrice, PythClient, PythError};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
-use crate::{error::ApiError, models::PortfolioModel, repositories::PortfolioRepository};
+use crate::{
+    error::ApiError,
+    models::PortfolioModel,
+    repositories::{PortfolioRepository, PortfolioRepositoryTrait},
+};
+
+/// Abstraction for oracle price providers conforming to Open/Closed (OCP) and Dependency Inversion (DIP).
+#[async_trait]
+pub trait PriceFeedProvider: Send + Sync {
+    async fn get_normalized_price_by_symbol(
+        &self,
+        symbol: &str,
+        max_staleness_secs: i64,
+    ) -> Result<NormalizedPrice, PythError>;
+}
+
+#[async_trait]
+impl PriceFeedProvider for PythClient {
+    async fn get_normalized_price_by_symbol(
+        &self,
+        symbol: &str,
+        max_staleness_secs: i64,
+    ) -> Result<NormalizedPrice, PythError> {
+        self.get_normalized_price_by_symbol(symbol, max_staleness_secs)
+            .await
+    }
+}
 
 /// Service responsible for fetching, validating, and normalizing external oracle price feeds.
 #[derive(Clone)]
 pub struct OracleService {
-    pyth_client: Arc<PythClient>,
-    portfolio_repo: Option<PortfolioRepository>,
+    price_provider: Arc<dyn PriceFeedProvider>,
+    portfolio_repo: Option<Arc<dyn PortfolioRepositoryTrait>>,
     max_staleness_secs: i64,
     max_confidence_ratio: f64,
 }
 
 impl OracleService {
-    /// Creates a new OracleService with standard safety thresholds.
+    /// Creates a new OracleService with standard safety thresholds using concrete PythClient.
     pub fn new(pyth_client: Arc<PythClient>, portfolio_repo: Option<PortfolioRepository>) -> Self {
         Self {
-            pyth_client,
-            portfolio_repo,
+            price_provider: pyth_client,
+            portfolio_repo: portfolio_repo
+                .map(|r| Arc::new(r) as Arc<dyn PortfolioRepositoryTrait>),
             max_staleness_secs: 120,    // 2 minutes max staleness
             max_confidence_ratio: 0.05, // Max 5% confidence width
+        }
+    }
+
+    /// Creates an OracleService with an abstract PriceFeedProvider and PortfolioRepositoryTrait (DIP).
+    pub fn new_with_provider(
+        price_provider: Arc<dyn PriceFeedProvider>,
+        portfolio_repo: Option<Arc<dyn PortfolioRepositoryTrait>>,
+    ) -> Self {
+        Self {
+            price_provider,
+            portfolio_repo,
+            max_staleness_secs: 120,
+            max_confidence_ratio: 0.05,
         }
     }
 
@@ -40,15 +79,15 @@ impl OracleService {
         self
     }
 
-    /// Returns a reference to the underlying Pyth client.
-    pub fn pyth_client(&self) -> &PythClient {
-        &self.pyth_client
+    /// Returns a reference to the underlying price provider.
+    pub fn price_provider(&self) -> &Arc<dyn PriceFeedProvider> {
+        &self.price_provider
     }
 
     /// Fetches and normalizes a price for a given asset symbol.
     pub async fn get_normalized_price(&self, symbol: &str) -> Result<NormalizedPrice, ApiError> {
         let price = self
-            .pyth_client
+            .price_provider
             .get_normalized_price_by_symbol(symbol, self.max_staleness_secs)
             .await
             .map_err(|e| match e {

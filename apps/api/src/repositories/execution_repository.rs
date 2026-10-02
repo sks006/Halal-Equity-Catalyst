@@ -1,10 +1,13 @@
-//! Data access repository for Execution entities.
-
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use deadpool_postgres::Pool;
 use uuid::Uuid;
 
-use crate::{error::ApiError, models::ExecutionModel};
+use crate::{
+    error::ApiError,
+    models::ExecutionModel,
+    repositories::traits::{ExecutionReader, ExecutionRecorder},
+};
 
 #[derive(Clone, Debug)]
 pub struct ExecutionRepository {
@@ -153,5 +156,23 @@ impl ExecutionRepository {
             })?;
 
         Ok(rows.iter().map(ExecutionModel::from).collect())
+    }
+}
+
+#[async_trait]
+impl ExecutionReader for ExecutionRepository {
+    async fn list_all(&self) -> Result<Vec<ExecutionModel>, ApiError> {
+        self.list_all().await
+    }
+
+    async fn list_by_vault(&self, vault_address: &str) -> Result<Vec<ExecutionModel>, ApiError> {
+        self.list_by_vault(vault_address).await
+    }
+}
+
+#[async_trait]
+impl ExecutionRecorder for ExecutionRepository {
+    async fn create(&self, execution: &ExecutionModel) -> Result<ExecutionModel, ApiError> {
+        self.create(execution).await
     }
 }

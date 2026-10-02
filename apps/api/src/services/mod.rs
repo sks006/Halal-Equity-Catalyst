@@ -12,11 +12,16 @@ pub mod vault_service;
 pub use asset_subscription_watcher::{AssetSubscriptionWatcher, SubscriptionWatcherConfig};
 pub use equity_catalyst_pyth::{DynamicStreamManager, PriceUpdateSink, StreamManagerConfig};
 pub use execution_engine_service::{ExecutionEngineService, ExecutionOutcome, ExecutionRequest};
-pub use health_monitor::{ComponentHealth, HealthMonitor, HealthStatus, SystemHealthReport};
+pub use health_monitor::{
+    ComponentHealth, DefaultReadinessChecker, HealthCheckable, HealthMonitor, HealthStatus,
+    InMemoryReadinessChecker, ReadinessChecker, ReadinessProbeResult, SystemHealthReport,
+};
 pub use market_data_store::{
     calculate_scaled_int, MarketDataError, MarketDataStore, MarketPriceUpdate, PriceFreshness,
 };
-pub use oracle_service::OracleService;
-pub use quote_service::{QuoteExecutionRequest, QuoteExecutionService, QuoteExecutionVerdict};
+pub use oracle_service::{OracleService, PriceFeedProvider};
+pub use quote_service::{
+    QuoteExecutionRequest, QuoteExecutionService, QuoteExecutionVerdict, QuoteProvider,
+};
 pub use solana_service::SolanaService;
 pub use vault_service::VaultService;

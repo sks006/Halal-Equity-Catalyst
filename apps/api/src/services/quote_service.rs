@@ -1,7 +1,8 @@
-//! Quote execution domain service integrating Jupiter v6 quotes with the Risk Engine.
-
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use equity_catalyst_jupiter::{parse_price_impact_bps, JupiterClient, QuoteRequest, QuoteResponse};
+use equity_catalyst_jupiter::{
+    parse_price_impact_bps, JupiterClient, JupiterError, QuoteRequest, QuoteResponse,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -11,8 +12,24 @@ use crate::{
     engines::risk_engine::{validate_position_exposure, RiskEngine},
     error::ApiError,
     models::ExecutionModel,
-    repositories::{ExecutionRepository, PolicyRepository, PortfolioRepository, VaultRepository},
+    repositories::{
+        traits::{ExecutionRecorder, PolicyReader, PortfolioReader, VaultReader},
+        ExecutionRepository, PolicyRepository, PortfolioRepository, VaultRepository,
+    },
 };
+
+/// Abstraction for DEX quote providers conforming to Open/Closed (OCP) and Dependency Inversion (DIP).
+#[async_trait]
+pub trait QuoteProvider: Send + Sync {
+    async fn get_quote(&self, request: &QuoteRequest) -> Result<QuoteResponse, JupiterError>;
+}
+
+#[async_trait]
+impl QuoteProvider for JupiterClient {
+    async fn get_quote(&self, request: &QuoteRequest) -> Result<QuoteResponse, JupiterError> {
+        self.get_quote(request).await
+    }
+}
 
 /// Request parameters for evaluating a trade quote without on-chain execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -50,14 +67,16 @@ pub struct QuoteExecutionVerdict {
 
 /// Service implementing Step 33 quote-only execution.
 /// Flow: token A -> Jupiter quote -> expected output -> price impact -> risk engine
+///
+/// Follows Interface Segregation Principle (ISP): only depends on segregated readers and recorder.
 #[derive(Clone)]
 pub struct QuoteExecutionService {
-    jupiter_client: Arc<JupiterClient>,
+    quote_provider: Arc<dyn QuoteProvider>,
     risk_engine: Arc<RiskEngine>,
-    vault_repo: Option<VaultRepository>,
-    policy_repo: Option<PolicyRepository>,
-    portfolio_repo: Option<PortfolioRepository>,
-    execution_repo: Option<ExecutionRepository>,
+    vault_repo: Option<Arc<dyn VaultReader>>,
+    policy_repo: Option<Arc<dyn PolicyReader>>,
+    portfolio_repo: Option<Arc<dyn PortfolioReader>>,
+    execution_repo: Option<Arc<dyn ExecutionRecorder>>,
 }
 
 impl QuoteExecutionService {
@@ -70,7 +89,26 @@ impl QuoteExecutionService {
         execution_repo: Option<ExecutionRepository>,
     ) -> Self {
         Self {
-            jupiter_client,
+            quote_provider: jupiter_client,
+            risk_engine,
+            vault_repo: vault_repo.map(|r| Arc::new(r) as Arc<dyn VaultReader>),
+            policy_repo: policy_repo.map(|r| Arc::new(r) as Arc<dyn PolicyReader>),
+            portfolio_repo: portfolio_repo.map(|r| Arc::new(r) as Arc<dyn PortfolioReader>),
+            execution_repo: execution_repo.map(|r| Arc::new(r) as Arc<dyn ExecutionRecorder>),
+        }
+    }
+
+    /// Creates a QuoteExecutionService with abstract traits (ISP & DIP).
+    pub fn new_with_traits(
+        quote_provider: Arc<dyn QuoteProvider>,
+        risk_engine: Arc<RiskEngine>,
+        vault_repo: Option<Arc<dyn VaultReader>>,
+        policy_repo: Option<Arc<dyn PolicyReader>>,
+        portfolio_repo: Option<Arc<dyn PortfolioReader>>,
+        execution_repo: Option<Arc<dyn ExecutionRecorder>>,
+    ) -> Self {
+        Self {
+            quote_provider,
             risk_engine,
             vault_repo,
             policy_repo,
@@ -83,8 +121,8 @@ impl QuoteExecutionService {
         &self.risk_engine
     }
 
-    pub fn jupiter_client(&self) -> &JupiterClient {
-        &self.jupiter_client
+    pub fn quote_provider(&self) -> &Arc<dyn QuoteProvider> {
+        &self.quote_provider
     }
 
     /// Evaluates a trade quote through the complete multi-factor risk defense pipeline.
@@ -96,16 +134,16 @@ impl QuoteExecutionService {
         let execution_id = Uuid::new_v4();
         let slippage = request.slippage_bps.unwrap_or(50); // Default 0.50%
 
-        // 1. token A -> Jupiter quote
+        // 1. token A -> Quote provider quote
         let quote_req =
             QuoteRequest::new(&request.input_mint, &request.output_mint, request.amount_in)
                 .with_slippage_bps(slippage);
 
         let quote: QuoteResponse = self
-            .jupiter_client
+            .quote_provider
             .get_quote(&quote_req)
             .await
-            .map_err(|e| ApiError::InternalServerError(format!("Jupiter quote failed: {}", e)))?;
+            .map_err(|e| ApiError::InternalServerError(format!("Quote provider failed: {}", e)))?;
 
         // 2. Expected output & other amount threshold
         let expected_amount_out: u64 = quote.out_amount.parse().map_err(|e| {

@@ -8,6 +8,7 @@
     "sdk"
   ],
   "scripts": {
+    "api": "cargo run -p equity-catalyst-api",
     "build": "npm run build --workspace=apps/web",
     "build:sdk": "npm run build --workspace=sdk",
     "build:web": "npm run build --workspace=apps/web",

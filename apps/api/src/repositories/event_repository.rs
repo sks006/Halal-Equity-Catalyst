@@ -1,10 +1,13 @@
-//! Data access repository for Event entities.
-
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use deadpool_postgres::Pool;
 use uuid::Uuid;
 
-use crate::{error::ApiError, models::EventModel};
+use crate::{
+    error::ApiError,
+    models::EventModel,
+    repositories::traits::{EventReader, EventWriter},
+};
 
 #[derive(Clone, Debug)]
 pub struct EventRepository {
@@ -134,5 +137,27 @@ impl EventRepository {
             .map_err(|e| ApiError::InternalServerError(format!("Failed to list events: {}", e)))?;
 
         Ok(rows.iter().map(EventModel::from).collect())
+    }
+}
+
+#[async_trait]
+impl EventReader for EventRepository {
+    async fn list_all(&self) -> Result<Vec<EventModel>, ApiError> {
+        self.list_all().await
+    }
+
+    async fn find_pending(&self) -> Result<Vec<EventModel>, ApiError> {
+        self.find_pending().await
+    }
+
+    async fn list_by_vault(&self, vault_address: &str) -> Result<Vec<EventModel>, ApiError> {
+        self.list_by_vault(vault_address).await
+    }
+}
+
+#[async_trait]
+impl EventWriter for EventRepository {
+    async fn create(&self, event: &EventModel) -> Result<EventModel, ApiError> {
+        self.create(event).await
     }
 }

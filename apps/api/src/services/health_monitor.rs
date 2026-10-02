@@ -10,10 +10,12 @@
 //! 7. Policy Worker
 //! 8. Execution Worker
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use deadpool_postgres::Pool;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::sync::Arc;
 use std::time::Instant;
 use tracing::instrument;
 
@@ -43,11 +45,128 @@ pub struct SystemHealthReport {
     pub components: Vec<ComponentHealth>,
 }
 
+/// Pluggable health check trait conforming to the Open/Closed Principle (OCP).
+///
+/// Any platform component, external API, or worker can implement this trait
+/// and be registered into the `HealthMonitor` without modifying existing monitor logic.
+#[async_trait]
+pub trait HealthCheckable: Send + Sync {
+    /// Identifier or name of the component being checked.
+    fn component_name(&self) -> &str;
+
+    /// Runs a health probe and returns structured diagnostic information.
+    async fn check_health(&self) -> ComponentHealth;
+}
+
+/// Structured outcome of a system readiness check.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReadinessProbeResult {
+    pub ready: bool,
+    pub database: String,
+    pub redis: String,
+}
+
+/// Service abstraction for readiness checking (Single Responsibility Principle).
+///
+/// Decouples HTTP handlers from raw SQL queries and Redis network operations.
+#[async_trait]
+pub trait ReadinessChecker: Send + Sync {
+    async fn check_readiness(&self, is_app_ready: bool) -> ReadinessProbeResult;
+}
+
+/// Standard production implementation of `ReadinessChecker` using PostgreSQL and Redis.
+#[derive(Clone)]
+pub struct DefaultReadinessChecker {
+    db_pool: Pool,
+    redis_client: Option<redis::Client>,
+}
+
+impl DefaultReadinessChecker {
+    pub fn new(db_pool: Pool, redis_client: Option<redis::Client>) -> Self {
+        Self {
+            db_pool,
+            redis_client,
+        }
+    }
+}
+
+#[async_trait]
+impl ReadinessChecker for DefaultReadinessChecker {
+    async fn check_readiness(&self, is_app_ready: bool) -> ReadinessProbeResult {
+        let mut db_status = "unhealthy";
+        let mut redis_status = "disabled";
+        let mut is_healthy = is_app_ready;
+
+        // Check Postgres
+        match self.db_pool.get().await {
+            Ok(client) => match client.execute("SELECT 1", &[]).await {
+                Ok(_) => db_status = "healthy",
+                Err(_) => is_healthy = false,
+            },
+            Err(_) => is_healthy = false,
+        }
+
+        // Check Redis
+        if let Some(ref client) = self.redis_client {
+            match client.get_multiplexed_async_connection().await {
+                Ok(mut conn) => match redis::cmd("PING").query_async::<String>(&mut conn).await {
+                    Ok(resp) if resp == "PONG" => redis_status = "healthy",
+                    _ => is_healthy = false,
+                },
+                Err(_) => is_healthy = false,
+            }
+        }
+
+        ReadinessProbeResult {
+            ready: is_healthy,
+            database: db_status.to_string(),
+            redis: redis_status.to_string(),
+        }
+    }
+}
+
+/// In-memory implementation of `ReadinessChecker` for local testing (Liskov Substitution Principle).
+#[derive(Clone, Default)]
+pub struct InMemoryReadinessChecker {
+    pub force_unhealthy: bool,
+}
+
+impl InMemoryReadinessChecker {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_unhealthy(force_unhealthy: bool) -> Self {
+        Self { force_unhealthy }
+    }
+}
+
+#[async_trait]
+impl ReadinessChecker for InMemoryReadinessChecker {
+    async fn check_readiness(&self, is_app_ready: bool) -> ReadinessProbeResult {
+        let ready = is_app_ready && !self.force_unhealthy;
+        ReadinessProbeResult {
+            ready,
+            database: if ready {
+                "healthy".to_string()
+            } else {
+                "unhealthy".to_string()
+            },
+            redis: if ready {
+                "healthy".to_string()
+            } else {
+                "disabled".to_string()
+            },
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct HealthMonitor {
     db_pool: Pool,
     redis_client: Option<redis::Client>,
     solana_service: Option<SolanaService>,
+    checkers: Vec<Arc<dyn HealthCheckable>>,
     start_time: Instant,
 }
 
@@ -61,8 +180,15 @@ impl HealthMonitor {
             db_pool,
             redis_client,
             solana_service,
+            checkers: Vec::new(),
             start_time: Instant::now(),
         }
+    }
+
+    /// Registers an additional pluggable health checker (Open/Closed Principle).
+    pub fn with_checker(mut self, checker: Arc<dyn HealthCheckable>) -> Self {
+        self.checkers.push(checker);
+        self
     }
 
     pub fn uptime_seconds(&self) -> u64 {
@@ -97,6 +223,11 @@ impl HealthMonitor {
 
         // 8. Execution Worker
         components.push(self.check_execution_worker().await);
+
+        // 9+. Pluggable dynamic health checkers (Open/Closed Principle)
+        for checker in &self.checkers {
+            components.push(checker.check_health().await);
+        }
 
         // Calculate aggregate system status
         let has_unhealthy = components

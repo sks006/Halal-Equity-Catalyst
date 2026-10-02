@@ -144,7 +144,9 @@ impl Rule for MainnetExecutionAuthorityRule {
             .trim()
             .is_empty()
         {
-            return Err(ConfigError::MissingExpectedExecutionAuthority(c.environment));
+            return Err(ConfigError::MissingExpectedExecutionAuthority(
+                c.environment,
+            ));
         }
         Ok(())
     }

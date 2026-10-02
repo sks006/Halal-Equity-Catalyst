@@ -1,14 +1,24 @@
-//! Vault business logic service managing vault lifecycle, deposits, and withdrawals.
+use std::sync::Arc;
 
-use crate::{error::ApiError, models::VaultModel, repositories::VaultRepository};
+use crate::{
+    error::ApiError,
+    models::VaultModel,
+    repositories::{VaultRepository, VaultRepositoryTrait},
+};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct VaultService {
-    repo: VaultRepository,
+    repo: Arc<dyn VaultRepositoryTrait>,
 }
 
 impl VaultService {
     pub fn new(repo: VaultRepository) -> Self {
+        Self {
+            repo: Arc::new(repo),
+        }
+    }
+
+    pub fn new_with_repo(repo: Arc<dyn VaultRepositoryTrait>) -> Self {
         Self { repo }
     }
 

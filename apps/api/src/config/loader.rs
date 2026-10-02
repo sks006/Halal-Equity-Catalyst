@@ -50,8 +50,7 @@ fn overlay(src: &impl EnvSource, c: &mut super::Config) {
     // Pyth: rebuild from source so the whole sub-struct is one concern.
     c.pyth = PythConfig::from_source(src);
 
-    c.execution_signer_path =
-        src.get_or("EXECUTION_SIGNER_PATH", c.execution_signer_path.clone());
+    c.execution_signer_path = src.get_or("EXECUTION_SIGNER_PATH", c.execution_signer_path.clone());
 
     c.signer_backend = src
         .get_first(&["SIGNER_BACKEND", "EXECUTION_SIGNER_BACKEND"])
@@ -61,14 +60,14 @@ fn overlay(src: &impl EnvSource, c: &mut super::Config) {
         .get_first(&["EXPECTED_EXECUTION_AUTHORITY", "EXECUTION_AUTHORITY"])
         .or_else(|| c.expected_execution_authority.clone());
 
-    c.kms_key_id = src.get_nonempty("KMS_KEY_ID").or_else(|| c.kms_key_id.clone());
+    c.kms_key_id = src
+        .get_nonempty("KMS_KEY_ID")
+        .or_else(|| c.kms_key_id.clone());
     c.kms_endpoint = src
         .get_nonempty("KMS_ENDPOINT")
         .or_else(|| c.kms_endpoint.clone());
 
-    c.hsm_slot = src
-        .get_parsed("HSM_SLOT")
-        .or(c.hsm_slot);
+    c.hsm_slot = src.get_parsed("HSM_SLOT").or(c.hsm_slot);
 
     c.hsm_key_label = src
         .get_nonempty("HSM_KEY_LABEL")
@@ -78,9 +77,7 @@ fn overlay(src: &impl EnvSource, c: &mut super::Config) {
         .get_parsed("PREFLIGHT_SIMULATION_ENABLED")
         .unwrap_or(c.preflight_simulation_enabled);
 
-    c.read_only = src
-        .get_parsed("EXECUTION_READ_ONLY")
-        .unwrap_or(c.read_only);
+    c.read_only = src.get_parsed("EXECUTION_READ_ONLY").unwrap_or(c.read_only);
 
     c.max_trade_size_usd = src
         .get_parsed("MAX_TRADE_SIZE_USD")

@@ -1,8 +1,11 @@
-//! Data access repository for Portfolio position entities.
-
+use async_trait::async_trait;
 use deadpool_postgres::Pool;
 
-use crate::{error::ApiError, models::PortfolioModel};
+use crate::{
+    error::ApiError,
+    models::PortfolioModel,
+    repositories::traits::{PortfolioReader, PortfolioWriter},
+};
 
 #[derive(Clone, Debug)]
 pub struct PortfolioRepository {
@@ -82,5 +85,19 @@ impl PortfolioRepository {
             })?;
 
         Ok(rows.iter().map(PortfolioModel::from).collect())
+    }
+}
+
+#[async_trait]
+impl PortfolioReader for PortfolioRepository {
+    async fn list_by_vault(&self, vault_address: &str) -> Result<Vec<PortfolioModel>, ApiError> {
+        self.list_by_vault(vault_address).await
+    }
+}
+
+#[async_trait]
+impl PortfolioWriter for PortfolioRepository {
+    async fn upsert_position(&self, pos: &PortfolioModel) -> Result<PortfolioModel, ApiError> {
+        self.upsert_position(pos).await
     }
 }

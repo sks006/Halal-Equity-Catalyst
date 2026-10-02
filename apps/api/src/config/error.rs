@@ -8,7 +8,9 @@ pub enum ConfigError {
     #[error("Missing required administrative API key in {0} environment")]
     MissingAdminApiKey(Environment),
 
-    #[error("Development/test admin secret '{0}' cannot be used in production Mainnet environment")]
+    #[error(
+        "Development/test admin secret '{0}' cannot be used in production Mainnet environment"
+    )]
     DevSecretInProduction(String),
 
     #[error("Production Mainnet cannot point to local/localhost RPC endpoint: '{0}'")]

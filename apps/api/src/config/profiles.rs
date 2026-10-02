@@ -36,9 +36,7 @@ pub fn testnet() -> Config {
         api_host: "0.0.0.0".into(),
         api_port: 4000,
         solana_rpc_url: "https://api.devnet.solana.com".into(),
-        solana_fallback_rpc_urls: vec![
-            "https://devnet.helius-rpc.com/?api-key=public".into(),
-        ],
+        solana_fallback_rpc_urls: vec!["https://devnet.helius-rpc.com/?api-key=public".into()],
         solana_rpc_timeout_ms: 15_000,
         solana_ws_url: "wss://api.devnet.solana.com".into(),
         solana_cluster: "devnet".into(),

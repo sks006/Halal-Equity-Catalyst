@@ -1,21 +1,20 @@
-//! Router configuration and middleware pipeline.
+//! Router configuration.
+//!
+//! Conforms to Single Responsibility Principle (SRP):
+//! Responsible solely for declaring endpoint paths, HTTP method bindings,
+//! and 404 fallback routing. Contains NO middleware or transport layers.
+//!
+//! Middleware pipeline application is decoupled and managed by `crate::pipeline`.
 
 use axum::{
-    extract::DefaultBodyLimit,
     http::Uri,
-    middleware::from_fn_with_state,
     routing::{get, post},
     Router,
 };
 use std::sync::Arc;
-use tower_http::{
-    cors::{Any, CorsLayer},
-    trace::TraceLayer,
-};
 
 use crate::{
     error::ApiError,
-    middleware::{rate_limit_middleware, require_admin_auth},
     routes::{
         compare_dbc_handler, configure_dbc_handler, create_event_handler,
         create_or_update_policy_handler, create_vault_handler, detailed_health_handler,
@@ -29,14 +28,9 @@ use crate::{
     state::AppState,
 };
 
-pub fn create_router(state: Arc<AppState>) -> Router {
-    let cors = CorsLayer::new()
-        .allow_origin(Any)
-        .allow_methods(Any)
-        .allow_headers(Any);
-
-    // Administrative / State-mutating routes protected by require_admin_auth
-    let admin_routes = Router::new()
+/// Configures administrative and state-mutating endpoints (pure route definitions).
+pub fn admin_routes() -> Router<Arc<AppState>> {
+    Router::new()
         .route("/dbc/configure", post(configure_dbc_handler))
         .route("/dbc/pools", post(record_dbc_pool_handler))
         .route("/vaults", post(create_vault_handler))
@@ -46,10 +40,11 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         )
         .route("/policies", post(create_or_update_policy_handler))
         .route("/events", post(create_event_handler))
-        .route_layer(from_fn_with_state(state.clone(), require_admin_auth));
+}
 
-    // Public & query routes
-    let public_routes = Router::new()
+/// Configures public read-only and simulation endpoints (pure route definitions).
+pub fn public_routes() -> Router<Arc<AppState>> {
+    Router::new()
         .route("/health", get(health_handler))
         .route("/health/detailed", get(detailed_health_handler))
         .route("/health/monitor", get(detailed_health_handler))
@@ -76,19 +71,15 @@ pub fn create_router(state: Arc<AppState>) -> Router {
         .route(
             "/vaults/:address/executions",
             get(list_vault_executions_handler),
-        );
-
-    Router::new()
-        .merge(public_routes)
-        .merge(admin_routes)
-        .fallback(fallback_handler)
-        .layer(DefaultBodyLimit::max(1024 * 1024))
-        .layer(from_fn_with_state(state.clone(), rate_limit_middleware))
-        .layer(TraceLayer::new_for_http())
-        .layer(cors)
-        .with_state(state)
+        )
 }
 
-async fn fallback_handler(uri: Uri) -> ApiError {
+/// Fallback 404 handler for undefined endpoints.
+pub async fn fallback_handler(uri: Uri) -> ApiError {
     ApiError::NotFound(format!("Route not found: {}", uri.path()))
+}
+
+/// Re-export create_router for backwards compatibility by delegating to the middleware pipeline.
+pub fn create_router(state: Arc<AppState>) -> Router {
+    crate::pipeline::build_router(state)
 }

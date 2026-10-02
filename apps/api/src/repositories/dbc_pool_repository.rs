@@ -1,10 +1,10 @@
-//! Data access repository for DBC Pool entities.
-
+use async_trait::async_trait;
 use deadpool_postgres::Pool;
 
 use crate::{
     error::ApiError,
     models::dbc_pool::{CreateDbcPoolRequest, DbcPoolModel},
+    repositories::traits::{DbcPoolReader, DbcPoolWriter},
 };
 
 #[derive(Clone, Debug)]
@@ -133,5 +133,23 @@ impl DbcPoolRepository {
             .map_err(|e| ApiError::InternalServerError(format!("Failed to update dbc pool telemetry: {}", e)))?;
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl DbcPoolReader for DbcPoolRepository {
+    async fn list_all(&self) -> Result<Vec<DbcPoolModel>, ApiError> {
+        self.list_all().await
+    }
+
+    async fn find_by_pool_address(&self, address: &str) -> Result<Option<DbcPoolModel>, ApiError> {
+        self.find_by_pool_address(address).await
+    }
+}
+
+#[async_trait]
+impl DbcPoolWriter for DbcPoolRepository {
+    async fn create(&self, pool: &CreateDbcPoolRequest) -> Result<DbcPoolModel, ApiError> {
+        self.create(pool).await
     }
 }

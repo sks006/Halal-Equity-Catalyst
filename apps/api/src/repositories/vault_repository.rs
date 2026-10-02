@@ -1,8 +1,11 @@
-//! Data access repository for Vault entities.
-
+use async_trait::async_trait;
 use deadpool_postgres::Pool;
 
-use crate::{error::ApiError, models::VaultModel};
+use crate::{
+    error::ApiError,
+    models::VaultModel,
+    repositories::traits::{VaultReader, VaultWriter},
+};
 
 #[derive(Clone, Debug)]
 pub struct VaultRepository {
@@ -124,5 +127,37 @@ impl VaultRepository {
             })?;
 
         Ok(())
+    }
+}
+
+#[async_trait]
+impl VaultReader for VaultRepository {
+    async fn find_by_address(&self, address: &str) -> Result<Option<VaultModel>, ApiError> {
+        self.find_by_address(address).await
+    }
+
+    async fn list_all(&self) -> Result<Vec<VaultModel>, ApiError> {
+        self.list_all().await
+    }
+}
+
+#[async_trait]
+impl VaultWriter for VaultRepository {
+    async fn create(&self, vault: &VaultModel) -> Result<VaultModel, ApiError> {
+        self.create(vault).await
+    }
+
+    async fn update_totals(
+        &self,
+        address: &str,
+        total_shares: u64,
+        total_deposits: u64,
+    ) -> Result<(), ApiError> {
+        self.update_totals(address, total_shares, total_deposits)
+            .await
+    }
+
+    async fn set_paused(&self, address: &str, is_paused: bool) -> Result<(), ApiError> {
+        self.set_paused(address, is_paused).await
     }
 }

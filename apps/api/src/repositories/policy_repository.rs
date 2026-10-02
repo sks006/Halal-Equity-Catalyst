@@ -1,8 +1,11 @@
-//! Data access repository for Policy entities.
-
+use async_trait::async_trait;
 use deadpool_postgres::Pool;
 
-use crate::{error::ApiError, models::PolicyModel};
+use crate::{
+    error::ApiError,
+    models::PolicyModel,
+    repositories::traits::{PolicyReader, PolicyWriter},
+};
 
 #[derive(Clone, Debug)]
 pub struct PolicyRepository {
@@ -94,5 +97,23 @@ impl PolicyRepository {
             })?;
 
         Ok(rows.iter().map(PolicyModel::from).collect())
+    }
+}
+
+#[async_trait]
+impl PolicyReader for PolicyRepository {
+    async fn find_by_vault(&self, vault_address: &str) -> Result<Option<PolicyModel>, ApiError> {
+        self.find_by_vault(vault_address).await
+    }
+
+    async fn list_all(&self) -> Result<Vec<PolicyModel>, ApiError> {
+        self.list_all().await
+    }
+}
+
+#[async_trait]
+impl PolicyWriter for PolicyRepository {
+    async fn upsert(&self, policy: &PolicyModel) -> Result<PolicyModel, ApiError> {
+        self.upsert(policy).await
     }
 }
