@@ -208,15 +208,21 @@ export class ApiClient {
   private readonly baseUrl: string;
 
   constructor(baseUrl?: string) {
-    const defaultUrl =
-      process.env.NEXT_PUBLIC_API_URL ??
-      (process.env.NODE_ENV === "production"
-        ? "https://halal-equity-catalyst.onrender.com"
-        : "http://127.0.0.1:4000");
-    this.baseUrl = (baseUrl || defaultUrl).replace(
-      /\/+$/,
-      ""
-    );
+    let defaultUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (typeof window !== "undefined") {
+      const isLocalHost =
+        window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      if (isLocalHost && (!defaultUrl || defaultUrl.includes("onrender.com"))) {
+        defaultUrl = "http://127.0.0.1:4000";
+      }
+    }
+    if (!defaultUrl) {
+      defaultUrl =
+        process.env.NODE_ENV === "production"
+          ? "https://halal-equity-catalyst.onrender.com"
+          : "http://127.0.0.1:4000";
+    }
+    this.baseUrl = (baseUrl || defaultUrl).replace(/\/+$/, "");
   }
 
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
@@ -232,6 +238,29 @@ export class ApiClient {
       });
 
       if (!resp.ok) {
+        if (
+          typeof window !== "undefined" &&
+          (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+          !url.includes("127.0.0.1") &&
+          !url.includes("localhost")
+        ) {
+          try {
+            const fallback = await fetch(`http://127.0.0.1:4000${endpoint}`, {
+              ...options,
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+                ...options?.headers,
+              },
+            });
+            if (fallback.ok) {
+              return (await fallback.json()) as T;
+            }
+          } catch {
+            // ignore fallback error
+          }
+        }
+
         let errorMsg = resp.statusText;
         try {
           const errJson = await resp.json();
@@ -244,6 +273,29 @@ export class ApiClient {
 
       return (await resp.json()) as T;
     } catch (err) {
+      if (
+        typeof window !== "undefined" &&
+        (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") &&
+        !url.includes("127.0.0.1") &&
+        !url.includes("localhost")
+      ) {
+        try {
+          const fallback = await fetch(`http://127.0.0.1:4000${endpoint}`, {
+            ...options,
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              ...options?.headers,
+            },
+          });
+          if (fallback.ok) {
+            return (await fallback.json()) as T;
+          }
+        } catch {
+          // ignore fallback error
+        }
+      }
+
       if (err instanceof ApiClientError) {
         throw err;
       }
