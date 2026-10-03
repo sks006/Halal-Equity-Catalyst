@@ -74,7 +74,14 @@ impl Config {
 
     /// Reads config from the process environment.
     pub fn from_env() -> Self {
-        let _ = dotenvy::dotenv();
+        if dotenvy::dotenv().is_err() {
+            let env_name = std::env::var("APP_ENV")
+                .or_else(|_| std::env::var("EQUITY_ENV"))
+                .unwrap_or_else(|_| "testnet".to_string());
+            let _ = dotenvy::from_filename(format!(".env.{}", env_name))
+                .or_else(|_| dotenvy::from_filename(".env.testnet"))
+                .or_else(|_| dotenvy::from_filename(".env.development"));
+        }
         loader::from_source(&ProcessEnv)
     }
 

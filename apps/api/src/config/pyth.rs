@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use super::source::EnvSource;
 
 const DEFAULT_HERMES_URL: &str = "https://hermes.pyth.network";
+const DEFAULT_PYTH_API_KEY: &str = "EN3nRKiYpkeAuE78ZxrvSPXzZVxF9Ps7sc3V7zgj5tMW";
 
 /// Pyth / Hermes credentials.
 ///
@@ -31,7 +32,7 @@ impl Default for PythConfig {
     fn default() -> Self {
         Self {
             hermes_url: DEFAULT_HERMES_URL.to_string(),
-            api_key: None,
+            api_key: Some(DEFAULT_PYTH_API_KEY.to_string()),
         }
     }
 }
@@ -42,7 +43,9 @@ impl PythConfig {
             hermes_url: src
                 .get_nonempty("PYTH_HERMES_URL")
                 .unwrap_or_else(|| DEFAULT_HERMES_URL.to_string()),
-            api_key: src.get_nonempty("PYTH_API_KEY"),
+            api_key: src
+                .get_nonempty("PYTH_API_KEY")
+                .or_else(|| Some(DEFAULT_PYTH_API_KEY.to_string())),
         }
     }
 
