@@ -125,9 +125,12 @@ export default function MarketsPage() {
     const symbols = ["NVDA", "AAPL", "MSFT", "TSLA", "SPYx"];
 
     return symbols.map((sym) => {
-      const priceObj = marketPrices[sym];
-      const verified = verifiedAssets.find((a) => a.symbol === sym);
-      const pool = dbcPools.find((p) => p.token_symbol === sym);
+      const priceObj =
+        marketPrices[sym] ??
+        marketPrices[`${sym}x`] ??
+        marketPrices[sym.replace(/x$/i, "")];
+      const verified = verifiedAssets.find((a) => a.symbol === sym || a.symbol === `${sym}x`);
+      const pool = dbcPools.find((p) => p.token_symbol === sym || p.token_symbol === `${sym}x`);
 
       const hasPrice = Boolean(priceObj && !priceObj.is_stale);
 

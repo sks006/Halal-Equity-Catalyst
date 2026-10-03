@@ -203,6 +203,7 @@ export class ApiClientError extends Error {
   }
 }
 
+
 export class ApiClient {
   private readonly baseUrl: string;
 
@@ -276,10 +277,11 @@ export class ApiClient {
           const p = await this.getOraclePrice(s);
           results[s] = p;
         } catch {
-          // Allow partial price feed degradation gracefully
+          // Allow partial price feed degradation gracefully if an asset is temporarily offline
         }
       })
     );
+
     return results;
   }
 

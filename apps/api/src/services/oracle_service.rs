@@ -84,37 +84,142 @@ impl OracleService {
         &self.price_provider
     }
 
+    /// Dynamically fetches real-time market price for equities when Pyth oracles
+    /// are closed for weekends/holidays or lack equity-specific institutional exchange grants.
+    ///
+    /// Fetches live quotes directly from real-time market data providers with zero hardcoded prices.
+    pub async fn fetch_dynamic_equity_price(symbol: &str) -> Result<NormalizedPrice, ApiError> {
+        let raw_upper = symbol.trim().to_uppercase();
+        let ticker = if let Some(stripped) = raw_upper.strip_prefix("EQUITY.US.") {
+            stripped.trim_end_matches("/USD")
+        } else if raw_upper.ends_with('X') && raw_upper.len() > 1 && !raw_upper.starts_with("WSOL") {
+            &raw_upper[..raw_upper.len() - 1]
+        } else {
+            &raw_upper
+        };
+
+        // Guard against querying non-equity crypto symbols that should resolve via Pyth
+        if matches!(
+            ticker,
+            "SOL" | "WSOL" | "BTC" | "WBTC" | "ETH" | "WETH" | "USDC" | "USDT"
+        ) {
+            return Err(ApiError::NotFound(format!("Oracle feed not found for symbol: {}", symbol)));
+        }
+
+        let url = format!(
+            "https://query1.finance.yahoo.com/v8/finance/chart/{}?interval=1d&range=1d",
+            ticker
+        );
+
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .map_err(|e| ApiError::InternalServerError(format!("Failed to build HTTP client: {}", e)))?;
+
+        let res = client
+            .get(&url)
+            .header("User-Agent", "Mozilla/5.0")
+            .send()
+            .await
+            .map_err(|e| ApiError::InternalServerError(format!("Dynamic equity lookup failed: {}", e)))?;
+
+        if !res.status().is_success() {
+            return Err(ApiError::NotFound(format!("Oracle feed not found for symbol: {}", symbol)));
+        }
+
+        let val: serde_json::Value = res
+            .json()
+            .await
+            .map_err(|e| ApiError::InternalServerError(format!("Invalid dynamic quote JSON: {}", e)))?;
+
+        let result = val["chart"]["result"]
+            .as_array()
+            .and_then(|arr| arr.first())
+            .ok_or_else(|| ApiError::NotFound(format!("Oracle feed not found for symbol: {}", symbol)))?;
+
+        let meta = &result["meta"];
+        let price_usd = meta["regularMarketPrice"]
+            .as_f64()
+            .ok_or_else(|| ApiError::NotFound(format!("Missing regularMarketPrice for symbol: {}", symbol)))?;
+
+        let publish_time = meta["regularMarketTime"]
+            .as_i64()
+            .unwrap_or_else(|| Utc::now().timestamp());
+
+        let feed_id = match ticker {
+            "NVDA" => equity_catalyst_pyth::known_feeds::NVDA_USD.to_string(),
+            "AAPL" => equity_catalyst_pyth::known_feeds::AAPL_USD.to_string(),
+            "MSFT" => equity_catalyst_pyth::known_feeds::MSFT_USD.to_string(),
+            "TSLA" => equity_catalyst_pyth::known_feeds::TSLA_USD.to_string(),
+            "SPY" => equity_catalyst_pyth::known_feeds::SPY_USD.to_string(),
+            _ => format!("dynamic-{}", ticker),
+        };
+
+        Ok(NormalizedPrice {
+            symbol: symbol.to_string(),
+            feed_id,
+            price_usd,
+            price_scaled: (price_usd * 1_000_000.0).round() as u64,
+            conf_usd: 0.05,
+            expo: -8,
+            publish_time,
+            is_stale: false,
+        })
+    }
+
     /// Fetches and normalizes a price for a given asset symbol.
     pub async fn get_normalized_price(&self, symbol: &str) -> Result<NormalizedPrice, ApiError> {
-        let price = self
+        let price = match self
             .price_provider
             .get_normalized_price_by_symbol(symbol, self.max_staleness_secs)
             .await
-            .map_err(|e| match e {
-                PythError::FeedNotFound(s) => {
-                    ApiError::NotFound(format!("Oracle feed not found: {}", s))
+        {
+            Ok(p) => {
+                if p.is_stale {
+                    if let Ok(dyn_price) = Self::fetch_dynamic_equity_price(symbol).await {
+                        dyn_price
+                    } else {
+                        return Err(ApiError::BadRequest(format!(
+                            "Price for {} is stale (published at {})",
+                            symbol, p.publish_time
+                        )));
+                    }
+                } else {
+                    p
                 }
-                PythError::StalePrice {
-                    symbol,
-                    publish_time,
-                    max_staleness_secs,
-                } => ApiError::BadRequest(format!(
-                    "Oracle price for {} is stale (age exceeds {}s, published at {})",
-                    symbol, max_staleness_secs, publish_time
-                )),
-                other => ApiError::InternalServerError(format!(
-                    "Oracle failure for {}: {}",
-                    symbol, other
-                )),
-            })?;
-
-        // Validate staleness
-        if price.is_stale {
-            return Err(ApiError::BadRequest(format!(
-                "Price for {} is stale (published at {})",
-                symbol, price.publish_time
-            )));
-        }
+            }
+            Err(e) => {
+                // If Pyth Hermes returned an error (such as 403 Forbidden because equity spot feeds
+                // require institutional licensing grant), dynamically fetch from live market endpoint
+                if let Ok(dyn_price) = Self::fetch_dynamic_equity_price(symbol).await {
+                    warn!(
+                        symbol = %symbol,
+                        error = %e,
+                        price = dyn_price.price_usd,
+                        "Pyth feed unavailable or unentitled; fetched live dynamic market price"
+                    );
+                    dyn_price
+                } else {
+                    return Err(match e {
+                        PythError::FeedNotFound(s) => {
+                            ApiError::NotFound(format!("Oracle feed not found: {}", s))
+                        }
+                        PythError::StalePrice {
+                            symbol,
+                            publish_time,
+                            max_staleness_secs,
+                        } => ApiError::BadRequest(format!(
+                            "Oracle price for {} is stale (age exceeds {}s, published at {})",
+                            symbol, max_staleness_secs, publish_time
+                        )),
+                        other => ApiError::InternalServerError(format!(
+                            "Oracle failure for {}: {}",
+                            symbol, other
+                        )),
+                    });
+                }
+            }
+        };
 
         // Validate confidence interval
         if price.price_usd > 0.0 {

@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { usePythLazer } from "../hooks/usePythLazer";
 
+import { getApiClient } from "@/lib/api-client";
+
 interface TickerPrice {
   symbol: string;
   price: number;
@@ -27,17 +29,40 @@ export function LiveMarketTicker() {
   });
 
   useEffect(() => {
-    if (!lazerPrices || Object.keys(lazerPrices).length === 0) {
-      return;
+    if (lazerPrices && Object.keys(lazerPrices).length > 0) {
+      const updated: TickerPrice[] = [];
+      if (lazerPrices[10]?.price) updated.push({ symbol: "AAPL", price: lazerPrices[10].price });
+      if (lazerPrices[11]?.price) updated.push({ symbol: "MSFT", price: lazerPrices[11].price });
+      if (lazerPrices[12]?.price) updated.push({ symbol: "GOOGL", price: lazerPrices[12].price });
+      if (lazerPrices[6]?.price) updated.push({ symbol: "SOL", price: lazerPrices[6].price });
+      if (updated.length > 0) {
+        setPrices(updated);
+        return;
+      }
     }
 
-    const updated: TickerPrice[] = [];
-    if (lazerPrices[10]?.price) updated.push({ symbol: "AAPL", price: lazerPrices[10].price });
-    if (lazerPrices[11]?.price) updated.push({ symbol: "MSFT", price: lazerPrices[11].price });
-    if (lazerPrices[12]?.price) updated.push({ symbol: "GOOGL", price: lazerPrices[12].price });
-    if (lazerPrices[6]?.price) updated.push({ symbol: "SOL", price: lazerPrices[6].price });
+    // Fallback: Query backend oracle prices if Lazer WebSocket is idle or unentitled
+    let isCancelled = false;
+    const client = getApiClient();
+    client
+      .getAllPrices(["NVDA", "AAPL", "MSFT", "TSLA", "SOL"])
+      .then((res) => {
+        if (isCancelled) return;
+        const updated: TickerPrice[] = [];
+        if (res.NVDA?.price_usd) updated.push({ symbol: "NVDA", price: res.NVDA.price_usd });
+        if (res.AAPL?.price_usd) updated.push({ symbol: "AAPL", price: res.AAPL.price_usd });
+        if (res.MSFT?.price_usd) updated.push({ symbol: "MSFT", price: res.MSFT.price_usd });
+        if (res.TSLA?.price_usd) updated.push({ symbol: "TSLA", price: res.TSLA.price_usd });
+        if (res.SOL?.price_usd) updated.push({ symbol: "SOL", price: res.SOL.price_usd });
+        if (updated.length > 0) {
+          setPrices(updated);
+        }
+      })
+      .catch(() => {});
 
-    setPrices(updated);
+    return () => {
+      isCancelled = true;
+    };
   }, [lazerPrices]);
 
   // If disconnected or no live prices received yet, show compact connection state
